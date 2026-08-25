@@ -1,0 +1,174 @@
+{
+  "start_room_id": "loc.square",
+  "rooms": {
+    "loc.square": {
+      "id": "loc.square",
+      "name": "Village Square",
+      "description": "A quiet square with a stone fountain at its center.",
+      "exits": {
+        "east": "loc.market",
+        "south": "loc.tavern"
+      }
+    },
+    "loc.market": {
+      "id": "loc.market",
+      "name": "Market Street",
+      "description": "Small stalls line a street filled with the smell of fresh bread.",
+      "exits": {
+        "west": "loc.square",
+        "east": "loc.garden"
+      }
+    },
+    "loc.garden": {
+      "id": "loc.garden",
+      "name": "Herb Garden",
+      "description": "Medicinal plants grow between neat rows of stones.",
+      "exits": {
+        "west": "loc.market",
+        "south": "loc.river"
+      }
+    },
+    "loc.river": {
+      "id": "loc.river",
+      "name": "Riverbank",
+      "description": "A narrow path follows the clear water downstream.",
+      "exits": {
+        "north": "loc.garden",
+        "south": "loc.bridge"
+      }
+    },
+    "loc.bridge": {
+      "id": "loc.bridge",
+      "name": "Old Bridge",
+      "description": "Weathered planks cross the river above smooth gray rocks.",
+      "exits": {
+        "north": "loc.river",
+        "west": "loc.forest"
+      }
+    },
+    "loc.forest": {
+      "id": "loc.forest",
+      "name": "Forest Trail",
+      "description": "Tall trees shade a trail that splits near a rocky slope.",
+      "exits": {
+        "east": "loc.bridge",
+        "west": "loc.ruins",
+        "south": "loc.cave"
+      }
+    },
+    "loc.ruins": {
+      "id": "loc.ruins",
+      "name": "Old Ruins",
+      "description": "Broken walls mark the remains of a forgotten watchtower.",
+      "exits": {
+        "east": "loc.forest",
+        "north": "loc.tavern"
+      }
+    },
+    "loc.tavern": {
+      "id": "loc.tavern",
+      "name": "Village Tavern",
+      "description": "A warm fire burns beside a row of wooden tables.",
+      "exits": {
+        "north": "loc.square",
+        "south": "loc.ruins"
+      }
+    },
+    "loc.cave": {
+      "id": "loc.cave",
+      "name": "Rocky Cave",
+      "description": "Cold air drifts from a dark cave beneath the forest.",
+      "exits": {
+        "north": "loc.forest"
+      }
+    }
+  },
+  "items": {
+    "item.herbs": {
+      "name": "Healing Herbs",
+      "description": "A bundle of fragrant medicinal leaves.",
+      "room_id": "loc.garden",
+      "obtainable": true
+    },
+    "item.key": {
+      "name": "Rusty Key",
+      "description": "An old iron key found among the stones.",
+      "room_id": "loc.ruins",
+      "obtainable": true
+    },
+    "item.ale": {
+      "name": "Frothy Ale",
+      "description": "A mug of ale served at the tavern.",
+      "room_id": "loc.tavern",
+      "obtainable": true
+    },
+    "item.map": {
+      "name": "Worn Map",
+      "description": "A faded sketch of the nearby trails.",
+      "room_id": "loc.bridge",
+      "obtainable": true
+    }
+  },
+  "npcs": {
+    "npc.guard": {
+      "name": "Village Guard",
+      "description": "A guard keeping watch beside the fountain.",
+      "role": "dialogue",
+      "room_id": "loc.square",
+      "hp": 20,
+      "dialogue": ["Welcome to the village. Stay on the marked paths."]
+    },
+    "npc.merchant": {
+      "name": "Market Merchant",
+      "description": "A merchant sorting jars behind a stall.",
+      "role": "quest_giver",
+      "room_id": "loc.market",
+      "hp": 15,
+      "dialogue": ["I could use some herbs from the garden."]
+    },
+    "npc.ranger": {
+      "name": "Forest Ranger",
+      "description": "A ranger watching the path toward the cave.",
+      "role": "quest_giver",
+      "room_id": "loc.forest",
+      "hp": 30,
+      "dialogue": ["A goblin has been hiding in the cave."]
+    },
+    "npc.goblin": {
+      "name": "Cave Goblin",
+      "description": "A goblin guarding a pile of loose stones.",
+      "role": "enemy",
+      "room_id": "loc.cave",
+      "hp": 35,
+      "dialogue": ["Get out of my cave!"]
+    }
+  },
+  "quests": {
+    "quest.herbs": {
+      "name": "Herbs for the Merchant",
+      "description": "Bring the merchant the herbs from the garden.",
+      "giver_npc_id": "npc.merchant",
+      "objective": {
+        "type": "collect_item",
+        "target_id": "item.herbs",
+        "count": 1
+      },
+      "reward": {
+        "hp": 10
+      }
+    },
+    "quest.goblin": {
+      "name": "Clear the Cave",
+      "description": "Defeat the goblin in the cave.",
+      "giver_npc_id": "npc.ranger",
+      "objective": {
+        "type": "defeat_npc",
+        "target_id": "npc.goblin",
+        "count": 1
+      },
+      "reward": {
+        "hp": 20
+      }
+    }
+  }
+}
