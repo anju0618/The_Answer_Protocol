@@ -9,7 +9,7 @@ import (
 func main() {
 	server := NewServer()
 
-	listener, err := net.Listen("tcp", "127.0.0.1:4242")
+	listener, err := net.Listen("tcp", ":4242")
 	if err != nil {
 		log.Fatal(err)
 	}

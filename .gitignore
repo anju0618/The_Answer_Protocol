@@ -1,4 +1,6 @@
 *.pdf
 en.subject.txt
 protocol-rfc.html
+rfc.tar.gz
 /saves/*
+/server
