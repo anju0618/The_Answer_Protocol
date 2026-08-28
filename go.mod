@@ -1,3 +1,3 @@
 module github.com/anju0618/The_Answer_Protocol
 
-go 1.27.0
+go 1.25.0
