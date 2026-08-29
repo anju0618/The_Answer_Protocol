@@ -1,174 +1,390 @@
 {
-  "start_room_id": "loc.square",
+  "start_room_id": "loc.hall_of_fates",
   "rooms": {
-    "loc.square": {
-      "id": "loc.square",
-      "name": "Village Square",
-      "description": "A quiet square with a stone fountain at its center.",
+    "loc.hall_of_fates": {
+      "id": "loc.hall_of_fates",
+      "name": "Hall of the Fates",
+      "description": "Outside time itself, the three Moirai spin, measure, and cut the thread of every hero's life. Three great tapestries hang before you, each depicting a different age of heroes.",
       "exits": {
-        "east": "loc.market",
-        "south": "loc.tavern"
+        "west": "loc.argo_iolcus",
+        "north": "loc.troy_ida",
+        "east": "loc.ody_troy_shore"
       }
     },
-    "loc.market": {
-      "id": "loc.market",
-      "name": "Market Street",
-      "description": "Small stalls line a street filled with the smell of fresh bread.",
-      "exits": {
-        "west": "loc.square",
-        "east": "loc.garden"
-      }
+
+    "loc.argo_iolcus": {
+      "id": "loc.argo_iolcus",
+      "name": "Harbor of Iolcus",
+      "description": "The Argo strains at her moorings, fifty oars shipped and ready. King Pelias watches from the cliff above, having sent Jason after the Golden Fleece hoping he would never return.",
+      "exits": { "east": "loc.hall_of_fates", "north": "loc.argo_lemnos", "south": "loc.argo_bebrycia" }
     },
-    "loc.garden": {
-      "id": "loc.garden",
-      "name": "Herb Garden",
-      "description": "Medicinal plants grow between neat rows of stones.",
-      "exits": {
-        "west": "loc.market",
-        "south": "loc.river"
-      }
+    "loc.argo_lemnos": {
+      "id": "loc.argo_lemnos",
+      "name": "Island of Lemnos",
+      "description": "An island of women alone, ruled by Queen Hypsipyle since they rose up against their husbands. The Argonauts have lingered here far longer than the winds allow.",
+      "exits": { "south": "loc.argo_iolcus" }
     },
-    "loc.river": {
-      "id": "loc.river",
-      "name": "Riverbank",
-      "description": "A narrow path follows the clear water downstream.",
-      "exits": {
-        "north": "loc.garden",
-        "south": "loc.bridge"
-      }
+    "loc.argo_bebrycia": {
+      "id": "loc.argo_bebrycia",
+      "name": "Shore of the Bebrycians",
+      "description": "King Amycus, proud of his skill with the boxer's leather straps, blocks every crew that lands until their best fighter has faced him.",
+      "exits": { "north": "loc.argo_iolcus", "east": "loc.argo_salmydessus" }
     },
-    "loc.bridge": {
-      "id": "loc.bridge",
-      "name": "Old Bridge",
-      "description": "Weathered planks cross the river above smooth gray rocks.",
-      "exits": {
-        "north": "loc.river",
-        "west": "loc.forest"
-      }
+    "loc.argo_salmydessus": {
+      "id": "loc.argo_salmydessus",
+      "name": "Salmydessus, Coast of Thrace",
+      "description": "The blind seer Phineus sits at a table of rotting food, tormented daily by Harpies who swoop down to foul his meals as punishment from the gods.",
+      "exits": { "west": "loc.argo_bebrycia", "east": "loc.argo_symplegades" }
     },
-    "loc.forest": {
-      "id": "loc.forest",
-      "name": "Forest Trail",
-      "description": "Tall trees shade a trail that splits near a rocky slope.",
-      "exits": {
-        "east": "loc.bridge",
-        "west": "loc.ruins",
-        "south": "loc.cave"
-      }
+    "loc.argo_symplegades": {
+      "id": "loc.argo_symplegades",
+      "name": "The Clashing Rocks",
+      "description": "The Symplegades grind together at the mouth of the Bosphorus, crushing any ship that dares the passage. Phineus's advice was to release a dove first, and follow if she survives.",
+      "exits": { "west": "loc.argo_salmydessus", "east": "loc.argo_colchis_shore" }
     },
-    "loc.ruins": {
-      "id": "loc.ruins",
-      "name": "Old Ruins",
-      "description": "Broken walls mark the remains of a forgotten watchtower.",
-      "exits": {
-        "east": "loc.forest",
-        "north": "loc.tavern"
-      }
+    "loc.argo_colchis_shore": {
+      "id": "loc.argo_colchis_shore",
+      "name": "Mouth of the River Phasis",
+      "description": "The Argo has reached Colchis at last, at the far eastern edge of the known sea, beneath the shadow of the Caucasus mountains.",
+      "exits": { "west": "loc.argo_symplegades", "north": "loc.argo_court_aeetes" }
     },
-    "loc.tavern": {
-      "id": "loc.tavern",
-      "name": "Village Tavern",
-      "description": "A warm fire burns beside a row of wooden tables.",
-      "exits": {
-        "north": "loc.square",
-        "south": "loc.ruins"
-      }
+    "loc.argo_court_aeetes": {
+      "id": "loc.argo_court_aeetes",
+      "name": "Court of King Aeetes",
+      "description": "King Aeetes, son of the sun god Helios, receives the Argonauts with cold courtesy and a challenge he is certain no mortal can survive.",
+      "exits": { "south": "loc.argo_colchis_shore", "east": "loc.argo_bull_field" }
     },
-    "loc.cave": {
-      "id": "loc.cave",
-      "name": "Rocky Cave",
-      "description": "Cold air drifts from a dark cave beneath the forest.",
-      "exits": {
-        "north": "loc.forest"
-      }
+    "loc.argo_bull_field": {
+      "id": "loc.argo_bull_field",
+      "name": "Field of the Bronze Bulls",
+      "description": "Two fire-breathing bulls with hooves of bronze must be yoked and set to plow this field, and the dragon's teeth sown in its furrows will rise as armed warriors before nightfall.",
+      "exits": { "west": "loc.argo_court_aeetes", "north": "loc.argo_grove" }
+    },
+    "loc.argo_grove": {
+      "id": "loc.argo_grove",
+      "name": "Sacred Grove of Ares",
+      "description": "An ancient oak stands at the grove's heart, the Golden Fleece draped over its lowest branch, coiled about by a serpent that has never once closed its eyes.",
+      "exits": { "south": "loc.argo_bull_field", "east": "loc.argo_flight" }
+    },
+    "loc.argo_flight": {
+      "id": "loc.argo_flight",
+      "name": "Flight from Colchis",
+      "description": "The Argo runs before the wind with the Fleece aboard, King Aeetes's warships closing fast behind, led by his own son.",
+      "exits": { "west": "loc.argo_grove", "north": "loc.argo_return_sea" }
+    },
+    "loc.argo_return_sea": {
+      "id": "loc.argo_return_sea",
+      "name": "The Long Way Home",
+      "description": "Driven far from the direct route by an angry Zeus, the Argo threads unfamiliar seas, guided at times by the sea-nymph Thetis herself.",
+      "exits": { "south": "loc.argo_flight", "east": "loc.argo_crete" }
+    },
+    "loc.argo_crete": {
+      "id": "loc.argo_crete",
+      "name": "Shore of Crete",
+      "description": "Talos, the bronze giant forged by Hephaestus, strides the beach hurling boulders at any ship that nears the island he was set to guard.",
+      "exits": { "west": "loc.argo_return_sea", "north": "loc.argo_iolcus" }
+    },
+
+    "loc.troy_ida": {
+      "id": "loc.troy_ida",
+      "name": "Slopes of Mount Ida",
+      "description": "Here the shepherd-prince Paris judged which goddess was fairest, and Aphrodite's promised reward — the most beautiful woman alive — set the whole war in motion.",
+      "exits": { "south": "loc.hall_of_fates", "east": "loc.troy_sparta" }
+    },
+    "loc.troy_sparta": {
+      "id": "loc.troy_sparta",
+      "name": "Palace of Sparta",
+      "description": "King Menelaus's halls stand strangely quiet. His wife Helen sailed for Troy with a guest he had welcomed under his own roof.",
+      "exits": { "west": "loc.troy_ida", "east": "loc.troy_aulis" }
+    },
+    "loc.troy_aulis": {
+      "id": "loc.troy_aulis",
+      "name": "Harbor of Aulis",
+      "description": "A thousand ships sit becalmed, waiting on winds that will not turn until the seer Calchas is satisfied that the goddess Artemis has been answered.",
+      "exits": { "west": "loc.troy_sparta", "east": "loc.troy_camp" }
+    },
+    "loc.troy_camp": {
+      "id": "loc.troy_camp",
+      "name": "Greek Camp Before Troy",
+      "description": "Ten years into the siege, rows of black ships line the beach. Agamemnon's quarrel with Achilles over the captive Briseis still poisons the camp.",
+      "exits": { "west": "loc.troy_aulis", "north": "loc.troy_achilles_tent", "east": "loc.troy_plain" }
+    },
+    "loc.troy_achilles_tent": {
+      "id": "loc.troy_achilles_tent",
+      "name": "Tent of Achilles",
+      "description": "The greatest of the Greek spearmen sits apart from the war he refuses to fight, his anger at Agamemnon burning hotter than the siege itself.",
+      "exits": { "south": "loc.troy_camp" }
+    },
+    "loc.troy_plain": {
+      "id": "loc.troy_plain",
+      "name": "The Scamander Plain",
+      "description": "Chariots and spearmen clash on the plain between camp and city, the river Scamander running red more days than not.",
+      "exits": { "west": "loc.troy_camp", "east": "loc.troy_gate" }
+    },
+    "loc.troy_gate": {
+      "id": "loc.troy_gate",
+      "name": "The Scaean Gate",
+      "description": "Beneath Troy's great gate, Hector holds the line his city cannot survive without, while Helen watches the battle from the walls above.",
+      "exits": { "west": "loc.troy_plain", "south": "loc.troy_countryside", "north": "loc.troy_city" }
+    },
+    "loc.troy_countryside": {
+      "id": "loc.troy_countryside",
+      "name": "Fields Beneath the Walls",
+      "description": "Chariot tracks scar the ground where Hector's body was once dragged in circles before the horrified eyes of the city.",
+      "exits": { "north": "loc.troy_gate", "west": "loc.troy_camp" }
+    },
+    "loc.troy_city": {
+      "id": "loc.troy_city",
+      "name": "Priam's Palace",
+      "description": "Within the walls, aged King Priam rules a city that has buried too many sons, while his daughter Cassandra's warnings go unheeded as always.",
+      "exits": { "south": "loc.troy_gate", "east": "loc.troy_horse" }
+    },
+    "loc.troy_horse": {
+      "id": "loc.troy_horse",
+      "name": "The Shore of the Horse",
+      "description": "A hollow horse of fir planking rises on the beach where the Greek ships once stood, Odysseus's answer to ten years of failed sieges.",
+      "exits": { "west": "loc.troy_city", "north": "loc.troy_fall" }
+    },
+    "loc.troy_fall": {
+      "id": "loc.troy_fall",
+      "name": "The Burning of Troy",
+      "description": "The horse was dragged inside the gates as an offering, and by night its hidden crew opened the city to the waiting Greek army. Troy burns.",
+      "exits": { "south": "loc.troy_horse" }
+    },
+
+    "loc.ody_troy_shore": {
+      "id": "loc.ody_troy_shore",
+      "name": "Departure from Troy",
+      "description": "With Troy fallen, Odysseus turns his ships toward Ithaca, not yet knowing the voyage home will take ten more years than the war itself.",
+      "exits": { "west": "loc.hall_of_fates", "east": "loc.ody_cicones" }
+    },
+    "loc.ody_cicones": {
+      "id": "loc.ody_cicones",
+      "name": "Ismarus, Land of the Cicones",
+      "description": "A raid meant to resupply the fleet lingers too long celebrating, and the Cicones return with reinforcements before the ships can escape.",
+      "exits": { "west": "loc.ody_troy_shore", "east": "loc.ody_lotus" }
+    },
+    "loc.ody_lotus": {
+      "id": "loc.ody_lotus",
+      "name": "Land of the Lotus-Eaters",
+      "description": "Whoever tastes the honeyed lotus fruit forgets home entirely, content to stay forever. Several crewmen already wear the same drowsy smile.",
+      "exits": { "west": "loc.ody_cicones", "east": "loc.ody_cyclops" }
+    },
+    "loc.ody_cyclops": {
+      "id": "loc.ody_cyclops",
+      "name": "Cave of Polyphemus",
+      "description": "A stone the size of a hillside seals the cave mouth. Polyphemus, the one-eyed son of Poseidon, has already made a meal of two of the crew.",
+      "exits": { "west": "loc.ody_lotus", "east": "loc.ody_aeolus" }
+    },
+    "loc.ody_aeolus": {
+      "id": "loc.ody_aeolus",
+      "name": "The Floating Island of Aeolus",
+      "description": "Aeolus, keeper of the winds by Zeus's own appointment, offers a leather bag holding every wind but the one needed to sail home.",
+      "exits": { "west": "loc.ody_cyclops", "east": "loc.ody_laestrygonians" }
+    },
+    "loc.ody_laestrygonians": {
+      "id": "loc.ody_laestrygonians",
+      "name": "Harbor of the Laestrygonians",
+      "description": "Giant cannibals hurl boulders down from the cliffs onto the harbor below, shattering every ship but the one Odysseus was wise enough to anchor outside.",
+      "exits": { "west": "loc.ody_aeolus", "east": "loc.ody_circe" }
+    },
+    "loc.ody_circe": {
+      "id": "loc.ody_circe",
+      "name": "Aeaea, Isle of Circe",
+      "description": "The enchantress Circe has already turned half the landing party into swine rooting in her sty. Smoke curls invitingly from her stone hall all the same.",
+      "exits": { "west": "loc.ody_laestrygonians", "east": "loc.ody_underworld", "south": "loc.ody_sirens" }
+    },
+    "loc.ody_underworld": {
+      "id": "loc.ody_underworld",
+      "name": "The House of the Dead",
+      "description": "At the world's edge, where the rivers of the underworld meet, the shades of the dead crowd toward a trench of sacrificial blood, eager to speak.",
+      "exits": { "west": "loc.ody_circe" }
+    },
+    "loc.ody_sirens": {
+      "id": "loc.ody_sirens",
+      "name": "Rocks of the Sirens",
+      "description": "Bones litter the rocks below a song so beautiful that every sailor who has heard it clearly has also died hearing it.",
+      "exits": { "north": "loc.ody_circe", "east": "loc.ody_scylla" }
+    },
+    "loc.ody_scylla": {
+      "id": "loc.ody_scylla",
+      "name": "The Strait of Scylla and Charybdis",
+      "description": "On one side a six-headed monster snatches sailors from the deck; on the other, a whirlpool swallows the sea itself three times a day.",
+      "exits": { "west": "loc.ody_sirens", "east": "loc.ody_thrinacia" }
+    },
+    "loc.ody_thrinacia": {
+      "id": "loc.ody_thrinacia",
+      "name": "Thrinacia, Isle of the Sun",
+      "description": "Helios pastures his immortal cattle here, bright as sunlight, and swore ruin on any sailor who touches so much as one.",
+      "exits": { "west": "loc.ody_scylla", "east": "loc.ody_calypso" }
+    },
+    "loc.ody_calypso": {
+      "id": "loc.ody_calypso",
+      "name": "Ogygia, Isle of Calypso",
+      "description": "The nymph Calypso has kept the shipwrecked Odysseus at her side for seven years, offering an undying life he keeps refusing.",
+      "exits": { "west": "loc.ody_thrinacia", "east": "loc.ody_phaeacia" }
+    },
+    "loc.ody_phaeacia": {
+      "id": "loc.ody_phaeacia",
+      "name": "Scheria, Land of the Phaeacians",
+      "description": "Princess Nausicaa found a shipwrecked, salt-crusted stranger on this shore and brought him to her father's court, where he finally tells his whole story.",
+      "exits": { "west": "loc.ody_calypso", "east": "loc.ody_ithaca_shore" }
+    },
+    "loc.ody_ithaca_shore": {
+      "id": "loc.ody_ithaca_shore",
+      "name": "Shore of Ithaca",
+      "description": "Home at last, disguised as a beggar by Athena's hand, Odysseus is welcomed at the hut of his old swineherd Eumaeus before anyone else recognizes him.",
+      "exits": { "west": "loc.ody_phaeacia", "north": "loc.ody_palace" }
+    },
+    "loc.ody_palace": {
+      "id": "loc.ody_palace",
+      "name": "Hall of the Suitors",
+      "description": "A hundred suitors feast on Odysseus's own cattle while courting his wife Penelope, who has set them one last, impossible test: string the great bow.",
+      "exits": { "south": "loc.ody_ithaca_shore" }
     }
   },
+
   "items": {
-    "item.herbs": {
-      "name": "Healing Herbs",
-      "description": "A bundle of fragrant medicinal leaves.",
-      "room_id": "loc.garden",
-      "obtainable": true
-    },
-    "item.key": {
-      "name": "Rusty Key",
-      "description": "An old iron key found among the stones.",
-      "room_id": "loc.ruins",
-      "obtainable": true
-    },
-    "item.ale": {
-      "name": "Frothy Ale",
-      "description": "A mug of ale served at the tavern.",
-      "room_id": "loc.tavern",
-      "obtainable": true
-    },
-    "item.map": {
-      "name": "Worn Map",
-      "description": "A faded sketch of the nearby trails.",
-      "room_id": "loc.bridge",
-      "obtainable": true
-    }
+    "item.hospitality_gift": { "name": "Woven Cloak of Lemnos", "description": "A finely woven cloak, a parting gift from the women of Lemnos.", "room_id": "loc.argo_lemnos", "obtainable": true },
+    "item.medeas_draught": { "name": "Medea's Sleeping Draught", "description": "A potion brewed from grave-herbs, strong enough to close a dragon's sleepless eyes.", "room_id": "loc.argo_grove", "obtainable": true },
+    "item.dragons_teeth": { "name": "Dragon's Teeth", "description": "Teeth drawn from the slain guardian dragon of Ares, said to grow into armed warriors when sown.", "room_id": "loc.argo_bull_field", "obtainable": true },
+    "item.golden_fleece": { "name": "The Golden Fleece", "description": "The shining pelt of the ram Chrysomallos, which once carried Phrixus safely across the sea.", "room_id": "loc.argo_grove", "obtainable": true },
+
+    "item.aulis_offering": { "name": "White Hind of Aulis", "description": "An offering sent in place of a king's daughter, if the old stories are kind to Agamemnon.", "room_id": "loc.troy_aulis", "obtainable": true },
+    "item.shield_of_achilles": { "name": "Shield of Achilles", "description": "Forged by Hephaestus at the sea-nymph Thetis's plea, its rim shows the whole world in bronze, tin, silver, and gold.", "room_id": "loc.troy_achilles_tent", "obtainable": true },
+    "item.hectors_ransom": { "name": "Hector's Ransom", "description": "A king's weight in gold and fine cloth, Priam's price for the return of his son's body.", "room_id": "loc.troy_city", "obtainable": true },
+    "item.trojan_horse": { "name": "The Trojan Horse", "description": "A hollow horse of fir planking, tall as the city walls, with a rope ladder coiled in its belly.", "room_id": "loc.troy_horse", "obtainable": true },
+
+    "item.olive_stake": { "name": "Sharpened Olive Stake", "description": "A great stake of green olive wood, hardened in the fire and sharpened to a point.", "room_id": "loc.ody_cyclops", "obtainable": true },
+    "item.strong_wine": { "name": "Unwatered Wine", "description": "Wine strong enough to fell a god, carried ashore from the ship's stores.", "room_id": "loc.ody_cyclops", "obtainable": true },
+    "item.bag_of_winds": { "name": "Bag of the Winds", "description": "A leather bag holding every wind but the one already loosed to carry the ship home. Best left unopened.", "room_id": "loc.ody_aeolus", "obtainable": true },
+    "item.moly": { "name": "Moly Root", "description": "A small herb with white flowers and a black root, a gift from Hermes proof against any enchantment of Circe's.", "room_id": "loc.ody_circe", "obtainable": true },
+    "item.sacred_cattle": { "name": "Cattle of Helios", "description": "One of the sun god's own immortal cattle, coat bright as noon. Touching it is forbidden.", "room_id": "loc.ody_thrinacia", "obtainable": true },
+    "item.odysseus_bow": { "name": "Odysseus's Bow", "description": "A great bow that no suitor could even bend, let alone string. It has waited twenty years for its owner's return.", "room_id": "loc.ody_palace", "obtainable": true }
   },
+
   "npcs": {
-    "npc.guard": {
-      "name": "Village Guard",
-      "description": "A guard keeping watch beside the fountain.",
-      "role": "dialogue",
-      "room_id": "loc.square",
-      "hp": 20,
-      "dialogue": ["Welcome to the village. Stay on the marked paths."]
-    },
-    "npc.merchant": {
-      "name": "Market Merchant",
-      "description": "A merchant sorting jars behind a stall.",
-      "role": "quest_giver",
-      "room_id": "loc.market",
-      "hp": 15,
-      "dialogue": ["I could use some herbs from the garden."]
-    },
-    "npc.ranger": {
-      "name": "Forest Ranger",
-      "description": "A ranger watching the path toward the cave.",
-      "role": "quest_giver",
-      "room_id": "loc.forest",
-      "hp": 30,
-      "dialogue": ["A goblin has been hiding in the cave."]
-    },
-    "npc.goblin": {
-      "name": "Cave Goblin",
-      "description": "A goblin guarding a pile of loose stones.",
-      "role": "enemy",
-      "room_id": "loc.cave",
-      "hp": 35,
-      "dialogue": ["Get out of my cave!"]
-    }
+    "npc.hypsipyle": { "name": "Queen Hypsipyle", "description": "Queen of Lemnos, ruling an island of women alone.", "role": "dialogue", "room_id": "loc.argo_lemnos", "hp": 20, "dialogue": ["Stay with us, Argonauts. Lemnos has been lonely since the men were... gone."] },
+    "npc.amycus": { "name": "King Amycus", "description": "The boastful boxer-king of the Bebrycians.", "role": "enemy", "room_id": "loc.argo_bebrycia", "hp": 40, "dialogue": ["No ship passes my shore until its best man faces me in the ring!"] },
+    "npc.phineus": { "name": "Phineus", "description": "A blind prophet, tormented eternally by Harpies for a false prophecy.", "role": "quest_giver", "room_id": "loc.argo_salmydessus", "hp": 15, "dialogue": ["Drive off the Harpies that torment me, and I will tell you how to pass the Clashing Rocks."] },
+    "npc.harpy": { "name": "Harpy", "description": "A winged tormentor sent to foul Phineus's every meal.", "role": "enemy", "room_id": "loc.argo_salmydessus", "hp": 20, "dialogue": ["Screeching, it dives for the old man's plate again."] },
+    "npc.aeetes": { "name": "King Aeetes", "description": "King of Colchis, son of the sun god Helios, keeper of the Golden Fleece.", "role": "dialogue", "room_id": "loc.argo_court_aeetes", "hp": 50, "dialogue": ["Yoke my bronze bulls, sow the dragon's teeth, and survive what grows from them — then, perhaps, the Fleece is yours."] },
+    "npc.khalkotauroi": { "name": "The Bronze Bulls", "description": "Fire-breathing bulls with hooves of bronze, Aeetes's first trial.", "role": "enemy", "room_id": "loc.argo_bull_field", "hp": 45, "dialogue": ["The bulls snort fire and paw the earth, daring anyone to yoke them."] },
+    "npc.earthborn": { "name": "Earthborn Warrior", "description": "An armed warrior sprung fully grown from a sown dragon's tooth.", "role": "enemy", "room_id": "loc.argo_bull_field", "hp": 30, "dialogue": ["It claws free of the soil already reaching for a spear."] },
+    "npc.medea": { "name": "Medea", "description": "Princess of Colchis and sorceress, who falls for Jason against her own family's interest.", "role": "quest_giver", "room_id": "loc.argo_grove", "hp": 25, "dialogue": ["Take this draught — it will close the dragon's eyes. Know that in helping you, I betray my own father."] },
+    "npc.colchis_dragon": { "name": "The Sleepless Dragon", "description": "A serpent coiled endlessly about the oak that holds the Golden Fleece.", "role": "enemy", "room_id": "loc.argo_grove", "hp": 60, "dialogue": ["Not once, in all its long watch, have its eyes closed."] },
+    "npc.apsyrtus": { "name": "Apsyrtus", "description": "Medea's brother, sent by King Aeetes to reclaim the Fleece and his sister.", "role": "enemy", "room_id": "loc.argo_flight", "hp": 35, "dialogue": ["Sister, come home, and bring the thief who stole our Fleece."] },
+    "npc.talos": { "name": "Talos", "description": "A bronze automaton forged by Hephaestus to guard Crete, vulnerable only at a single sealed vein in his ankle.", "role": "enemy", "room_id": "loc.argo_crete", "hp": 55, "dialogue": ["It hurls another boulder the size of a chariot toward the shore."] },
+
+    "npc.paris": { "name": "Paris", "description": "The Trojan prince who judged Aphrodite fairest and was promised the world's most beautiful woman.", "role": "dialogue", "room_id": "loc.troy_ida", "hp": 30, "dialogue": ["I chose beauty over the rule of Asia, or the glory of war. Some say that choice will burn a city."] },
+    "npc.menelaus": { "name": "Menelaus", "description": "King of Sparta, husband of Helen, wronged host and gathering king.", "role": "dialogue", "room_id": "loc.troy_sparta", "hp": 40, "dialogue": ["She was here, and then she was gone, taken by a guest I welcomed under my own roof."] },
+    "npc.calchas": { "name": "Calchas", "description": "The seer whose reading of the winds and the gods binds the fleet to Aulis.", "role": "quest_giver", "room_id": "loc.troy_aulis", "hp": 20, "dialogue": ["The winds will not turn until Artemis is answered. Bring an offering worthy of a goddess."] },
+    "npc.agamemnon": { "name": "Agamemnon", "description": "High King of the Greeks, whose pride cost him his best warrior's spear.", "role": "dialogue", "room_id": "loc.troy_camp", "hp": 50, "dialogue": ["Achilles sulks in his tent like a child. The war does not wait for one man's pride."] },
+    "npc.achilles": { "name": "Achilles", "description": "The greatest of the Greek warriors, wrathful and grieving, sitting out the war over a stolen captive.", "role": "quest_giver", "room_id": "loc.troy_achilles_tent", "hp": 80, "dialogue": ["Agamemnon took what was mine to take. Let Hector burn the ships before I lift my spear for his sake."] },
+    "npc.hector": { "name": "Hector", "description": "Troy's greatest defender, who will not abandon his city though he knows his fate.", "role": "enemy", "room_id": "loc.troy_gate", "hp": 90, "dialogue": ["Every day I hold this gate is a day my city still stands."] },
+    "npc.helen": { "name": "Helen", "description": "The most famous of women, watching the war fought over her from the walls of Troy.", "role": "dialogue", "room_id": "loc.troy_gate", "hp": 20, "dialogue": ["I watch my two husbands from these walls — the one I left, and the one who dies defending the roof that hides me."] },
+    "npc.priam": { "name": "Priam", "description": "The aged King of Troy, father of Hector, who will kneel before his son's killer for the sake of a proper burial.", "role": "quest_giver", "room_id": "loc.troy_city", "hp": 60, "dialogue": ["Achilles dragged my son around these very walls. I will kneel before my enemy if it brings Hector home."] },
+    "npc.cassandra": { "name": "Cassandra", "description": "Priam's daughter, cursed to see the truth and never be believed.", "role": "dialogue", "room_id": "loc.troy_city", "hp": 20, "dialogue": ["The horse on the shore will bring our end. No one in this city has ever believed me, and no one ever will."] },
+    "npc.odysseus": { "name": "Odysseus", "description": "The cunning king of Ithaca, architect of the wooden horse.", "role": "quest_giver", "room_id": "loc.troy_horse", "hp": 60, "dialogue": ["Ten years of spears and walls taught us nothing. So we offer Troy a gift they cannot resist bringing inside their own gates."] },
+    "npc.aeneas": { "name": "Aeneas", "description": "A Trojan prince fleeing the burning city with his father on his back and his household gods in his arms.", "role": "dialogue", "room_id": "loc.troy_fall", "hp": 40, "dialogue": ["Troy falls tonight. Somewhere west of here, I am told, there is another city waiting to be born."] },
+
+    "npc.lotus_eater": { "name": "Lotus-Eater", "description": "A drowsy islander offering the honeyed fruit that erases every memory of home.", "role": "dialogue", "room_id": "loc.ody_lotus", "hp": 10, "dialogue": ["Eat the lotus, stranger. Why sail home to grow old, when here there is only honeyed forgetting?"] },
+    "npc.trapped_sailor": { "name": "Trapped Sailor", "description": "A crewman sealed in the cyclops's cave, urging swift action before more of the crew are eaten.", "role": "quest_giver", "room_id": "loc.ody_cyclops", "hp": 15, "dialogue": ["Blind the beast before he eats us all one by one — he has already crushed two of our friends against these stones!"] },
+    "npc.polyphemus": { "name": "Polyphemus", "description": "The one-eyed son of Poseidon, keeper of a cave full of trapped sailors.", "role": "enemy", "room_id": "loc.ody_cyclops", "hp": 70, "dialogue": ["Nobody is hurting me! Nobody!"] },
+    "npc.aeolus": { "name": "Aeolus", "description": "Keeper of the winds by Zeus's appointment, master of a floating island.", "role": "quest_giver", "room_id": "loc.ody_aeolus", "hp": 20, "dialogue": ["Take this bag — the west wind alone is loosed to carry you home. Do not open it before Ithaca."] },
+    "npc.laestrygonian": { "name": "Laestrygonian Giant", "description": "A cannibal giant of Lamos's city, hurling boulders the size of ships.", "role": "enemy", "room_id": "loc.ody_laestrygonians", "hp": 65, "dialogue": ["It roars down from the cliff, already reaching for another boulder."] },
+    "npc.circe": { "name": "Circe", "description": "The enchantress of Aeaea, daughter of Helios, keeper of a sty full of transformed sailors.", "role": "quest_giver", "room_id": "loc.ody_circe", "hp": 45, "dialogue": ["Eat the moly root first, and my cup will only make you stronger, never smaller."] },
+    "npc.tiresias": { "name": "Tiresias", "description": "The blind prophet of Thebes, whose shade is consulted even in death.", "role": "dialogue", "room_id": "loc.ody_underworld", "hp": 20, "dialogue": ["You will reach home, Odysseus, but only if your men leave the cattle of Helios untouched on Thrinacia."] },
+    "npc.elpenor": { "name": "Elpenor", "description": "The youngest of the crew, who fell from Circe's roof and died before he could say goodbye.", "role": "dialogue", "room_id": "loc.ody_underworld", "hp": 10, "dialogue": ["Leave me not unwept, unburied. Burn my body on the shore of Aeaea and raise my oar over the mound."] },
+    "npc.sirens": { "name": "The Sirens", "description": "Singers whose voices have drawn every ship that ever heard them onto the rocks.", "role": "dialogue", "room_id": "loc.ody_sirens", "hp": 30, "dialogue": ["Come closer, famous Odysseus, and hear the song no man has heard and lived to tell."] },
+    "npc.scylla": { "name": "Scylla", "description": "A six-headed monster of the strait, opposite the whirlpool Charybdis.", "role": "enemy", "room_id": "loc.ody_scylla", "hp": 50, "dialogue": ["Six heads lunge from the rock face as the ship draws near."] },
+    "npc.eurylochus": { "name": "Eurylochus", "description": "Odysseus's second-in-command, who will lead a starving crew to slaughter the sacred cattle against every warning.", "role": "quest_giver", "room_id": "loc.ody_thrinacia", "hp": 30, "dialogue": ["Better to die once, quickly, with a full belly, than waste away obeying a warning from a blind old ghost."] },
+    "npc.calypso": { "name": "Calypso", "description": "The nymph who kept Odysseus seven years on Ogygia, offering an undying life at her side.", "role": "dialogue", "room_id": "loc.ody_calypso", "hp": 30, "dialogue": ["Seven years I offered you a god's own life, deathless and unaging. And still you build a raft to leave me for a mortal wife."] },
+    "npc.nausicaa": { "name": "Nausicaa", "description": "Princess of the Phaeacians, who found the shipwrecked Odysseus washed ashore.", "role": "dialogue", "room_id": "loc.ody_phaeacia", "hp": 20, "dialogue": ["My mother says: give the stranger clothes, food, and passage. My mother is rarely wrong."] },
+    "npc.alcinous": { "name": "King Alcinous", "description": "King of the Phaeacians, host to Odysseus, who will provide the ship home.", "role": "dialogue", "room_id": "loc.ody_phaeacia", "hp": 30, "dialogue": ["Tell us your story from the beginning, stranger. My court has never heard a tale like yours."] },
+    "npc.eumaeus": { "name": "Eumaeus", "description": "The loyal swineherd who shelters the disguised beggar-king without knowing who he shelters.", "role": "dialogue", "room_id": "loc.ody_ithaca_shore", "hp": 20, "dialogue": ["Twenty years I've kept his pigs and his house in order, hoping."] },
+    "npc.telemachus": { "name": "Telemachus", "description": "Odysseus's son, grown to manhood defending his father's house from the suitors.", "role": "dialogue", "room_id": "loc.ody_ithaca_shore", "hp": 30, "dialogue": ["I was a baby when you sailed. I have grown up defending a house full of men who want my mother's hand and my inheritance both."] },
+    "npc.antinous": { "name": "Antinous", "description": "The most arrogant of Penelope's suitors, feasting nightly on another man's cattle.", "role": "enemy", "room_id": "loc.ody_palace", "hp": 40, "dialogue": ["Another cup, and another of the beggar-king's own oxen for the fire!"] },
+    "npc.penelope": { "name": "Penelope", "description": "Odysseus's wife, who wove and unwove a burial shroud for three years to delay remarriage.", "role": "quest_giver", "room_id": "loc.ody_palace", "hp": 30, "dialogue": ["Twenty years I have waited. Only one man alive could string that bow."] }
   },
+
   "quests": {
-    "quest.herbs": {
-      "name": "Herbs for the Merchant",
-      "description": "Bring the merchant the herbs from the garden.",
-      "giver_npc_id": "npc.merchant",
-      "objective": {
-        "type": "collect_item",
-        "target_id": "item.herbs",
-        "count": 1
-      },
-      "reward": {
-        "hp": 10
-      }
+    "quest.phineus_harpies": {
+      "name": "The Blind Prophet's Torment",
+      "description": "Drive off the Harpy tormenting Phineus, so he will share his knowledge of the Clashing Rocks.",
+      "giver_npc_id": "npc.phineus",
+      "objective": { "type": "defeat_npc", "target_id": "npc.harpy", "count": 1 },
+      "reward": { "hp": 10 }
     },
-    "quest.goblin": {
-      "name": "Clear the Cave",
-      "description": "Defeat the goblin in the cave.",
-      "giver_npc_id": "npc.ranger",
-      "objective": {
-        "type": "defeat_npc",
-        "target_id": "npc.goblin",
-        "count": 1
-      },
-      "reward": {
-        "hp": 20
-      }
+    "quest.golden_fleece": {
+      "name": "The Golden Fleece",
+      "description": "Take the Golden Fleece from the sacred oak, with Medea's help against its sleepless guardian.",
+      "giver_npc_id": "npc.medea",
+      "objective": { "type": "collect_item", "target_id": "item.golden_fleece", "count": 1 },
+      "reward": { "hp": 20 }
+    },
+    "quest.wind_offering": {
+      "name": "The Winds of Aulis",
+      "description": "Bring Calchas an offering worthy of Artemis, so the fleet may finally sail for Troy.",
+      "giver_npc_id": "npc.calchas",
+      "objective": { "type": "collect_item", "target_id": "item.aulis_offering", "count": 1 },
+      "reward": { "hp": 10 }
+    },
+    "quest.arms_of_achilles": {
+      "name": "The Arms of Achilles",
+      "description": "Bring Achilles the new armor forged by Hephaestus, so he will return to the war after Patroclus's death.",
+      "giver_npc_id": "npc.achilles",
+      "objective": { "type": "collect_item", "target_id": "item.shield_of_achilles", "count": 1 },
+      "reward": { "hp": 20 }
+    },
+    "quest.ransom_hector": {
+      "name": "Ransom of Hector",
+      "description": "Deliver Priam's ransom in exchange for the return of Hector's body.",
+      "giver_npc_id": "npc.priam",
+      "objective": { "type": "collect_item", "target_id": "item.hectors_ransom", "count": 1 },
+      "reward": { "hp": 15 }
+    },
+    "quest.trojan_horse": {
+      "name": "The Wooden Horse",
+      "description": "Help Odysseus complete the horse that will finally bring down Troy's walls from within.",
+      "giver_npc_id": "npc.odysseus",
+      "objective": { "type": "collect_item", "target_id": "item.trojan_horse", "count": 1 },
+      "reward": { "hp": 20 }
+    },
+    "quest.blind_the_cyclops": {
+      "name": "Nobody's Escape",
+      "description": "Blind Polyphemus to free the crew trapped in his cave.",
+      "giver_npc_id": "npc.trapped_sailor",
+      "objective": { "type": "defeat_npc", "target_id": "npc.polyphemus", "count": 1 },
+      "reward": { "hp": 15 }
+    },
+    "quest.winds_of_aeolus": {
+      "name": "The Bag of Winds",
+      "description": "Accept Aeolus's bag of winds, and guard it well until Ithaca is in sight.",
+      "giver_npc_id": "npc.aeolus",
+      "objective": { "type": "collect_item", "target_id": "item.bag_of_winds", "count": 1 },
+      "reward": { "hp": 10 }
+    },
+    "quest.moly_herb": {
+      "name": "The Moly Root",
+      "description": "Take the moly root before drinking from Circe's cup, or join the pigs in her sty.",
+      "giver_npc_id": "npc.circe",
+      "objective": { "type": "collect_item", "target_id": "item.moly", "count": 1 },
+      "reward": { "hp": 10 }
+    },
+    "quest.sacred_cattle": {
+      "name": "The Forbidden Cattle",
+      "description": "Eurylochus would slaughter the cattle of Helios against every warning. What you do with them is yours to decide.",
+      "giver_npc_id": "npc.eurylochus",
+      "objective": { "type": "collect_item", "target_id": "item.sacred_cattle", "count": 1 },
+      "reward": { "hp": 10 }
+    },
+    "quest.string_the_bow": {
+      "name": "The Test of the Bow",
+      "description": "Take up Odysseus's bow, which no suitor could even bend, and prove who has truly come home.",
+      "giver_npc_id": "npc.penelope",
+      "objective": { "type": "collect_item", "target_id": "item.odysseus_bow", "count": 1 },
+      "reward": { "hp": 25 }
     }
   }
 }
