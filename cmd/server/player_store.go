@@ -14,14 +14,6 @@ func (s *Server) playersSavePath() string {
 	return filepath.Join(s.saveDir, playersSaveFile)
 }
 
-func (s *Server) loadPlayer(name string) (*Player, error) {
-	players, err := s.loadPlayers()
-	if err != nil {
-		return nil, err
-	}
-	return players[name], nil
-}
-
 func (s *Server) loadPlayers() (map[string]*Player, error) {
 	data, err := os.ReadFile(s.playersSavePath())
 	if errors.Is(err, os.ErrNotExist) {
@@ -29,6 +21,9 @@ func (s *Server) loadPlayers() (map[string]*Player, error) {
 	}
 	if err != nil {
 		return nil, fmt.Errorf("read player state: %w", err)
+	}
+	if len(data) == 0 {
+		return make(map[string]*Player), nil
 	}
 
 	var players map[string]*Player
@@ -44,6 +39,29 @@ func (s *Server) loadPlayers() (map[string]*Player, error) {
 		}
 	}
 	return players, nil
+}
+
+func (s *Server) restoreItemOwnership() error {
+	players, err := s.loadPlayers()
+	if err != nil {
+		return err
+	}
+	owners := make(map[string]string)
+	for name, player := range players {
+		for _, itemID := range player.Inventory {
+			if s.world.Items[itemID] == nil {
+				continue
+			}
+			if owner, exists := owners[itemID]; exists {
+				return fmt.Errorf("item %q appears in inventories of %q and %q", itemID, owner, name)
+			}
+			owners[itemID] = name
+		}
+	}
+	for itemID := range owners {
+		s.world.Items[itemID].RoomID = ""
+	}
+	return nil
 }
 
 func (s *Server) savePlayer(player *Player) error {
