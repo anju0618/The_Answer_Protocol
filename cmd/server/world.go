@@ -65,14 +65,74 @@ func loadWorld(path string) (*World, error) {
 }
 
 func (w *World) validate() error {
-	if _, ok := w.Rooms[w.StartRoomID]; !ok {
+	if w == nil {
+		return fmt.Errorf("world is null")
+	}
+	if w.Rooms[w.StartRoomID] == nil {
 		return fmt.Errorf("start room %q does not exist", w.StartRoomID)
 	}
 	for id, room := range w.Rooms {
+		if id == "" {
+			return fmt.Errorf("room ID is empty")
+		}
+		if room == nil {
+			return fmt.Errorf("room %q is null", id)
+		}
+		if room.ID != id {
+			return fmt.Errorf("room %q has ID %q", id, room.ID)
+		}
 		for dir, dest := range room.Exits {
-			if _, ok := w.Rooms[dest]; !ok {
+			if w.Rooms[dest] == nil {
 				return fmt.Errorf("room %q exit %q points to unknown room %q", id, dir, dest)
 			}
+		}
+	}
+	for id, item := range w.Items {
+		if id == "" {
+			return fmt.Errorf("item ID is empty")
+		}
+		if item == nil {
+			return fmt.Errorf("item %q is null", id)
+		}
+		if w.Rooms[item.RoomID] == nil {
+			return fmt.Errorf("item %q points to unknown room %q", id, item.RoomID)
+		}
+	}
+	for id, npc := range w.NPCs {
+		if id == "" {
+			return fmt.Errorf("NPC ID is empty")
+		}
+		if npc == nil {
+			return fmt.Errorf("NPC %q is null", id)
+		}
+		if w.Rooms[npc.RoomID] == nil {
+			return fmt.Errorf("NPC %q points to unknown room %q", id, npc.RoomID)
+		}
+	}
+	for id, quest := range w.Quests {
+		if id == "" {
+			return fmt.Errorf("quest ID is empty")
+		}
+		if quest == nil {
+			return fmt.Errorf("quest %q is null", id)
+		}
+		if w.NPCs[quest.GiverNPCID] == nil {
+			return fmt.Errorf("quest %q points to unknown giver NPC %q", id, quest.GiverNPCID)
+		}
+		if quest.Objective.Count < 1 {
+			return fmt.Errorf("quest %q has invalid objective count %d", id, quest.Objective.Count)
+		}
+		switch quest.Objective.Type {
+		case "collect_item":
+			if w.Items[quest.Objective.TargetID] == nil {
+				return fmt.Errorf("quest %q points to unknown item %q", id, quest.Objective.TargetID)
+			}
+		case "defeat_npc":
+			if w.NPCs[quest.Objective.TargetID] == nil {
+				return fmt.Errorf("quest %q points to unknown NPC %q", id, quest.Objective.TargetID)
+			}
+		default:
+			return fmt.Errorf("quest %q has unknown objective type %q", id, quest.Objective.Type)
 		}
 	}
 	return nil
