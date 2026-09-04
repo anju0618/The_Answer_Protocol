@@ -204,19 +204,22 @@
       "id": "loc.ody_sirens",
       "name": "Rocks of the Sirens",
       "description": "Bones litter the rocks below a song so beautiful that every sailor who has heard it clearly has also died hearing it.",
-      "exits": { "north": "loc.ody_circe", "east": "loc.ody_scylla", "south": "loc.ody_charybdis" }
+      "exits": { "north": "loc.ody_circe", "east": "loc.ody_scylla", "south": "loc.ody_charybdis" },
+      "hazard": { "type": "item_gate", "required_item_id": "item.beeswax" }
     },
     "loc.ody_scylla": {
       "id": "loc.ody_scylla",
       "name": "The Strait of Scylla and Charybdis",
       "description": "On one side a six-headed monster snatches sailors from the deck; on the other, a whirlpool swallows the sea itself three times a day.",
-      "exits": { "west": "loc.ody_sirens", "east": "loc.ody_thrinacia" }
+      "exits": { "west": "loc.ody_sirens", "east": "loc.ody_thrinacia" },
+      "hazard": { "type": "crew_gate", "crew_loss": 6, "min_party_total": 7 }
     },
     "loc.ody_charybdis": {
       "id": "loc.ody_charybdis",
       "name": "The Whirlpool of Charybdis",
       "description": "The sea itself opens its throat here, swallowing the strait three times a day and spewing it back just as violently. No ship that has entered this maw has ever been seen again.",
-      "exits": { "north": "loc.ody_sirens" }
+      "exits": { "north": "loc.ody_sirens" },
+      "hazard": { "type": "lethal" }
     },
     "loc.ody_thrinacia": {
       "id": "loc.ody_thrinacia",
@@ -299,10 +302,10 @@
 
     "npc.lotus_eater": { "name": "Lotus-Eater", "description": "A drowsy islander offering the honeyed fruit that erases every memory of home.", "role": "dialogue", "room_id": "loc.ody_lotus", "hp": 10, "dialogue": ["Eat the lotus, stranger. Why sail home to grow old, when here there is only honeyed forgetting?"] },
     "npc.trapped_sailor": { "name": "Trapped Sailor", "description": "A crewman sealed in the cyclops's cave, urging swift action before more of the crew are eaten.", "role": "quest_giver", "room_id": "loc.ody_cyclops", "hp": 15, "dialogue": ["Blind the beast before he eats us all one by one — he has already crushed two of our friends against these stones!"] },
-    "npc.polyphemus": { "name": "Polyphemus", "description": "The one-eyed son of Poseidon, keeper of a cave full of trapped sailors.", "role": "enemy", "room_id": "loc.ody_cyclops", "hp": 70, "dialogue": ["Nobody is hurting me! Nobody!"] },
+    "npc.polyphemus": { "name": "Polyphemus", "description": "The one-eyed son of Poseidon, keeper of a cave full of trapped sailors.", "role": "enemy", "room_id": "loc.ody_cyclops", "hp": 70, "dialogue": ["Nobody is hurting me! Nobody!"], "myth_requirement_item": "item.olive_stake", "flee_accurate": true },
     "npc.aeolus": { "name": "Aeolus", "description": "Keeper of the winds by Zeus's appointment, master of a floating island.", "role": "quest_giver", "room_id": "loc.ody_aeolus", "hp": 20, "dialogue": ["Take this bag — the west wind alone is loosed to carry you home. Do not open it before Ithaca."] },
-    "npc.laestrygonian": { "name": "Laestrygonian Giant", "description": "A cannibal giant of Lamos's city, hurling boulders the size of ships.", "role": "enemy", "room_id": "loc.ody_laestrygonians", "hp": 65, "dialogue": ["It roars down from the cliff, already reaching for another boulder."] },
-    "npc.circe": { "name": "Circe", "description": "The enchantress of Aeaea, daughter of Helios, keeper of a sty full of transformed sailors.", "role": "quest_giver", "room_id": "loc.ody_circe", "hp": 45, "dialogue": ["Eat the moly root first, and my cup will only make you stronger, never smaller."] },
+    "npc.laestrygonian": { "name": "Laestrygonian Giant", "description": "A cannibal giant of Lamos's city, hurling boulders the size of ships.", "role": "enemy", "room_id": "loc.ody_laestrygonians", "hp": 65, "dialogue": ["It roars down from the cliff, already reaching for another boulder."], "unwinnable": true, "crew_loss_on_attack": 8, "flee_accurate": true },
+    "npc.circe": { "name": "Circe", "description": "The enchantress of Aeaea, daughter of Helios, keeper of a sty full of transformed sailors.", "role": "quest_giver", "room_id": "loc.ody_circe", "hp": 45, "dialogue": ["Eat the moly root first, and my cup will only make you stronger, never smaller."], "myth_requirement_item": "item.moly" },
     "npc.tiresias": { "name": "Tiresias", "description": "The blind prophet of Thebes, whose shade is consulted even in death.", "role": "dialogue", "room_id": "loc.ody_underworld", "hp": 20, "dialogue": ["You will reach home, Odysseus, but only if your men leave the cattle of Helios untouched on Thrinacia."] },
     "npc.elpenor": { "name": "Elpenor", "description": "The youngest of the crew, who fell from Circe's roof and died before he could say goodbye.", "role": "dialogue", "room_id": "loc.ody_underworld", "hp": 10, "dialogue": ["Leave me not unwept, unburied. Burn my body on the shore of Aeaea and raise my oar over the mound."] },
     "npc.sirens": { "name": "The Sirens", "description": "Singers whose voices have drawn every ship that ever heard them onto the rocks.", "role": "dialogue", "room_id": "loc.ody_sirens", "hp": 30, "dialogue": ["Come closer, famous Odysseus, and hear the song no man has heard and lived to tell."] },
@@ -313,7 +316,7 @@
     "npc.alcinous": { "name": "King Alcinous", "description": "King of the Phaeacians, host to Odysseus, who will provide the ship home.", "role": "dialogue", "room_id": "loc.ody_phaeacia", "hp": 30, "dialogue": ["Tell us your story from the beginning, stranger. My court has never heard a tale like yours."] },
     "npc.eumaeus": { "name": "Eumaeus", "description": "The loyal swineherd who shelters the disguised beggar-king without knowing who he shelters.", "role": "dialogue", "room_id": "loc.ody_ithaca_shore", "hp": 20, "dialogue": ["Twenty years I've kept his pigs and his house in order, hoping."] },
     "npc.telemachus": { "name": "Telemachus", "description": "Odysseus's son, grown to manhood defending his father's house from the suitors.", "role": "dialogue", "room_id": "loc.ody_ithaca_shore", "hp": 30, "dialogue": ["I was a baby when you sailed. I have grown up defending a house full of men who want my mother's hand and my inheritance both."] },
-    "npc.antinous": { "name": "Antinous", "description": "The most arrogant of Penelope's suitors, feasting nightly on another man's cattle.", "role": "enemy", "room_id": "loc.ody_palace", "hp": 40, "dialogue": ["Another cup, and another of the beggar-king's own oxen for the fire!"] },
+    "npc.antinous": { "name": "Antinous", "description": "The most arrogant of Penelope's suitors, feasting nightly on another man's cattle.", "role": "enemy", "room_id": "loc.ody_palace", "hp": 40, "dialogue": ["Another cup, and another of the beggar-king's own oxen for the fire!"], "myth_requirement_item": "item.odysseus_bow", "flee_accurate": false },
     "npc.penelope": { "name": "Penelope", "description": "Odysseus's wife, who wove and unwove a burial shroud for three years to delay remarriage.", "role": "quest_giver", "room_id": "loc.ody_palace", "hp": 30, "dialogue": ["Twenty years I have waited. Only one man alive could string that bow."] }
   },
 
