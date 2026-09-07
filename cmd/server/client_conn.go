@@ -28,6 +28,7 @@ type serverClient struct {
 	done         chan struct{}
 	writeTimeout time.Duration
 	closeOnce    sync.Once
+	locale       string
 }
 
 func newServerClient(conn net.Conn) *serverClient {
