@@ -9,8 +9,8 @@ type RoomHazard struct {
 
 type Room struct {
 	ID          string            `json:"id"`
-	Name        string            `json:"name"`
-	Description string            `json:"description"`
+	Name        LocalizedText     `json:"name"`
+	Description LocalizedText     `json:"description"`
 	Exits       map[string]string `json:"exits"`
 	Hazard      *RoomHazard       `json:"hazard,omitempty"`
 }

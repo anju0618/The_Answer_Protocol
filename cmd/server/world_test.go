@@ -15,15 +15,15 @@ func validTestWorld() *World {
 			"loc.extra": {ID: "loc.extra"},
 		},
 		Items: map[string]*Item{
-			"item.key": {Name: "Key", RoomID: "loc.start", Obtainable: true},
+			"item.key": {Name: en("Key"), RoomID: "loc.start", Obtainable: true},
 		},
 		NPCs: map[string]*NPC{
-			"npc.guide": {Name: "Guide", RoomID: "loc.start", Role: "quest_giver"},
-			"npc.enemy": {Name: "Enemy", RoomID: "loc.next", Role: "enemy"},
+			"npc.guide": {Name: en("Guide"), RoomID: "loc.start", Role: "quest_giver"},
+			"npc.enemy": {Name: en("Enemy"), RoomID: "loc.next", Role: "enemy"},
 		},
 		Quests: map[string]*Quest{
 			"quest.key": {
-				Name:       "Find the Key",
+				Name:       en("Find the Key"),
 				GiverNPCID: "npc.guide",
 				Objective:  QuestObjective{Type: "collect_item", TargetID: "item.key", Count: 1},
 			},
