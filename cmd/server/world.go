@@ -8,23 +8,25 @@ import (
 )
 
 type Item struct {
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	RoomID      string `json:"room_id"`
-	Obtainable  bool   `json:"obtainable"`
+	Name        LocalizedText `json:"name"`
+	Description LocalizedText `json:"description"`
+	RoomID      string        `json:"room_id"`
+	Obtainable  bool          `json:"obtainable"`
 }
 
 type NPC struct {
-	Name                string   `json:"name"`
-	Description         string   `json:"description"`
-	Role                string   `json:"role"`
-	RoomID              string   `json:"room_id"`
-	HP                  int      `json:"hp"`
-	Dialogue            []string `json:"dialogue"`
-	MythRequirementItem string   `json:"myth_requirement_item,omitempty"`
-	FleeAccurate        bool     `json:"flee_accurate,omitempty"`
-	Unwinnable          bool     `json:"unwinnable,omitempty"`
-	CrewLossOnAttack    int      `json:"crew_loss_on_attack,omitempty"`
+	Name                 LocalizedText   `json:"name"`
+	Description          LocalizedText   `json:"description"`
+	Role                 string          `json:"role"`
+	RoomID               string          `json:"room_id"`
+	HP                   int             `json:"hp"`
+	Dialogue             []LocalizedText `json:"dialogue"`
+	MythRequirementItem  string          `json:"myth_requirement_item,omitempty"`
+	MythRequirementQuest string          `json:"myth_requirement_quest,omitempty"`
+	FleeAccurate         bool            `json:"flee_accurate,omitempty"`
+	FleeSucceedsOnce     bool            `json:"flee_succeeds_once,omitempty"`
+	Unwinnable           bool            `json:"unwinnable,omitempty"`
+	CrewLossOnAttack     int             `json:"crew_loss_on_attack,omitempty"`
 }
 
 type QuestObjective struct {
@@ -38,8 +40,8 @@ type QuestReward struct {
 }
 
 type Quest struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
+	Name        LocalizedText  `json:"name"`
+	Description LocalizedText  `json:"description"`
 	GiverNPCID  string         `json:"giver_npc_id"`
 	Objective   QuestObjective `json:"objective"`
 	Reward      QuestReward    `json:"reward"`
@@ -131,6 +133,9 @@ func (w *World) validate() error {
 		if npc.MythRequirementItem != "" && w.Items[npc.MythRequirementItem] == nil {
 			return fmt.Errorf("NPC %q myth requirement points to unknown item %q", id, npc.MythRequirementItem)
 		}
+		if npc.MythRequirementQuest != "" && w.Quests[npc.MythRequirementQuest] == nil {
+			return fmt.Errorf("NPC %q myth requirement points to unknown quest %q", id, npc.MythRequirementQuest)
+		}
 		if npc.Unwinnable && npc.CrewLossOnAttack < 1 {
 			return fmt.Errorf("NPC %q is unwinnable but has invalid crew_loss_on_attack %d", id, npc.CrewLossOnAttack)
 		}
@@ -164,23 +169,19 @@ func (w *World) validate() error {
 	return nil
 }
 
-// resolveNPCInRoom finds an NPC in roomID by ID first, then by case-insensitive
-// display name. When several NPCs share a name, the lexicographically smallest
-// ID wins, matching the tie-break already used for items in TAKE/DROP.
-func (w *World) resolveNPCInRoom(roomID, query string) string {
+func (w *World) resolveNPCInRoom(roomID, query, locale string) string {
 	if npc := w.NPCs[query]; npc != nil && npc.RoomID == roomID {
 		return query
 	}
 	npcID := ""
 	for id, npc := range w.NPCs {
-		if npc != nil && npc.RoomID == roomID && strings.EqualFold(npc.Name, query) && (npcID == "" || id < npcID) {
+		if npc != nil && npc.RoomID == roomID && strings.EqualFold(npc.Name.Get(locale), query) && (npcID == "" || id < npcID) {
 			npcID = id
 		}
 	}
 	return npcID
 }
 
-// questByGiver returns the quest offered by npcID, or "", nil if it gives none.
 func (w *World) questByGiver(npcID string) (string, *Quest) {
 	questID := ""
 	for id, quest := range w.Quests {
