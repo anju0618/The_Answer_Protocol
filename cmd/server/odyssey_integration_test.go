@@ -5,10 +5,6 @@ import (
 	"testing"
 )
 
-// TestOdysseyArcAgainstRealWorldData exercises the myth-gate mechanics
-// (memo.md 7.3-7.6) against the actual data/world.json content, not a
-// synthetic test world — so it catches ID typos or wiring mistakes between
-// the data and the engine that combat_test.go's isolated worlds can't see.
 func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 	world, err := loadWorld(filepath.Join("..", "..", "data", "world.json"))
 	if err != nil {
@@ -25,16 +21,39 @@ func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 		server.players["alice"].RoomID = roomID
 		server.mu.Unlock()
 	}
-	// respawnHP is not a reliable "did they die" signal once HP is already
-	// sitting at respawnHP from an earlier death, so check where they ended
-	// up instead: death always sends them back to the world's start room.
 	atStartRoom := func() bool {
 		server.mu.Lock()
 		defer server.mu.Unlock()
 		return server.players["alice"].RoomID == world.StartRoomID
 	}
 
-	// Polyphemus: dies without the stake, defeatable with it.
+	alice.cmd(t, "MOVE east", "OK room=loc.ody_troy_shore")
+	server.mu.Lock()
+	crew := server.players["alice"].Crew
+	server.mu.Unlock()
+	if crew != startingCrew {
+		t.Fatalf("crew after entering the Odyssey arc = %d, want %d", crew, startingCrew)
+	}
+
+	teleport("loc.ody_lotus")
+	alice.cmd(t, "TAKE item.lotus_fruit", "OK taken=item.lotus_fruit")
+	server.mu.Lock()
+	crew = server.players["alice"].Crew
+	server.mu.Unlock()
+	if crew != startingCrew-2 {
+		t.Fatalf("crew after eating the lotus = %d, want %d", crew, startingCrew-2)
+	}
+
+	teleport("loc.ody_aeolus")
+	alice.cmd(t, "TAKE item.bag_of_winds", "OK taken=item.bag_of_winds")
+	alice.cmd(t, "DROP item.bag_of_winds", "OK dropped=item.bag_of_winds")
+	server.mu.Lock()
+	crew = server.players["alice"].Crew
+	server.mu.Unlock()
+	if crew != startingCrew-2-3 {
+		t.Fatalf("crew after opening the bag of winds early = %d, want %d", crew, startingCrew-2-3)
+	}
+
 	teleport("loc.ody_cyclops")
 	beast := alice.cmdJSON(t, "ATTACK npc.polyphemus")
 	if beast["status"] != "dead" {
@@ -42,7 +61,7 @@ func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 	}
 	teleport("loc.ody_cyclops")
 	server.mu.Lock()
-	server.players["alice"].HP = maxPlayerHP // the earlier instant death left HP at respawnHP
+	server.players["alice"].HP = maxPlayerHP
 	server.mu.Unlock()
 	alice.cmd(t, "TAKE item.olive_stake", "OK taken=item.olive_stake")
 	won := false
@@ -60,14 +79,12 @@ func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 		t.Fatalf("did not defeat Polyphemus within 20 rounds")
 	}
 
-	// Circe: TALK kills without moly, is safe with it.
 	teleport("loc.ody_circe")
 	alice.cmd(t, "TALK npc.circe", "OK dead")
 	teleport("loc.ody_circe")
 	alice.cmd(t, "TAKE item.moly", "OK taken=item.moly")
 	alice.cmd(t, "TALK npc.circe", "OK Eat the moly root first, and my cup will only make you stronger, never smaller.")
 
-	// Sirens: entering the room kills without beeswax, is safe with it.
 	teleport("loc.ody_circe")
 	alice.cmd(t, "MOVE south", "OK room=loc.ody_sirens")
 	if !atStartRoom() {
@@ -80,13 +97,11 @@ func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 		t.Fatalf("entering the sirens with beeswax should not kill alice")
 	}
 
-	// Charybdis: always lethal.
 	alice.cmd(t, "MOVE south", "OK room=loc.ody_charybdis")
 	if !atStartRoom() {
 		t.Fatalf("charybdis should always be lethal")
 	}
 
-	// Scylla: needs crew+1 >= 7 to survive, loses 6 crew when it does.
 	teleport("loc.ody_sirens")
 	server.mu.Lock()
 	server.players["alice"].Crew = 2
@@ -101,13 +116,12 @@ func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 	server.mu.Unlock()
 	alice.cmd(t, "MOVE east", "OK room=loc.ody_scylla")
 	server.mu.Lock()
-	crew := server.players["alice"].Crew
+	crew = server.players["alice"].Crew
 	server.mu.Unlock()
 	if crew != 4 {
 		t.Fatalf("crew after scylla = %d, want 4 (10-6)", crew)
 	}
 
-	// Laestrygonians: attacking costs crew, not HP.
 	teleport("loc.ody_laestrygonians")
 	server.mu.Lock()
 	server.players["alice"].Crew = 12
@@ -123,7 +137,6 @@ func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 		t.Fatalf("crew after laestrygonian attack = %d, want 4 (12-8)", crew)
 	}
 
-	// Suitors: dies without the strung bow, defeatable with it.
 	teleport("loc.ody_palace")
 	suitor := alice.cmdJSON(t, "ATTACK npc.antinous")
 	if suitor["status"] != "dead" {

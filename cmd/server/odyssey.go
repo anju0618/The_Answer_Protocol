@@ -2,9 +2,6 @@ package main
 
 import "fmt"
 
-// Odyssey-arc-specific item behavior (memo.md 7.6, 7.9). These are hardcoded
-// by item ID rather than a generic data-driven field, since only three items
-// need this treatment.
 const (
 	itemLotusFruit    = "item.lotus_fruit"
 	itemSacredCattle  = "item.sacred_cattle"
@@ -15,8 +12,6 @@ const (
 	windsCrewLoss = 3
 )
 
-// initializeCrewLocked grants the player their starting crew the first time
-// they set foot in the Odyssey arc. Callers must hold s.mu.
 func (s *Server) initializeCrewLocked(player *Player) {
 	if player.CrewInitialized || player.RoomID != odysseyStartRoomID {
 		return
@@ -33,8 +28,6 @@ func spendCrewLocked(player *Player, amount int) int {
 	return amount
 }
 
-// applyTakeConsequencesLocked applies fallout for picking up a "forbidden" or
-// costly item. Callers must hold s.mu.
 func (s *Server) applyTakeConsequencesLocked(player *Player, name, itemID string) string {
 	switch itemID {
 	case itemLotusFruit:
@@ -47,8 +40,6 @@ func (s *Server) applyTakeConsequencesLocked(player *Player, name, itemID string
 	return ""
 }
 
-// applyDropConsequencesLocked applies fallout for dropping an item in the
-// wrong place. Callers must hold s.mu.
 func (s *Server) applyDropConsequencesLocked(player *Player, name, itemID string) string {
 	if itemID != itemBagOfWinds || player.RoomID == ithacaShoreRoomID {
 		return ""

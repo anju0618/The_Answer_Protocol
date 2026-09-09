@@ -105,10 +105,10 @@ func takeTestWorld() *World {
 			"loc.other": {ID: "loc.other"},
 		},
 		Items: map[string]*Item{
-			"item.sword":  {Name: "Rusty Sword", RoomID: "loc.start", Obtainable: true},
-			"item.shield": {Name: "Silver Shield", RoomID: "loc.start", Obtainable: true},
-			"item.fixed":  {Name: "Stone Statue", RoomID: "loc.start"},
-			"item.remote": {Name: "Distant Key", RoomID: "loc.other", Obtainable: true},
+			"item.sword":  {Name: en("Rusty Sword"), RoomID: "loc.start", Obtainable: true},
+			"item.shield": {Name: en("Silver Shield"), RoomID: "loc.start", Obtainable: true},
+			"item.fixed":  {Name: en("Stone Statue"), RoomID: "loc.start"},
+			"item.remote": {Name: en("Distant Key"), RoomID: "loc.other", Obtainable: true},
 		},
 	}
 }
@@ -116,8 +116,8 @@ func takeTestWorld() *World {
 func TestLookShowsCurrentRoomState(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = takeTestWorld()
-	server.world.Rooms["loc.start"].Name = "Starting Room"
-	server.world.Rooms["loc.start"].Description = "A quiet room."
+	server.world.Rooms["loc.start"].Name = en("Starting Room")
+	server.world.Rooms["loc.start"].Description = en("A quiet room.")
 	server.world.Rooms["loc.start"].Exits = map[string]string{"east": "loc.other"}
 	server.world.NPCs = map[string]*NPC{
 		"npc.guide":  {RoomID: "loc.start"},
@@ -125,7 +125,7 @@ func TestLookShowsCurrentRoomState(t *testing.T) {
 	}
 
 	type lookResponse struct {
-		Room    Room     `json:"room"`
+		Room    roomView `json:"room"`
 		Players []string `json:"players"`
 		Items   []string `json:"items"`
 		NPCs    []string `json:"npcs"`
@@ -524,7 +524,7 @@ func TestConnectRejectsNameThatWouldOverflowPresence(t *testing.T) {
 func TestLookRejectsOversizedResponseWithoutDisconnecting(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = takeTestWorld()
-	server.world.Rooms["loc.start"].Description = strings.Repeat("x", maxProtocolLineBytes)
+	server.world.Rooms["loc.start"].Description = en(strings.Repeat("x", maxProtocolLineBytes))
 	client := startTestClient(t, server)
 	client.connect(t, "alice")
 	client.command(t, "LOOK", "ERR 500 STATE_ERROR")
