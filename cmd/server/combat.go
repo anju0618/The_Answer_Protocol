@@ -13,9 +13,6 @@ func randDamage(min, max int) int {
 	return min + rand.IntN(max-min+1)
 }
 
-// respawnPlayerLocked kills the player and sends them back to the world's
-// start room with a reduced HP, per TASKS.md's "HP0で安全地帯にリスポーン"
-// requirement. Callers must hold s.mu.
 func (s *Server) respawnPlayerLocked(player *Player, name string) {
 	oldRoomID := player.RoomID
 	destination := defaultStartRoomID
@@ -58,6 +55,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		return false
 	}
 	query := strings.Join(parts[1:], " ")
+	locale := clientLocale(conn)
 
 	s.mu.Lock()
 	player := s.playerForUpdateLocked(*name)
@@ -66,7 +64,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	npcID := s.world.resolveNPCInRoom(player.RoomID, query)
+	npcID := s.world.resolveNPCInRoom(player.RoomID, query, locale)
 	if npcID == "" {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 404 NPC_NOT_FOUND")
@@ -85,16 +83,14 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 
 	switch {
 	case npc.Unwinnable:
-		// This fight can never be won outright: attacking it costs crew
-		// instead of HP (see memo.md 7.3, Laestrygonians).
 		lost := spendCrewLocked(player, npc.CrewLossOnAttack)
 		player.CombatTargetID = ""
-		resultText = fmt.Sprintf("%s attacks %s and is driven back, losing %d crew.", *name, npc.Name, lost)
+		resultText = fmt.Sprintf("%s attacks %s and is driven back, losing %d crew.", *name, npc.Name.Get(locale), lost)
 		result = combatResult{player.HP, npc.HP, 0, "overwhelmed"}
 
-	case npc.MythRequirementItem != "" && !player.hasItem(npc.MythRequirementItem):
+	case npc.hasMythRequirement() && !player.meetsMythRequirement(npc):
 		s.respawnPlayerLocked(player, *name)
-		resultText = fmt.Sprintf("%s attacks %s unprepared and is killed.", *name, npc.Name)
+		resultText = fmt.Sprintf("%s attacks %s unprepared and is killed.", *name, npc.Name.Get(locale))
 		result = combatResult{0, npc.HP, 0, "dead"}
 
 	default:
@@ -106,7 +102,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		if npc.HP == 0 {
 			player.CombatTargetID = ""
 			s.checkQuestObjectiveLocked(player, "defeat_npc", npcID)
-			resultText = fmt.Sprintf("%s defeats %s.", *name, npc.Name)
+			resultText = fmt.Sprintf("%s defeats %s.", *name, npc.Name.Get(locale))
 			result = combatResult{player.HP, 0, damage, "victory"}
 		} else {
 			player.CombatTargetID = npcID
@@ -114,10 +110,10 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 			player.HP -= counter
 			if player.HP <= 0 {
 				s.respawnPlayerLocked(player, *name)
-				resultText = fmt.Sprintf("%s is struck down by %s.", *name, npc.Name)
+				resultText = fmt.Sprintf("%s is struck down by %s.", *name, npc.Name.Get(locale))
 				result = combatResult{0, npc.HP, damage, "dead"}
 			} else {
-				resultText = fmt.Sprintf("%s attacks %s for %d damage and takes %d in return.", *name, npc.Name, damage, counter)
+				resultText = fmt.Sprintf("%s attacks %s for %d damage and takes %d in return.", *name, npc.Name.Get(locale), damage, counter)
 				result = combatResult{player.HP, npc.HP, damage, "combat"}
 			}
 		}
@@ -150,6 +146,7 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 400 BAD_REQUEST")
 		return false
 	}
+	locale := clientLocale(conn)
 
 	s.mu.Lock()
 	player := s.playerForUpdateLocked(*name)
@@ -167,21 +164,30 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	encounterRoomID := player.RoomID
 
+	targetID := player.CombatTargetID
+	fleeSucceeds := npc.FleeAccurate || (npc.FleeSucceedsOnce && !player.FledFrom[targetID])
+
 	var resultText, result string
-	if npc.FleeAccurate {
+	if fleeSucceeds {
 		result = "success"
-		resultText = fmt.Sprintf("%s flees from %s.", *name, npc.Name)
+		resultText = fmt.Sprintf("%s flees from %s.", *name, npc.Name.Get(locale))
 		player.CombatTargetID = ""
+		if npc.FleeSucceedsOnce {
+			if player.FledFrom == nil {
+				player.FledFrom = make(map[string]bool)
+			}
+			player.FledFrom[targetID] = true
+		}
 	} else {
 		counter := randDamage(counterMinDamage, counterMaxDamage)
 		player.HP -= counter
 		if player.HP <= 0 {
 			s.respawnPlayerLocked(player, *name)
 			result = "failure_dead"
-			resultText = fmt.Sprintf("%s tries to flee %s and is cut down.", *name, npc.Name)
+			resultText = fmt.Sprintf("%s tries to flee %s and is cut down.", *name, npc.Name.Get(locale))
 		} else {
 			result = "failure"
-			resultText = fmt.Sprintf("%s tries to flee %s and is struck for %d.", *name, npc.Name, counter)
+			resultText = fmt.Sprintf("%s tries to flee %s and is struck for %d.", *name, npc.Name.Get(locale), counter)
 		}
 	}
 

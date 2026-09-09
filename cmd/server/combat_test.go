@@ -7,12 +7,6 @@ import (
 	"testing"
 )
 
-// cmd behaves like testClient.command, but first discards any pending
-// "EVT ..." lines. ATTACK/FLEE/MOVE/TAKE/TALK now broadcast a combat/presence
-// event to the acting player's own connection (same convention as MOVE's
-// self "EVT ROOM PRESENCE ENTER" notification), queued right after that
-// command's own response. The next command's reply is therefore not always
-// the very next line on the wire.
 func (client *testClient) cmd(t *testing.T, command, want string) {
 	t.Helper()
 	if _, err := fmt.Fprintln(client.conn, command); err != nil {
@@ -34,8 +28,6 @@ func (client *testClient) cmd(t *testing.T, command, want string) {
 	}
 }
 
-// cmdJSON is cmd's counterpart for responses whose exact bytes aren't
-// predictable (they contain a random damage roll).
 func (client *testClient) cmdJSON(t *testing.T, command string) map[string]any {
 	t.Helper()
 	if _, err := fmt.Fprintln(client.conn, command); err != nil {
@@ -66,9 +58,9 @@ func TestAttackMythGateKillsWithoutItem(t *testing.T) {
 	server.world = &World{
 		StartRoomID: "loc.start",
 		Rooms:       map[string]*Room{"loc.start": {ID: "loc.start"}},
-		Items:       map[string]*Item{"item.stake": {Name: "Stake", RoomID: "loc.start", Obtainable: true}},
+		Items:       map[string]*Item{"item.stake": {Name: en("Stake"), RoomID: "loc.start", Obtainable: true}},
 		NPCs: map[string]*NPC{
-			"npc.beast": {Name: "Beast", Role: "enemy", RoomID: "loc.start", HP: 100, MythRequirementItem: "item.stake"},
+			"npc.beast": {Name: en("Beast"), Role: "enemy", RoomID: "loc.start", HP: 100, MythRequirementItem: "item.stake"},
 		},
 	}
 	alice := startTestClient(t, server)
@@ -90,7 +82,7 @@ func TestAttackUnwinnableCostsCrewNotHP(t *testing.T) {
 		StartRoomID: "loc.start",
 		Rooms:       map[string]*Room{"loc.start": {ID: "loc.start"}},
 		NPCs: map[string]*NPC{
-			"npc.giant": {Name: "Giant", Role: "enemy", RoomID: "loc.start", HP: 65, Unwinnable: true, CrewLossOnAttack: 8, FleeAccurate: true},
+			"npc.giant": {Name: en("Giant"), Role: "enemy", RoomID: "loc.start", HP: 65, Unwinnable: true, CrewLossOnAttack: 8, FleeAccurate: true},
 		},
 	}
 	alice := startTestClient(t, server)
@@ -117,12 +109,12 @@ func TestAttackDefeatCompletesQuestAndHeals(t *testing.T) {
 		StartRoomID: "loc.start",
 		Rooms:       map[string]*Room{"loc.start": {ID: "loc.start"}},
 		NPCs: map[string]*NPC{
-			"npc.grunt": {Name: "Grunt", Role: "enemy", RoomID: "loc.start", HP: 8}, // <= min damage: dies in one hit
-			"npc.giver": {Name: "Giver", Role: "quest_giver", RoomID: "loc.start", Dialogue: []string{"Kill it."}},
+			"npc.grunt": {Name: en("Grunt"), Role: "enemy", RoomID: "loc.start", HP: 8},
+			"npc.giver": {Name: en("Giver"), Role: "quest_giver", RoomID: "loc.start", Dialogue: ens("Kill it.")},
 		},
 		Quests: map[string]*Quest{
 			"quest.defeat": {
-				Name: "Defeat the Grunt", Description: "Defeat the grunt.", GiverNPCID: "npc.giver",
+				Name: en("Defeat the Grunt"), Description: en("Defeat the grunt."), GiverNPCID: "npc.giver",
 				Objective: QuestObjective{Type: "defeat_npc", TargetID: "npc.grunt", Count: 1},
 				Reward:    QuestReward{HP: 30},
 			},
@@ -152,8 +144,8 @@ func TestFleeSuccessAndFailureAndNotInCombat(t *testing.T) {
 		StartRoomID: "loc.start",
 		Rooms:       map[string]*Room{"loc.start": {ID: "loc.start"}},
 		NPCs: map[string]*NPC{
-			"npc.brave":    {Name: "Brave", Role: "enemy", RoomID: "loc.start", HP: 1000, FleeAccurate: true},
-			"npc.stubborn": {Name: "Stubborn", Role: "enemy", RoomID: "loc.start", HP: 1000, FleeAccurate: false},
+			"npc.brave":    {Name: en("Brave"), Role: "enemy", RoomID: "loc.start", HP: 1000, FleeAccurate: true},
+			"npc.stubborn": {Name: en("Stubborn"), Role: "enemy", RoomID: "loc.start", HP: 1000, FleeAccurate: false},
 		},
 	}
 	alice := startTestClient(t, server)
@@ -161,7 +153,7 @@ func TestFleeSuccessAndFailureAndNotInCombat(t *testing.T) {
 
 	alice.cmd(t, "FLEE", "ERR 407 NOT_IN_COMBAT")
 
-	atk := alice.cmdJSON(t, "ATTACK npc.brave") // survives (HP 1000), enters combat
+	atk := alice.cmdJSON(t, "ATTACK npc.brave")
 	fleeData := alice.cmdJSON(t, "FLEE")
 	if fleeData["result"] != "success" || fleeData["hp"] != atk["attacker_hp"] {
 		t.Fatalf("flee from a myth-accurate retreat should succeed with unchanged hp, attack=%v flee=%v", atk, fleeData)
@@ -183,30 +175,27 @@ func TestRoomHazards(t *testing.T) {
 			"loc.start": {ID: "loc.start", Exits: map[string]string{
 				"east": "loc.gate", "south": "loc.pit", "west": "loc.strait",
 			}},
-			"loc.gate":   {ID: "loc.gate", Name: "Gate", Exits: map[string]string{"west": "loc.start"}, Hazard: &RoomHazard{Type: "item_gate", RequiredItemID: "item.key"}},
-			"loc.pit":    {ID: "loc.pit", Name: "Pit", Hazard: &RoomHazard{Type: "lethal"}},
-			"loc.strait": {ID: "loc.strait", Name: "Strait", Hazard: &RoomHazard{Type: "crew_gate", CrewLoss: 6, MinPartyTotal: 7}},
+			"loc.gate":   {ID: "loc.gate", Name: en("Gate"), Exits: map[string]string{"west": "loc.start"}, Hazard: &RoomHazard{Type: "item_gate", RequiredItemID: "item.key"}},
+			"loc.pit":    {ID: "loc.pit", Name: en("Pit"), Hazard: &RoomHazard{Type: "lethal"}},
+			"loc.strait": {ID: "loc.strait", Name: en("Strait"), Hazard: &RoomHazard{Type: "crew_gate", CrewLoss: 6, MinPartyTotal: 7}},
 		},
 		Items: map[string]*Item{
-			"item.key": {Name: "Brass Key", RoomID: "loc.start", Obtainable: true},
+			"item.key": {Name: en("Brass Key"), RoomID: "loc.start", Obtainable: true},
 		},
 	}
 	alice := startTestClient(t, server)
 	alice.connect(t, "alice")
 
-	// lethal: always dies and respawns at the start room.
 	alice.cmd(t, "MOVE south", "OK room=loc.pit")
 	alice.cmd(t, "STATUS", `OK {"hp":20,"max_hp":100,"status":"healthy"}`)
 
-	// item_gate: dies without the key, survives with it.
 	alice.cmd(t, "MOVE east", "OK room=loc.gate")
 	alice.cmd(t, "STATUS", `OK {"hp":20,"max_hp":100,"status":"healthy"}`)
 	alice.cmd(t, "TAKE item.key", "OK taken=item.key")
 	alice.cmd(t, "MOVE east", "OK room=loc.gate")
-	alice.cmd(t, "STATUS", `OK {"hp":20,"max_hp":100,"status":"healthy"}`) // unchanged: no death this time
+	alice.cmd(t, "STATUS", `OK {"hp":20,"max_hp":100,"status":"healthy"}`)
 	alice.cmd(t, "MOVE west", "OK room=loc.start")
 
-	// crew_gate: not enough crew (Crew+1 < 7) dies; enough crew survives and pays the toll.
 	server.mu.Lock()
 	server.players["alice"].Crew = 3
 	server.mu.Unlock()
@@ -228,14 +217,75 @@ func TestRoomHazards(t *testing.T) {
 	}
 }
 
+func TestAttackMythGateByCompletedQuest(t *testing.T) {
+	server := newServer(t.TempDir())
+	server.world = &World{
+		StartRoomID: "loc.start",
+		Rooms:       map[string]*Room{"loc.start": {ID: "loc.start"}},
+		NPCs: map[string]*NPC{
+			"npc.giant":  {Name: en("Bronze Giant"), Role: "enemy", RoomID: "loc.start", HP: 100, MythRequirementQuest: "quest.favor"},
+			"npc.helper": {Name: en("Helper"), Role: "quest_giver", RoomID: "loc.start", Dialogue: ens("Help me first.")},
+		},
+		Quests: map[string]*Quest{
+			"quest.favor": {
+				Name: en("Earn Favor"), Description: en("Earn the sorceress's favor."), GiverNPCID: "npc.helper",
+				Objective: QuestObjective{Type: "defeat_npc", TargetID: "npc.placeholder", Count: 1},
+				Reward:    QuestReward{HP: 5},
+			},
+		},
+	}
+	alice := startTestClient(t, server)
+	alice.connect(t, "alice")
+
+	beast := alice.cmdJSON(t, "ATTACK npc.giant")
+	if beast["status"] != "dead" {
+		t.Fatalf("attacking a quest-gated NPC without the quest done should kill alice, got %v", beast)
+	}
+
+	server.mu.Lock()
+	server.players["alice"].HP = maxPlayerHP
+	server.players["alice"].Quests = map[string]*PlayerQuest{"quest.favor": {Status: "completed", Progress: 1}}
+	server.mu.Unlock()
+
+	result := alice.cmdJSON(t, "ATTACK npc.giant")
+	if result["status"] == "dead" {
+		t.Fatalf("attacking with the gating quest completed should not be instant death: %v", result)
+	}
+}
+
+func TestFleeSucceedsOnceThenFails(t *testing.T) {
+	server := newServer(t.TempDir())
+	server.world = &World{
+		StartRoomID: "loc.start",
+		Rooms:       map[string]*Room{"loc.start": {ID: "loc.start"}},
+		NPCs: map[string]*NPC{
+			"npc.hero": {Name: en("Proud Defender"), Role: "enemy", RoomID: "loc.start", HP: 1000, FleeSucceedsOnce: true},
+		},
+	}
+	alice := startTestClient(t, server)
+	alice.connect(t, "alice")
+
+	alice.cmdJSON(t, "ATTACK npc.hero")
+	first := alice.cmdJSON(t, "FLEE")
+	if first["result"] != "success" {
+		t.Fatalf("first flee ever from this NPC should succeed, got %v", first)
+	}
+
+	alice.cmdJSON(t, "ATTACK npc.hero")
+	second := alice.cmdJSON(t, "FLEE")
+	if second["result"] == "success" {
+		t.Fatalf("a second flee from this NPC, even in a new encounter, should fail: %v", second)
+	}
+}
+
 func TestTalkMythGateOnNonHostileNPC(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = &World{
 		StartRoomID: "loc.start",
 		Rooms:       map[string]*Room{"loc.start": {ID: "loc.start"}},
-		Items:       map[string]*Item{"item.moly": {Name: "Moly Root", RoomID: "loc.start", Obtainable: true}},
+		Items:       map[string]*Item{"item.moly": {Name: en("Moly Root"), RoomID: "loc.start", Obtainable: true}},
 		NPCs: map[string]*NPC{
-			"npc.host": {Name: "Host", Role: "quest_giver", RoomID: "loc.start", MythRequirementItem: "item.moly", Dialogue: []string{"Welcome."}},
+			"npc.host": {Name: en("Host"), Role: "quest_giver", RoomID: "loc.start", MythRequirementItem: "item.moly", Dialogue: ens("Welcome.")},
 		},
 	}
 	alice := startTestClient(t, server)

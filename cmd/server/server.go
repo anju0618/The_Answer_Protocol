@@ -221,6 +221,7 @@ func requireExactArgs(conn net.Conn, parts []string, n int) bool {
 type commandHandler func(s *Server, conn net.Conn, name *string, parts []string) (stop bool)
 
 var commandHandlers = map[string]commandHandler{
+	"LANG":      handleLang,
 	"CONNECT":   handleConnect,
 	"LOOK":      handleLook,
 	"MOVE":      handleMove,
@@ -300,11 +301,7 @@ func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 		return false
 	}
 	roomID := player.RoomID
-	room := *s.world.Rooms[roomID]
-	room.Exits = make(map[string]string, len(room.Exits))
-	for direction, destination := range s.world.Rooms[roomID].Exits {
-		room.Exits[direction] = destination
-	}
+	room := newRoomView(s.world.Rooms[roomID], clientLocale(conn))
 
 	players := make([]string, 0)
 	for playerName, other := range s.players {
@@ -328,7 +325,7 @@ func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 	sort.Strings(items)
 	sort.Strings(npcs)
 	data, err := json.Marshal(struct {
-		Room    Room     `json:"room"`
+		Room    roomView `json:"room"`
 		Players []string `json:"players"`
 		Items   []string `json:"items"`
 		NPCs    []string `json:"npcs"`
@@ -406,7 +403,7 @@ func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 			}
 		}
 		s.initializeCrewLocked(player)
-		if flavor := s.applyRoomHazardLocked(player, *name, s.world.Rooms[destination]); flavor != "" {
+		if flavor := s.applyRoomHazardLocked(player, *name, s.world.Rooms[destination], clientLocale(conn)); flavor != "" {
 			s.broadcastRoomEventLocked(destination, "EVT ROOM COMBAT "+flavor)
 		}
 	}
@@ -467,12 +464,13 @@ func handleTake(s *Server, conn net.Conn, name *string, parts []string) bool {
 		return false
 	}
 
+	locale := clientLocale(conn)
 	itemID := ""
 	if item := s.world.Items[query]; item != nil && item.Obtainable && item.RoomID == player.RoomID {
 		itemID = query
 	} else {
 		for id, item := range s.world.Items {
-			if item != nil && item.Obtainable && item.RoomID == player.RoomID && strings.EqualFold(item.Name, query) && (itemID == "" || id < itemID) {
+			if item != nil && item.Obtainable && item.RoomID == player.RoomID && strings.EqualFold(item.Name.Get(locale), query) && (itemID == "" || id < itemID) {
 				itemID = id
 			}
 		}
@@ -531,8 +529,9 @@ func handleDrop(s *Server, conn net.Conn, name *string, parts []string) bool {
 		}
 	}
 	if index == -1 {
+		locale := clientLocale(conn)
 		for i, itemID := range player.Inventory {
-			if item := s.world.Items[itemID]; item != nil && strings.EqualFold(item.Name, query) && (index == -1 || itemID < player.Inventory[index]) {
+			if item := s.world.Items[itemID]; item != nil && strings.EqualFold(item.Name.Get(locale), query) && (index == -1 || itemID < player.Inventory[index]) {
 				index = i
 			}
 		}
@@ -652,7 +651,8 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	npcID := s.world.resolveNPCInRoom(player.RoomID, query)
+	locale := clientLocale(conn)
+	npcID := s.world.resolveNPCInRoom(player.RoomID, query, locale)
 	if npcID == "" {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 404 NPC_NOT_FOUND")
@@ -660,16 +660,13 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	npc := s.world.NPCs[npcID]
 
-	// Non-hostile NPCs can still be lethal to engage without the right myth
-	// preparation (e.g. Circe without moly). Hostile NPCs gate on ATTACK
-	// instead, since idle TALK to them is always safe.
-	if npc.Role != "enemy" && npc.MythRequirementItem != "" && !player.hasItem(npc.MythRequirementItem) {
+	if npc.Role != "enemy" && npc.hasMythRequirement() && !player.meetsMythRequirement(npc) {
 		encounterRoomID := player.RoomID
 		client := conn.(*serverClient)
 		response, err := client.enqueueResponse("OK dead")
 		if err == nil {
 			s.respawnPlayerLocked(player, *name)
-			s.broadcastRoomEventLocked(encounterRoomID, fmt.Sprintf("EVT ROOM COMBAT %s speaks with %s unprepared, and does not survive it.", *name, npc.Name))
+			s.broadcastRoomEventLocked(encounterRoomID, fmt.Sprintf("EVT ROOM COMBAT %s speaks with %s unprepared, and does not survive it.", *name, npc.Name.Get(locale)))
 		}
 		s.mu.Unlock()
 		if err != nil {
@@ -678,14 +675,18 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 		return client.waitResponse(response) != nil
 	}
 
-	if len(npc.Dialogue) == 0 || strings.TrimSpace(npc.Dialogue[0]) == "" || !utf8.ValidString(npc.Dialogue[0]) ||
-		strings.IndexFunc(npc.Dialogue[0], unicode.IsControl) >= 0 || len("OK ")+len(npc.Dialogue[0]) > maxProtocolLineBytes {
+	dialogue := ""
+	if len(npc.Dialogue) > 0 {
+		dialogue = npc.Dialogue[0].Get(locale)
+	}
+	if dialogue == "" || strings.TrimSpace(dialogue) == "" || !utf8.ValidString(dialogue) ||
+		strings.IndexFunc(dialogue, unicode.IsControl) >= 0 || len("OK ")+len(dialogue) > maxProtocolLineBytes {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
 	client := conn.(*serverClient)
-	response, err := client.enqueueResponse("OK " + npc.Dialogue[0])
+	response, err := client.enqueueResponse("OK " + dialogue)
 	s.mu.Unlock()
 	if err != nil {
 		return true
