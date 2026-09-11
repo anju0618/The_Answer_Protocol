@@ -1,3 +1,7 @@
+// The Answer Protocol (TAP) の生プロトコル中継CLIクライアント。
+// 標準入力に打った行をそのままTCP接続に送り、サーバーからの応答行をそのまま
+// 標準出力に表示するだけの薄いクライアント。プロトコルをユーザーフレンドリーな
+// コマンドに翻訳する機能は持たない(README「Instructions」参照)。
 package main
 
 import (
@@ -11,6 +15,8 @@ import (
 	"sync"
 )
 
+// main はサーバーに接続し、runClient に処理を委譲する。
+// コマンドライン引数で接続先の host:port を指定できる(省略時は127.0.0.1:4242)。
 func main() {
 	address := "127.0.0.1:4242"
 	if len(os.Args) > 2 {
@@ -30,11 +36,18 @@ func main() {
 	runClient(conn.(*net.TCPConn), os.Stdin)
 }
 
+// clientConn は net.Conn に半クローズ(送信方向だけ閉じる)ができる
+// CloseWrite を足したインターフェース。標準入力がEOFになった時に、
+// 受信はまだ続けたいまま送信だけを閉じるために使う。
 type clientConn interface {
 	net.Conn
 	CloseWrite() error
 }
 
+// runClient は「サーバーからの受信を読み続けるgoroutine」「標準入力を
+// 読み続けるgoroutine」「両者からのメッセージをselectでさばくメインループ」の
+// 3つで構成される。QUITを送った後は、サーバーからの応答(OK bye / ERR)を
+// 待ってから終了するようにしている(送信直後に打ち切ると応答を取りこぼすため)。
 func runClient(conn clientConn, stdin io.Reader) {
 	serverDone := make(chan error, 1)
 	quitAcknowledged := make(chan struct{}, 1)
