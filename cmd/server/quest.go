@@ -1,3 +1,6 @@
+// QUEST/QUESTSコマンドと、クエスト進行の自動判定。手動の完了報告コマンドは
+// 用意せず、TAKE/ATTACKが成功した瞬間にサーバー側で該当する進行中クエストを
+// 自動チェック・自動達成・自動報酬付与する(README「Quest System」参照)。
 package main
 
 import (
@@ -8,6 +11,11 @@ import (
 	"strings"
 )
 
+// checkQuestObjectiveLocked は、objType("collect_item"または"defeat_npc")と
+// targetID(取得したアイテムID/倒したNPC ID)に一致する、player が
+// 受注済み(active)の全クエストを1つ進める。目標数に達したクエストは
+// completedにし、報酬HPを即座に回復させる(上限maxPlayerHP)。
+// TAKE成功時・ATTACK勝利時から呼ばれる。
 func (s *Server) checkQuestObjectiveLocked(player *Player, objType, targetID string) {
 	if s.world == nil {
 		return
@@ -31,6 +39,10 @@ func (s *Server) checkQuestObjectiveLocked(player *Player, objType, targetID str
 	}
 }
 
+// handleQuest はQUEST <npc> コマンドを処理する。指定NPCが持つクエストの
+// 情報(未達成なら)を返し、初回呼び出し時はそのクエストをプレイヤーの
+// アクティブなクエストとして登録する。達成済みクエストを再度尋ねたり、
+// クエストを持たないNPCに尋ねたりするとERR 406を返す。
 func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !requireArgs(conn, parts, 2) {
 		return false
@@ -93,6 +105,9 @@ func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 	return client.waitResponse(response) != nil
 }
 
+// handleQuests はQUESTS(引数なし)コマンドを処理する。プレイヤーがこれ
+// までに受注した(進行中・達成済み問わず)全クエストを、進行状況
+// "現在数/目標数" 付きでID順に一覧表示する。
 func handleQuests(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !requireExactArgs(conn, parts, 1) {
 		return false

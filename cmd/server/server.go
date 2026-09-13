@@ -1,3 +1,8 @@
+// The Answer Protocol サーバーの中核。Server構造体、接続ライフサイクル
+// (接続・切断・セーブ/ロード)、コマンドディスパッチテーブル、および
+// LOOK/MOVE/CONNECT/QUIT/TAKE/DROP/INVENTORY/TALK/STATUSの各ハンドラを
+// まとめている(ATTACK/FLEEはcombat.go、QUEST/QUESTSはquest.go、
+// CHAT/GROUPはchat.go/group.goに分離)。
 package main
 
 import (
@@ -31,6 +36,10 @@ const (
 	startingCrew       = 12
 )
 
+// Server はサーバー全体の状態。mu が接続中プレイヤー・ワールド・
+// グループなどインメモリの共有状態全体を保護する単一ロックで、ioMu は
+// それとは別に、ディスクへの保存処理(player_store.go / item_store.go)を
+// 直列化する(ディスクI/Oの遅延でmuを長時間ロックしないため)。
 type Server struct {
 	mu            sync.Mutex
 	ioMu          sync.Mutex
@@ -44,6 +53,9 @@ type Server struct {
 	world         *World
 }
 
+// NewServer は本番用のServerを作る。data/world.json からワールドを
+// ロードし、保存済みのアイテム位置・所持状態を復元する。失敗時は
+// log.Fatalfでプロセスごと終了する(起動時にしか呼ばれないため)。
 func NewServer() *Server {
 	s := newServer("saves")
 	world, err := loadWorld("data/world.json")
@@ -60,6 +72,9 @@ func NewServer() *Server {
 	return s
 }
 
+// newServer は空の(ワールド未設定の)Serverを作る。テストでは実際の
+// world.jsonを読まず、直接 server.world にテスト用のWorldを差し込む
+// ために本体からNewServerとは別に切り出されている。
 func newServer(saveDir string) *Server {
 	return &Server{
 		players:       make(map[string]*Player),
@@ -71,6 +86,9 @@ func newServer(saveDir string) *Server {
 	}
 }
 
+// connectPlayer は name でのCONNECTを処理する。既にその名前で接続中なら
+// errNameInUseを返す。保存済みのプレイヤーがいればその状態を復元し、
+// いなければ新規プレイヤー(ワールドの開始地点、HP100)を作って保存する。
 func (s *Server) connectPlayer(name string) error {
 	s.mu.Lock()
 	if _, exists := s.players[name]; exists {
@@ -111,6 +129,9 @@ func (s *Server) connectPlayer(name string) error {
 	return nil
 }
 
+// saveAndRemovePlayer は name の現在の状態をディスクへ保存してから、
+// インメモリの接続中プレイヤー一覧から除去する(QUIT・正常切断の共通処理)。
+// 保存に失敗した場合は除去せず、次回の接続時に再試行できるようにする。
 func (s *Server) saveAndRemovePlayer(name string) error {
 	s.mu.Lock()
 	player := s.players[name]
@@ -142,6 +163,10 @@ func (s *Server) saveAndRemovePlayer(name string) error {
 	return nil
 }
 
+// removePlayerLocked は name をインメモリの状態(players/clients/groups等)
+// から除去する。restoreUnsavedTakes が true の場合(=保存できずに切断した
+// 異常系)、TAKEしたがまだディスクに保存されていないアイテムを元の部屋に
+// 戻す。同じ部屋にいる他プレイヤーへEVT ROOM PRESENCE LEAVEを通知する。
 func (s *Server) removePlayerLocked(name string, restoreUnsavedTakes bool) {
 	player := s.players[name]
 	if player == nil {
@@ -177,6 +202,8 @@ func (s *Server) removePlayerLocked(name string, restoreUnsavedTakes bool) {
 	s.broadcastPlayerCountLocked()
 }
 
+// broadcastRoomEventLocked は roomID にいる全プレイヤーへ event を送る。
+// 戦闘結果・部屋ハザードのフレーバーテキスト(EVT ROOM COMBAT)などで使う。
 func (s *Server) broadcastRoomEventLocked(roomID, event string) {
 	for playerName, other := range s.players {
 		if other.RoomID == roomID {
@@ -187,6 +214,8 @@ func (s *Server) broadcastRoomEventLocked(roomID, event string) {
 	}
 }
 
+// broadcastPlayerCountLocked は現在の接続人数を全クライアントへ
+// EVT STATSとして送る(接続・切断のたびに呼ばれる)。
 func (s *Server) broadcastPlayerCountLocked() {
 	event := fmt.Sprintf("EVT STATS players=%d", len(s.players))
 	for _, client := range s.clients {
@@ -194,6 +223,10 @@ func (s *Server) broadcastPlayerCountLocked() {
 	}
 }
 
+// playerForUpdateLocked は、状態を書き換えてよいプレイヤーを返す。
+// 切断処理中(exiting==true)のプレイヤーはnilを返す(切断のちょうど
+// 最中に別のコマンドが割り込んで状態を書き換えてしまうのを防ぐため)。
+// 読み取り専用の用途(LOOKなど)ではこれを使わず s.players を直接見てよい。
 func (s *Server) playerForUpdateLocked(name string) *Player {
 	player := s.players[name]
 	if player == nil || player.exiting {
@@ -202,6 +235,8 @@ func (s *Server) playerForUpdateLocked(name string) *Player {
 	return player
 }
 
+// requireArgs は引数の数が min 以上あるかを検証し、無ければERR 400を
+// 返してfalseを返す(足りていればtrue)。各ハンドラの先頭で使う共通処理。
 func requireArgs(conn net.Conn, parts []string, min int) bool {
 	if len(parts) < min {
 		fmt.Fprintln(conn, "ERR 400 BAD_REQUEST")
@@ -210,6 +245,7 @@ func requireArgs(conn net.Conn, parts []string, min int) bool {
 	return true
 }
 
+// requireExactArgs はrequireArgsの「ちょうどn個」版。
 func requireExactArgs(conn net.Conn, parts []string, n int) bool {
 	if len(parts) != n {
 		fmt.Fprintln(conn, "ERR 400 BAD_REQUEST")
@@ -218,8 +254,12 @@ func requireExactArgs(conn net.Conn, parts []string, n int) bool {
 	return true
 }
 
+// commandHandler は各コマンドの処理関数の型。戻り値は「この接続を
+// 切断すべきか」(true=切断)。
 type commandHandler func(s *Server, conn net.Conn, name *string, parts []string) (stop bool)
 
+// commandHandlers はコマンド名→処理関数のディスパッチテーブル。
+// LANG/FLEEはRFCに無い独自拡張、それ以外はRFC 5章で定義された15コマンド。
 var commandHandlers = map[string]commandHandler{
 	"LANG":      handleLang,
 	"CONNECT":   handleConnect,
@@ -240,6 +280,9 @@ var commandHandlers = map[string]commandHandler{
 	"QUESTS":    handleQuests,
 }
 
+// handleConnect はCONNECT <name>コマンドを処理する。1接続につき1回だけ
+// 呼べる(*nameが既に設定されていればERR 400)。名前の重複はERR 201。
+// 成功すると同じ部屋にいる他プレイヤーへEVT ROOM PRESENCE ENTERを通知する。
 func handleConnect(s *Server, conn net.Conn, name *string, parts []string) bool {
 	client := conn.(*serverClient)
 	if len(parts) != 2 || *name != "" {
@@ -284,6 +327,10 @@ func handleConnect(s *Server, conn net.Conn, name *string, parts []string) bool 
 	return client.waitResponse(response) != nil
 }
 
+// handleLook はLOOKコマンドを処理する。現在の部屋の情報(名前・説明・
+// 出口)と、同じ部屋にいるプレイヤー・アイテムID・NPC IDの一覧を返す。
+// 部屋名・説明はclientLocaleで解決した言語のプレーン文字列になる
+// (locale.goのroomView参照)。
 func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !requireExactArgs(conn, parts, 1) {
 		return false
@@ -350,6 +397,12 @@ func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 	return client.waitResponse(response) != nil
 }
 
+// handleMove はMOVE <direction>コマンドを処理する。処理順は:
+//  1. 指定方向の出口が存在するか(無ければERR 301)
+//  2. 現在の部屋に「まだ倒しても振り切ってもいない生きた敵」がいないか
+//     (いれば部屋封鎖=即死。hazard.goのblockingEnemyLockedを参照)
+//  3. 実際に移動し、他プレイヤーへ入退室イベントを通知
+//  4. オデュッセイア編ならクルー初期化、移動先の部屋ハザードを判定
 func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !requireExactArgs(conn, parts, 2) {
 		return false
@@ -383,6 +436,21 @@ func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
+	if _, blocker := s.blockingEnemyLocked(player, player.RoomID); blocker != nil {
+		encounterRoomID := player.RoomID
+		locale := clientLocale(conn)
+		client := conn.(*serverClient)
+		response, err := client.enqueueResponse("OK room=" + destination)
+		if err == nil {
+			s.respawnPlayerLocked(player, *name)
+			s.broadcastRoomEventLocked(encounterRoomID, fmt.Sprintf("EVT ROOM COMBAT %s tries to slip past %s and doesn't make it.", *name, blocker.Name.Get(locale)))
+		}
+		s.mu.Unlock()
+		if err != nil {
+			return true
+		}
+		return client.waitResponse(response) != nil
+	}
 	client := conn.(*serverClient)
 	response, err := client.enqueueResponse("OK room=" + destination)
 	if err == nil {
@@ -414,6 +482,7 @@ func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 	return client.waitResponse(response) != nil
 }
 
+// handleWho はWHOコマンドを処理する。現在の全接続人数を返す(認証前でも呼べる)。
 func handleWho(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !requireExactArgs(conn, parts, 1) {
 		return false
