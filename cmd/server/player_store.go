@@ -1,3 +1,7 @@
+// プレイヤーの状態(playerdata.json)の読み書きと、サーバー起動時の
+// アイテム所持状態の復元。CONNECT/QUIT/切断のたびにこのファイルが
+// 読み書きされ、プレイヤーはHP・所持品・居場所などを保ったまま
+// 再接続できる。
 package main
 
 import (
@@ -10,10 +14,13 @@ import (
 
 const playersSaveFile = "playerdata.json"
 
+// playersSavePath はプレイヤー状態の保存先ファイルパスを返す。
 func (s *Server) playersSavePath() string {
 	return filepath.Join(s.saveDir, playersSaveFile)
 }
 
+// loadPlayers は保存済みの全プレイヤー状態(名前→Player)を読み込む。
+// 保存ファイルが無い/空なら空のマップを返す。
 func (s *Server) loadPlayers() (map[string]*Player, error) {
 	data, err := os.ReadFile(s.playersSavePath())
 	if errors.Is(err, os.ErrNotExist) {
@@ -41,6 +48,11 @@ func (s *Server) loadPlayers() (map[string]*Player, error) {
 	return players, nil
 }
 
+// restoreItemOwnership はサーバー起動時に一度だけ呼ばれ、保存済み
+// プレイヤーの所持品に含まれるアイテムを「まだ部屋には無い」状態
+// (RoomID=="")にする(そうしないと、誰かの持ち物であるはずのアイテムが
+// world.jsonの初期配置どおり部屋にも存在する、という矛盾が起きる)。
+// 同じアイテムが2人の所持品に重複して入っていれば異常として弾く。
 func (s *Server) restoreItemOwnership() error {
 	players, err := s.loadPlayers()
 	if err != nil {
@@ -64,6 +76,8 @@ func (s *Server) restoreItemOwnership() error {
 	return nil
 }
 
+// savePlayer は player 1人ぶんの状態を、既存の保存データにマージして
+// 書き込む。
 func (s *Server) savePlayer(player *Player) error {
 	if player == nil {
 		return errors.New("missing player state")
@@ -76,6 +90,9 @@ func (s *Server) savePlayer(player *Player) error {
 	return s.writePlayers(players)
 }
 
+// writePlayers は players 全員ぶんの状態をplayerdata.jsonへ書き込む。
+// item_store.goのwriteItemLocationsと同じく、一時ファイル+renameの
+// アトミックな保存パターン。
 func (s *Server) writePlayers(players map[string]*Player) error {
 	data, err := json.MarshalIndent(players, "", "  ")
 	if err != nil {
