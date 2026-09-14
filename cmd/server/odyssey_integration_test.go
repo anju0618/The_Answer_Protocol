@@ -35,26 +35,29 @@ func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 		t.Fatalf("crew after entering the Odyssey arc = %d, want %d", crew, startingCrew)
 	}
 
-	teleport("loc.ody_lotus")
-	alice.cmd(t, "TAKE item.lotus_fruit", "OK taken=item.lotus_fruit")
+	alice.cmd(t, "MOVE east", "OK room=loc.ody_cicones")
 	server.mu.Lock()
 	crew = server.players["alice"].Crew
 	server.mu.Unlock()
 	if crew != startingCrew-2 {
-		t.Fatalf("crew after eating the lotus = %d, want %d", crew, startingCrew-2)
+		t.Fatalf("crew after the Cicones raid = %d, want %d", crew, startingCrew-2)
 	}
 
-	teleport("loc.ody_aeolus")
-	alice.cmd(t, "TAKE item.bag_of_winds", "OK taken=item.bag_of_winds")
-	alice.cmd(t, "DROP item.bag_of_winds", "OK dropped=item.bag_of_winds")
+	alice.cmd(t, "MOVE east", "OK room=loc.ody_lotus")
+	alice.cmd(t, "TAKE item.lotus_fruit", "OK taken=item.lotus_fruit")
+	if !atStartRoom() {
+		t.Fatalf("eating the lotus fruit should kill alice")
+	}
+
+	teleport("loc.ody_lotus")
+	alice.cmd(t, "MOVE east", "OK room=loc.ody_cyclops")
 	server.mu.Lock()
 	crew = server.players["alice"].Crew
 	server.mu.Unlock()
-	if crew != startingCrew-2-3 {
-		t.Fatalf("crew after opening the bag of winds early = %d, want %d", crew, startingCrew-2-3)
+	if crew != startingCrew-2-2 {
+		t.Fatalf("crew after Polyphemus's cave = %d, want %d", crew, startingCrew-2-2)
 	}
 
-	teleport("loc.ody_cyclops")
 	beast := alice.cmdJSON(t, "ATTACK npc.polyphemus")
 	if beast["status"] != "dead" {
 		t.Fatalf("attacking Polyphemus unarmed should kill alice, got %v", beast)
@@ -77,6 +80,16 @@ func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 	}
 	if !won {
 		t.Fatalf("did not defeat Polyphemus within 20 rounds")
+	}
+
+	teleport("loc.ody_aeolus")
+	alice.cmd(t, "TAKE item.bag_of_winds", "OK taken=item.bag_of_winds")
+	alice.cmd(t, "DROP item.bag_of_winds", "OK dropped=item.bag_of_winds")
+	server.mu.Lock()
+	crew = server.players["alice"].Crew
+	server.mu.Unlock()
+	if crew != startingCrew-2-2-3 {
+		t.Fatalf("crew after opening the bag of winds early = %d, want %d", crew, startingCrew-2-2-3)
 	}
 
 	teleport("loc.ody_circe")
@@ -120,6 +133,21 @@ func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 	server.mu.Unlock()
 	if crew != 4 {
 		t.Fatalf("crew after scylla = %d, want 4 (10-6)", crew)
+	}
+
+	alice.cmd(t, "MOVE east", "OK room=loc.ody_thrinacia")
+	if !atStartRoom() {
+		t.Fatalf("Scylla is still alive and unresolved, leaving toward Thrinacia without fleeing her should kill alice")
+	}
+	teleport("loc.ody_scylla")
+	alice.cmdJSON(t, "ATTACK npc.scylla")
+	fleeResult := alice.cmdJSON(t, "FLEE")
+	if fleeResult["result"] != "success" {
+		t.Fatalf("fleeing Scylla should succeed (she's myth-accurate to flee, not fight), got %v", fleeResult)
+	}
+	alice.cmd(t, "MOVE east", "OK room=loc.ody_thrinacia")
+	if atStartRoom() {
+		t.Fatalf("Scylla is resolved (fled from), leaving should now succeed")
 	}
 
 	teleport("loc.ody_laestrygonians")
