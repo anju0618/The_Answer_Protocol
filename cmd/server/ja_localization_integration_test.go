@@ -40,7 +40,7 @@ func TestJapaneseTranslationsAgainstRealWorldData(t *testing.T) {
 	alice.cmd(t, "TALK ヘクトール", "OK この門を守り抜く一日一日が、我が都市がまだ立っていることの証だ。")
 
 	teleport("loc.ody_cyclops")
-	alice.cmd(t, "TALK ポリュペモス", "OK 誰も俺を傷つけてなどいない! 誰も!")
+	alice.cmd(t, "TALK ポリュペモス", "OK また客が、自分から俺の食料庫に迷い込んできたか。じっとしてろ、すぐ終わる。")
 
 	teleport("loc.ody_cyclops")
 	quest := alice.cmdJSON(t, "QUEST 囚われた水夫")
