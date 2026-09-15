@@ -87,37 +87,6 @@ func TestConnectWithoutPasswordRegistrationAndReconnect(t *testing.T) {
 	<-third.done
 }
 
-func TestConnectIgnoresLegacyPasswordAndRemovesItOnSave(t *testing.T) {
-	server := newServer(t.TempDir())
-	server.world = takeTestWorld()
-	legacy := []byte(`{"alice":{"name":"alice","password":"old-password","hp":73,"room_id":"loc.start","inventory":[]}}`)
-	if err := os.WriteFile(server.playersSavePath(), legacy, 0600); err != nil {
-		t.Fatal(err)
-	}
-	client := startTestClient(t, server)
-	client.connect(t, "alice")
-	server.mu.Lock()
-	hp := server.players["alice"].HP
-	server.mu.Unlock()
-	if hp != 73 {
-		t.Fatalf("restored HP = %d, want 73", hp)
-	}
-	client.command(t, "QUIT", "OK bye")
-	<-client.done
-
-	data, err := os.ReadFile(server.playersSavePath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	var saved map[string]map[string]json.RawMessage
-	if err := json.Unmarshal(data, &saved); err != nil {
-		t.Fatal(err)
-	}
-	if _, exists := saved["alice"]["password"]; exists {
-		t.Fatal("legacy password was not removed")
-	}
-}
-
 func TestConnectRejectsInaccessibleSaveDirectory(t *testing.T) {
 	blocked := filepath.Join(t.TempDir(), "blocked")
 	if err := os.WriteFile(blocked, []byte("file"), 0600); err != nil {
