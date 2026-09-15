@@ -49,6 +49,31 @@ LOOK
 OK {"room":{...,"name":"運命の間",...}, ...}
 ```
 
+## コマンド一覧
+
+RFC 15コマンド + 独自拡張2つ(`FLEE`・`LANG`、下表に明記)。正式な仕様は`protocol-rfc.html` 5章、英語セクションの[Command list](#command-list)も参照。
+
+| コマンド | 構文 | 内容 |
+|---|---|---|
+| `CONNECT` | `CONNECT <name>` | `<name>`で認証。`LANG`を送る場合を除き最初に送るコマンド。 |
+| `LANG`(独自) | `LANG <en\|ja>` | このコネクションのストーリー言語を選択。**`CONNECT`より前**に送ること。 |
+| `LOOK` | `LOOK` | 現在の部屋(名前・説明・プレイヤー・アイテムID・NPC ID・出口)を取得。 |
+| `MOVE` | `MOVE <方向>` | 出口を通って移動(例: `MOVE east`)。 |
+| `TAKE` | `TAKE <アイテムIDまたは名前>` | 部屋にあるアイテムを取得。 |
+| `DROP` | `DROP <アイテムIDまたは名前>` | 所持品を部屋に置く。 |
+| `INVENTORY` | `INVENTORY` | 所持品一覧。 |
+| `TALK` | `TALK <NPC IDまたは名前>` | 部屋にいるNPCと話す。 |
+| `ATTACK` | `ATTACK <NPC IDまたは名前>` | 敵NPCを攻撃。 |
+| `FLEE`(独自) | `FLEE` | 現在の戦闘から離脱。戦闘中のみ有効。 |
+| `STATUS` | `STATUS` | 自分のHP・戦闘状態を確認。 |
+| `QUEST` | `QUEST <NPC IDまたは名前>` | そのNPCが持つクエストを受注。 |
+| `QUESTS` | `QUESTS` | これまで受注した全クエストと進行状況を一覧表示。 |
+| `CHAT` | `CHAT <GLOBAL\|ROOM\|GROUP> <メッセージ>` | 指定した範囲にチャット送信。 |
+| `WHO` | `WHO` | 現在の接続プレイヤー数。 |
+| `GROUP` | `GROUP CREATE` / `GROUP INVITE <name>` / `GROUP JOIN <leader>` / `GROUP LEAVE` | `CHAT GROUP`用のグループ管理。 |
+| `QUIT` | `QUIT` | 正常に切断する。 |
+CHAT GLOBAL 死ね死ねchatGPTよりclaudeのほうが頭いい
+attack npc.polyphemus
 ## テストの実行
 
 ```sh
@@ -68,7 +93,7 @@ go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
 英語セクションの各見出し([Architecture](#architecture)、[Protocol Implementation](#protocol-implementation)、[Combat System](#combat-system)、[Quest System](#quest-system)、[World Design](#world-design)、[Server Logging](#server-logging))に詳しく書いてあるので、ここでは要点だけ:
 
 - **並行モデル**: 接続ごとに1 goroutine + サーバー状態全体を単一の`sync.Mutex`で保護、という単純な方式。実装の正しさを優先した(`memo.md` 2章)。
-- **戦闘**: ATTACKは基本8〜14ダメージ・反撃6〜12ダメージのランダム。一部の敵は「正しいアイテム/達成済みクエスト」を持っていないとATTACKで即死する「神話ゲート」付き。HP0で運命の間にHP20でリスポーン。
+- **戦闘**: ATTACKは基本8〜14ダメージ・反撃6〜12ダメージのランダム。一部の敵は「正しいアイテム/達成済みクエスト」を持っていないとATTACKで即死する「神話ゲート」付き。HP0で運命の間にHP20でリスポーン。**生きている敵がいる部屋はMOVEで出ようとすると即死**(倒すかFLEEで振り切るまで封鎖)。
 - **クエスト**: `QUEST <npc>`で受注、TAKE/ATTACKの成否をサーバー側が自動で判定して進行・達成・報酬付与まで行う(完了報告コマンドは無し)。
 - **ワールド**: 40部屋・アイテム17種・NPC 40強・クエスト11種。アルゴナウタイ編はクレタ→イオルコスでループし、ハブ部屋は3分岐なので、「ループ+分岐、一直線不可」の要件を満たす。
 - **多言語対応**: `LANG ja`をCONNECT前に送るとLOOK/TALK/QUESTのテキストが日本語になる。RFC規定のJSON構造・コマンド名は一切変更していないので、他チームのサーバー/クライアントとの相互接続には影響しない。詳細は`memo.md` 8章。
@@ -96,6 +121,30 @@ A GUI client (`cmd/gui`) has not been started yet (the directory only holds a pl
 The server listens on TCP port 4242 and speaks the line-oriented TAP protocol described in `protocol-rfc.html`. Any RFC-compliant client — ours or another team's — can connect to it, and our CLI client can connect to any RFC-compliant server.
 
 Our CLI client is a **raw protocol relay**: every line you type is sent to the server unmodified, and every line the server sends back is printed unmodified. We chose this over a "friendly commands translated to protocol" client because it keeps the client trivial and lets anyone see exactly what is going over the wire, which matters for debugging interop with other teams (see "Building and Running" for how to start it).
+
+### Command list
+
+All 15 RFC commands, plus our two additive extensions (`FLEE`, `LANG`, both marked below). Full request/response/error shapes are in `protocol-rfc.html` §5; this is a quick reference.
+
+| Command | Syntax | What it does |
+|---|---|---|
+| `CONNECT` | `CONNECT <name>` | Authenticate as `<name>`. Must be the first command after `LANG` (if any). |
+| `LANG` *(custom)* | `LANG <en\|ja>` | Choose the story language for this connection. Must be sent **before** `CONNECT`. |
+| `LOOK` | `LOOK` | Current room: name/description, players, item IDs, NPC IDs, exits. |
+| `MOVE` | `MOVE <direction>` | Move through an exit (e.g. `MOVE east`). |
+| `TAKE` | `TAKE <item id or name>` | Pick up an item present in the room. |
+| `DROP` | `DROP <item id or name>` | Drop an item from your inventory into the room. |
+| `INVENTORY` | `INVENTORY` | List the items you're carrying. |
+| `TALK` | `TALK <npc id or name>` | Talk to an NPC in the room. |
+| `ATTACK` | `ATTACK <npc id or name>` | Attack an enemy NPC. |
+| `FLEE` *(custom)* | `FLEE` | Retreat from your current fight. Only valid while in combat. |
+| `STATUS` | `STATUS` | Your current HP and combat status. |
+| `QUEST` | `QUEST <npc id or name>` | Request the quest offered by that NPC. |
+| `QUESTS` | `QUESTS` | List every quest you've started, with progress. |
+| `CHAT` | `CHAT <GLOBAL\|ROOM\|GROUP> <message>` | Send a chat message in that scope. |
+| `WHO` | `WHO` | Number of players currently online. |
+| `GROUP` | `GROUP CREATE` / `GROUP INVITE <name>` / `GROUP JOIN <leader>` / `GROUP LEAVE` | Party management for `CHAT GROUP`. |
+| `QUIT` | `QUIT` | Disconnect cleanly. |
 
 Minimal example session (after connecting):
 
@@ -170,6 +219,7 @@ RFC §6.1.1 leaves damage calculation, turn/initiative handling, combat state tr
 - **Unwinnable fights.** The Laestrygonians can never be defeated by force: `ATTACK` against them never rolls damage at all and instead costs the player's crew (see "World Design"), while `FLEE` (the historically correct choice — only Odysseus's own ship escaped by anchoring outside the harbor) always succeeds. This uses the fight to spend the crew resource narratively instead of pretending it's a winnable stat check.
 - **Death and respawn.** Any death — ordinary attrition, a myth-gate instant kill, or a fatal room hazard — sets HP to 0 and respawns the player at the world's safe hub room (`loc.hall_of_fates`) with 20 HP, matching the subject's "HP 0 respawns in a safe zone, with reduced HP" requirement (`respawnPlayerLocked` in `combat.go`).
 - **Logging/broadcast.** Every `ATTACK`/`FLEE` resolution is broadcast to the room via `EVT ROOM COMBAT <flavor text>`, in addition to the structured response sent to the acting player.
+- **A live threat blocks the room, not just the fight.** Several room descriptions state outright that the enemy blocks passage — Amycus "blocks every crew that lands," Polyphemus's cave mouth is sealed by a boulder — but originally nothing stopped a player from just walking past a hostile NPC via `MOVE` without ever engaging it. We closed that: `MOVE` out of a room containing any live (`hp > 0`) `enemy`-role NPC the player hasn't yet defeated or successfully fled from is an instant kill (`blockingEnemyLocked` in `hazard.go`), consistent with every other myth gate in this design. A successful `FLEE` against a given NPC is remembered permanently per player (`Player.FledFrom`, keyed by NPC ID — not reset by leaving and re-entering), so once you've talked your way or run your way past something, it stays resolved. Because `Unwinnable` NPCs (the Laestrygonians) never reach 0 HP, `FLEE` is their *only* way out of the room; `TestNoEnemyIsBothUnwinnableAndUnfleeable` checks the whole roster so we can't accidentally ship an NPC that's both unwinnable and unfleeable (an unconditional softlock). Scylla was exactly this case during development — she had no `flee_accurate` set, which would have forced a fight the myth never asks for — so we gave her `flee_accurate: true`, matching how she's actually survived (you don't kill Scylla, you just get past her, at a cost already charged by the room's `crew_gate` hazard on the way in).
 
 We did not add a `DEFEND` command: none of the myth gates we designed call for a "reduce incoming damage" mechanic, so we judged it unnecessary complexity rather than adding it just because the RFC mentions it as an example.
 
@@ -192,7 +242,8 @@ RFC §6.1.2 fixes only the `QUEST`/`QUESTS` request/response shapes and leaves o
   - `lethal` — always fatal (the whirlpool of Charybdis: the myth gives no way to survive it).
   - `item_gate` — fatal without a specific item (the Sirens' rocks, without beeswax).
   - `crew_gate` — costs a fixed amount of crew on entry, and is fatal outright if the player doesn't have enough crew left to absorb the loss (Scylla, requiring `crew + 1 ≥ 7` to survive losing 6 crew — mirroring how Scylla takes exactly six of Odysseus's men but never the ship itself).
-- **Crew resource** (Odyssey arc only). The player is granted a crew of 12 (`Player.Crew`) the moment they first set foot in the Odyssey arc (`loc.ody_troy_shore`). It represents the companions accompanying Odysseus and is spent — not the player's own HP — by specific bad choices: eating the lotus fruit (−2), opening the bag of winds anywhere but Ithaca (−3), being attacked by the Laestrygonians (−8), and passing Scylla (−6, unavoidable). It is never exposed in any RFC-defined JSON response (see "Protocol Implementation"); the player only learns about it through `EVT ROOM COMBAT` narration and their own play. Kept purely in `Player` (server-side, and persisted per-player like the rest of that struct).
+  - `crew_cost` — unconditionally costs a fixed amount of crew on entry, never fatal (the Cicones' counter-raid and Polyphemus's cave, both −2, matching each room's own description of losses that already happened before the player arrives).
+- **Crew resource** (Odyssey arc only). The player is granted a crew of 12 (`Player.Crew`) the moment they first set foot in the Odyssey arc (`loc.ody_troy_shore`). It represents the companions accompanying Odysseus and is spent — not the player's own HP — by specific bad choices: entering the Cicones' land (−2) or Polyphemus's cave (−2), opening the bag of winds anywhere but Ithaca (−3), being attacked by the Laestrygonians (−8), and passing Scylla (−6, unavoidable). Eating the lotus fruit is *not* a crew cost — it's an instant kill (see "Combat System"'s myth gates, `applyTakeConsequencesLocked` in `odyssey.go`): the myth has whoever tastes it simply never choose to leave, which we judged closer to a death than a toll. Crew is never exposed in any RFC-defined JSON response (see "Protocol Implementation"); the player only learns about it through `EVT ROOM COMBAT` narration and their own play. Kept purely in `Player` (server-side, and persisted per-player like the rest of that struct).
 - **Circe/Sirens are engagement-gated, not entry-gated**, for one deliberate reason: `item.moly`, the item that protects against Circe, is located *inside* her own room. A room-entry hazard would kill the player before they could ever pick it up. So Circe's gate instead triggers on `TALK` (the moment the player actually engages her), which also better matches the myth — simply walking onto her island was never dangerous; drinking her cup was.
 
 ## Server Logging

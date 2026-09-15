@@ -390,6 +390,10 @@
       "exits": {
         "west": "loc.ody_troy_shore",
         "east": "loc.ody_lotus"
+      },
+      "hazard": {
+        "type": "crew_cost",
+        "crew_loss": 2
       }
     },
     "loc.ody_lotus": {
@@ -420,6 +424,10 @@
       "exits": {
         "west": "loc.ody_lotus",
         "east": "loc.ody_aeolus"
+      },
+      "hazard": {
+        "type": "crew_cost",
+        "crew_loss": 2
       }
     },
     "loc.ody_aeolus": {
@@ -1299,8 +1307,8 @@
       "hp": 70,
       "dialogue": [
         {
-          "en": "Nobody is hurting me! Nobody!",
-          "ja": "誰も俺を傷つけてなどいない! 誰も!"
+          "en": "Another guest wanders right into my larder. Sit still — this won't take long.",
+          "ja": "また客が、自分から俺の食料庫に迷い込んできたか。じっとしてろ、すぐ終わる。"
         }
       ],
       "myth_requirement_item": "item.olive_stake",
@@ -1441,7 +1449,8 @@
           "en": "Six heads lunge from the rock face as the ship draws near.",
           "ja": "船が近づくと、岩壁から六つの首が一斉に襲いかかってくる。"
         }
-      ]
+      ],
+      "flee_accurate": true
     },
     "npc.eurylochus": {
       "name": {
