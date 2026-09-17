@@ -1,0 +1,116 @@
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+type roomView struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Exits       map[string]string `json:"exits"`
+}
+
+type lookView struct {
+	Room    roomView `json:"room"`
+	Players []string `json:"players"`
+	Items   []string `json:"items"`
+	NPCs    []string `json:"npcs"`
+}
+
+type statusView struct {
+	HP     int    `json:"hp"`
+	MaxHP  int    `json:"max_hp"`
+	Status string `json:"status"`
+}
+
+type questView struct {
+	QuestID  string `json:"quest_id"`
+	Status   string `json:"status"`
+	Progress string `json:"progress"`
+}
+
+type localizedName map[string]string
+
+func (name localizedName) get(locale string) string {
+	if value := name[locale]; value != "" {
+		return value
+	}
+	return name["en"]
+}
+
+type catalogEntry struct {
+	Name localizedName `json:"name"`
+}
+
+type worldCatalog struct {
+	Items  map[string]catalogEntry `json:"items"`
+	NPCs   map[string]catalogEntry `json:"npcs"`
+	Quests map[string]catalogEntry `json:"quests"`
+}
+
+func loadCatalog() (*worldCatalog, error) {
+	var candidates []string
+	for _, base := range []string{workingDirectory(), executableDirectory()} {
+		for range 4 {
+			candidates = append(candidates, filepath.Join(base, "data", "world.json"))
+			base = filepath.Dir(base)
+		}
+	}
+	for _, path := range candidates {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+		var catalog worldCatalog
+		if err := json.Unmarshal(data, &catalog); err != nil {
+			return nil, fmt.Errorf("read %s: %w", path, err)
+		}
+		return &catalog, nil
+	}
+	return nil, fmt.Errorf("data/world.json was not found")
+}
+
+func workingDirectory() string {
+	path, _ := os.Getwd()
+	return path
+}
+
+func executableDirectory() string {
+	path, _ := os.Executable()
+	return filepath.Dir(path)
+}
+
+func (catalog *worldCatalog) label(kind, id, locale string) string {
+	if catalog == nil {
+		return id
+	}
+	var entry catalogEntry
+	switch kind {
+	case "item":
+		entry = catalog.Items[id]
+	case "npc":
+		entry = catalog.NPCs[id]
+	case "quest":
+		entry = catalog.Quests[id]
+	}
+	name := entry.Name.get(locale)
+	if name == "" || strings.EqualFold(name, id) {
+		return id
+	}
+	return name + " [" + id + "]"
+}
+
+func decodeOK(line string, target any) error {
+	if !strings.HasPrefix(line, "OK ") {
+		return fmt.Errorf("unexpected response %q", line)
+	}
+	if err := json.Unmarshal([]byte(strings.TrimPrefix(line, "OK ")), target); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+	return nil
+}
