@@ -56,6 +56,11 @@ func (s *Server) restoreItemLocations() error {
 		}
 	}
 	for itemID, roomID := range locations {
+		if s.world.Items[itemID].Renewable {
+			// 鍵アイテムは常に元の部屋に置かれている(過去の保存データで
+			// 別の場所に動いていても無視する)。
+			continue
+		}
 		s.world.Items[itemID].RoomID = roomID
 	}
 	return nil

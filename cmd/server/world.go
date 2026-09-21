@@ -10,13 +10,27 @@ import (
 	"strings"
 )
 
-// Item はワールド内に一意に存在するアイテム。Obtainable が true のものだけ
-// TAKE できる(false のものは「取れない設定物」用)。
+// Item はワールド内のアイテム。Obtainable が true のものだけTAKEできる
+// (false のものは「取れない設定物」用)。
+//
+// 通常のアイテムはワールド内に一意のインスタンスで、TAKEすると部屋から
+// 消え、DROPすると他のプレイヤーが拾える(課題の要件)。ただしクエストや
+// 神話ゲートに必要な「鍵アイテム」が一意のままだと、誰か1人が拾って
+// 放置(セーブ)しただけで他のプレイヤーは永久にその道をクリアできなくなる。
+// そこで Renewable が true のアイテムは部屋に残り続け、TAKEするたびに
+// そのプレイヤー専用のコピーが所持品に入る(既に持っている人には部屋の
+// 一覧から見えない)。RewardOnly が true のものはエンディングの報酬専用で、
+// どの部屋にも置かれない(RoomIDは空)。
 type Item struct {
 	Name        LocalizedText `json:"name"`
 	Description LocalizedText `json:"description"`
 	RoomID      string        `json:"room_id"`
 	Obtainable  bool          `json:"obtainable"`
+	Renewable   bool          `json:"renewable,omitempty"`
+	RewardOnly  bool          `json:"reward_only,omitempty"`
+	// HomeRoomID はworld.jsonでの元の配置(ロード時に記録、保存しない)。死んで失われた
+	// 一意のアイテムはここへ戻る。
+	HomeRoomID string `json:"-"`
 }
 
 // NPC はワールド内のNPC1体。Role は "dialogue"(会話専用)・
@@ -36,6 +50,8 @@ type NPC struct {
 	FleeSucceedsOnce     bool            `json:"flee_succeeds_once,omitempty"`
 	Unwinnable           bool            `json:"unwinnable,omitempty"`
 	CrewLossOnAttack     int             `json:"crew_loss_on_attack,omitempty"`
+	Guide                bool            `json:"guide,omitempty"`
+	Ending               *Ending         `json:"ending,omitempty"`
 }
 
 // QuestObjective はクエスト達成条件。Type は "collect_item"(アイテム所持)
@@ -84,6 +100,11 @@ func loadWorld(path string) (*World, error) {
 	var world World
 	if err := json.Unmarshal(data, &world); err != nil {
 		return nil, fmt.Errorf("decode world data: %w", err)
+	}
+	for _, item := range world.Items {
+		if item != nil {
+			item.HomeRoomID = item.RoomID
+		}
 	}
 	if err := world.validate(); err != nil {
 		return nil, err
@@ -143,7 +164,11 @@ func (w *World) validate() error {
 		if item == nil {
 			return fmt.Errorf("item %q is null", id)
 		}
-		if w.Rooms[item.RoomID] == nil {
+		if item.RewardOnly {
+			if item.RoomID != "" || item.Obtainable {
+				return fmt.Errorf("reward-only item %q must have no room and must not be obtainable", id)
+			}
+		} else if w.Rooms[item.RoomID] == nil {
 			return fmt.Errorf("item %q points to unknown room %q", id, item.RoomID)
 		}
 	}
@@ -193,7 +218,7 @@ func (w *World) validate() error {
 			return fmt.Errorf("quest %q has unknown objective type %q", id, quest.Objective.Type)
 		}
 	}
-	return nil
+	return w.validateEndings()
 }
 
 // resolveNPCInRoom は roomID 内のNPCを、まずID完全一致、次に指定
@@ -226,4 +251,20 @@ func (w *World) questByGiver(npcID string) (string, *Quest) {
 		return "", nil
 	}
 	return questID, w.Quests[questID]
+}
+
+// availableTo は player が今いる部屋で、このアイテムをTAKEできるかを返す。
+// Renewableなアイテムは、既に同じものを持っているプレイヤーには取れない
+// (1人1個)。id はこのアイテムのID。
+func (item *Item) availableTo(player *Player, id string) bool {
+	return item.Obtainable && item.visibleTo(player, id, player.RoomID)
+}
+
+// visibleTo は roomID にあるこのアイテムが player のLOOKに載るかを返す。
+// Renewableなアイテムは、既に持っているプレイヤーの一覧からだけ消える。
+func (item *Item) visibleTo(player *Player, id, roomID string) bool {
+	if item.RoomID != roomID {
+		return false
+	}
+	return !(item.Renewable && player.hasItem(id))
 }
