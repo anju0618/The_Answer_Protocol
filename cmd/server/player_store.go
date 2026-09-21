@@ -61,7 +61,9 @@ func (s *Server) restoreItemOwnership() error {
 	owners := make(map[string]string)
 	for name, player := range players {
 		for _, itemID := range player.Inventory {
-			if s.world.Items[itemID] == nil {
+			if s.world.Items[itemID] == nil || s.world.Items[itemID].Renewable {
+				// Renewableな鍵アイテムは全員が自分のコピーを持てるので、
+				// 所持・重複はチェックしないし、部屋からも消さない。
 				continue
 			}
 			if owner, exists := owners[itemID]; exists {
