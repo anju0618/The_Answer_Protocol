@@ -28,14 +28,94 @@ func (s *Server) checkQuestObjectiveLocked(player *Player, objType, targetID str
 		if state == nil || state.Status != "active" {
 			continue
 		}
-		state.Progress++
-		if state.Progress >= quest.Objective.Count {
-			state.Status = "completed"
-			player.HP += quest.Reward.HP
-			if player.HP > maxPlayerHP {
-				player.HP = maxPlayerHP
-			}
+		s.advanceQuestLocked(player, quest, state)
+	}
+}
+
+// advanceQuestLocked は player の進行中クエスト1件を1つ進める。目標数に
+// 達したら達成にして報酬HPを与える(上限maxPlayerHP)。進捗も達成も、
+// 本人にEVT PLAYER QUESTで知らせる(以前は何も通知されず、達成したかどうかが
+// QUESTSを打つまで分からなかった)。
+func (s *Server) advanceQuestLocked(player *Player, quest *Quest, state *PlayerQuest) {
+	locale := s.localeOfLocked(player.Name)
+	state.Progress++
+	if state.Progress < quest.Objective.Count {
+		s.sendPlayerEventLocked(player.Name, "QUEST", LocalizedText{
+			"en": "Quest \"%s\" progress: %d/%d.",
+			"ja": "クエスト「%s」の進捗: %d/%d。",
+		}.Format(locale, quest.Name.Get(locale), state.Progress, quest.Objective.Count))
+		return
+	}
+	state.Status = "completed"
+	player.HP += quest.Reward.HP
+	if player.HP > maxPlayerHP {
+		player.HP = maxPlayerHP
+	}
+	s.sendPlayerEventLocked(player.Name, "QUEST", LocalizedText{
+		"en": "Quest complete: \"%s\"! Reward: +%d HP (HP is now %d). Use QUESTS to see your quests, and look for the next NPC with a request.",
+		"ja": "クエスト達成: 「%s」! 報酬: HP+%d(現在HP %d)。QUESTSで一覧を確認し、次の依頼を探そう。",
+	}.Format(locale, quest.Name.Get(locale), quest.Reward.HP, player.HP))
+}
+
+// questGiverNPCIDsLocked は roomID にいる、クエストを持つNPCのIDをID順で返す。
+func (s *Server) questGiverNPCIDsLocked(roomID string) []string {
+	var ids []string
+	for id, npc := range s.world.NPCs {
+		if npc == nil || npc.RoomID != roomID {
+			continue
 		}
+		if _, quest := s.world.questByGiver(id); quest != nil {
+			ids = append(ids, id)
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// announceQuestGiversLocked は player が今いる部屋に、まだ受けていない
+// クエストを持つNPCがいれば「依頼がある。QUEST <名前>で受けられる」と
+// 本人にEVT PLAYER QUESTで知らせる。LOOKのレスポンスにはNPCのIDしか
+// 載らず(RFCの形式は変えられない)、誰がクエストを持っているかが
+// 分からなかったため、部屋に入った瞬間に案内する。MOVE後・CONNECT後に呼ぶ。
+func (s *Server) announceQuestGiversLocked(player *Player) {
+	if s.world == nil {
+		return
+	}
+	locale := s.localeOfLocked(player.Name)
+	for _, npcID := range s.questGiverNPCIDsLocked(player.RoomID) {
+		questID, quest := s.world.questByGiver(npcID)
+		if player.Quests[questID] != nil {
+			continue
+		}
+		npcName := s.world.NPCs[npcID].Name.Get(locale)
+		s.sendPlayerEventLocked(player.Name, "QUEST", LocalizedText{
+			"en": "%s has a request for you: \"%s\". Type QUEST %s to hear it and accept.",
+			"ja": "%sから依頼がある: 「%s」。QUEST %s と入力すると内容を聞いて受注できる。",
+		}.Format(locale, npcName, quest.Name.Get(locale), npcName))
+	}
+}
+
+// sendQuestHintLocked は quest_giver に TALK した後、そのNPCのクエストの
+// 状況(未受注なら受け方、進行中なら進捗)を本人へ知らせる。
+func (s *Server) sendQuestHintLocked(player *Player, npcID string) {
+	questID, quest := s.world.questByGiver(npcID)
+	if quest == nil {
+		return
+	}
+	locale := s.localeOfLocked(player.Name)
+	npcName := s.world.NPCs[npcID].Name.Get(locale)
+	state := player.Quests[questID]
+	switch {
+	case state == nil:
+		s.sendPlayerEventLocked(player.Name, "QUEST", LocalizedText{
+			"en": "%s has a quest for you: \"%s\" (reward: +%d HP). Type QUEST %s to accept it.",
+			"ja": "%sはあなたに頼みたいことがある: 「%s」(報酬: HP+%d)。QUEST %s で受注できる。",
+		}.Format(locale, npcName, quest.Name.Get(locale), quest.Reward.HP, npcName))
+	case state.Status == "active":
+		s.sendPlayerEventLocked(player.Name, "QUEST", LocalizedText{
+			"en": "Quest \"%s\" is in progress (%d/%d). Type QUEST %s to hear the details again.",
+			"ja": "クエスト「%s」は進行中(%d/%d)。QUEST %s で内容をもう一度聞ける。",
+		}.Format(locale, quest.Name.Get(locale), state.Progress, quest.Objective.Count, npcName))
 	}
 }
 
@@ -81,7 +161,8 @@ func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if player.Quests == nil {
 		player.Quests = make(map[string]*PlayerQuest)
 	}
-	if player.Quests[questID] == nil {
+	newlyAccepted := player.Quests[questID] == nil
+	if newlyAccepted {
 		player.Quests[questID] = &PlayerQuest{Status: "active"}
 	}
 
@@ -98,6 +179,12 @@ func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	client := conn.(*serverClient)
 	response, err := client.enqueueResponse("OK " + string(data))
+	if err == nil && newlyAccepted && s.objectiveAlreadyMetLocked(player, quest) {
+		// 受注前に済ませていた分も数える(進捗はTAKE/ATTACKの瞬間にしか
+		// 判定しないため、先に拾ったり倒したりしていると永遠に達成できなく
+		// なってしまう)。
+		s.advanceQuestLocked(player, quest, player.Quests[questID])
+	}
 	s.mu.Unlock()
 	if err != nil {
 		return true
@@ -158,4 +245,18 @@ func handleQuests(s *Server, conn net.Conn, name *string, parts []string) bool {
 		return true
 	}
 	return client.waitResponse(response) != nil
+}
+
+// objectiveAlreadyMetLocked は、クエストを受ける前の時点で player が既に
+// 目標を果たしているか(対象アイテムを持っている/対象の敵を自分の世界で
+// 倒し済み)を返す。
+func (s *Server) objectiveAlreadyMetLocked(player *Player, quest *Quest) bool {
+	switch quest.Objective.Type {
+	case "collect_item":
+		return player.hasItem(quest.Objective.TargetID)
+	case "defeat_npc":
+		npc := s.world.NPCs[quest.Objective.TargetID]
+		return npc != nil && player.enemyHP(quest.Objective.TargetID, npc) <= 0
+	}
+	return false
 }

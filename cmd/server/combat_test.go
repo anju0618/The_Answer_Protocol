@@ -142,7 +142,7 @@ func TestFleeSuccessAndFailureAndNotInCombat(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = &World{
 		StartRoomID: "loc.start",
-		Rooms:       map[string]*Room{"loc.start": {ID: "loc.start"}},
+		Rooms:       map[string]*Room{"loc.start": {ID: "loc.start"}, "loc.empty": {ID: "loc.empty"}},
 		NPCs: map[string]*NPC{
 			"npc.brave":    {Name: en("Brave"), Role: "enemy", RoomID: "loc.start", HP: 1000, FleeAccurate: true},
 			"npc.stubborn": {Name: en("Stubborn"), Role: "enemy", RoomID: "loc.start", HP: 1000, FleeAccurate: false},
@@ -151,14 +151,26 @@ func TestFleeSuccessAndFailureAndNotInCombat(t *testing.T) {
 	alice := startTestClient(t, server)
 	alice.connect(t, "alice")
 
+	// 敵のいない部屋で戦闘中でなければ、逃げる相手がいないのでERR 407。
+	server.mu.Lock()
+	server.players["alice"].RoomID = "loc.empty"
+	server.mu.Unlock()
 	alice.cmd(t, "FLEE", "ERR 407 NOT_IN_COMBAT")
+	server.mu.Lock()
+	server.players["alice"].RoomID = "loc.start"
+	server.mu.Unlock()
 
 	atk := alice.cmdJSON(t, "ATTACK npc.brave")
 	fleeData := alice.cmdJSON(t, "FLEE")
 	if fleeData["result"] != "success" || fleeData["hp"] != atk["attacker_hp"] {
 		t.Fatalf("flee from a myth-accurate retreat should succeed with unchanged hp, attack=%v flee=%v", atk, fleeData)
 	}
-	alice.cmd(t, "FLEE", "ERR 407 NOT_IN_COMBAT")
+	// 逃げ切った後は戦闘中ではなくなる(敵のいない部屋なら再びERR 407)。
+	server.mu.Lock()
+	if server.players["alice"].CombatTargetID != "" {
+		t.Errorf("combat target after fleeing = %q, want none", server.players["alice"].CombatTargetID)
+	}
+	server.mu.Unlock()
 
 	alice.cmdJSON(t, "ATTACK npc.stubborn")
 	fleeResp := alice.cmdJSON(t, "FLEE")
@@ -281,6 +293,9 @@ func TestLiveEnemyBlocksMove(t *testing.T) {
 	server.mu.Lock()
 	server.players["alice"].RoomID = "loc.den"
 	server.mu.Unlock()
+	// 死ぬと「逃げ切った」記録も敵の傷もリセットされるので、runnerからもう一度逃げる。
+	alice.cmdJSON(t, "ATTACK npc.runner")
+	alice.cmdJSON(t, "FLEE")
 	won := false
 	for range 5 {
 		result := alice.cmdJSON(t, "ATTACK npc.guard")

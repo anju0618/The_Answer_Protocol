@@ -15,6 +15,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 	"unicode/utf8"
 )
@@ -29,8 +30,8 @@ const (
 	respawnHP        = 20
 	combatMinDamage  = 8
 	combatMaxDamage  = 14
-	counterMinDamage = 6
-	counterMaxDamage = 12
+	counterMinDamage = 7
+	counterMaxDamage = 14
 
 	odysseyStartRoomID = "loc.ody_troy_shore"
 	startingCrew       = 12
@@ -202,18 +203,6 @@ func (s *Server) removePlayerLocked(name string, restoreUnsavedTakes bool) {
 	s.broadcastPlayerCountLocked()
 }
 
-// broadcastRoomEventLocked は roomID にいる全プレイヤーへ event を送る。
-// 戦闘結果・部屋ハザードのフレーバーテキスト(EVT ROOM COMBAT)などで使う。
-func (s *Server) broadcastRoomEventLocked(roomID, event string) {
-	for playerName, other := range s.players {
-		if other.RoomID == roomID {
-			if recipient := s.clients[playerName]; recipient != nil {
-				recipient.enqueueEvent(event)
-			}
-		}
-	}
-}
-
 // broadcastPlayerCountLocked は現在の接続人数を全クライアントへ
 // EVT STATSとして送る(接続・切断のたびに呼ばれる)。
 func (s *Server) broadcastPlayerCountLocked() {
@@ -232,6 +221,7 @@ func (s *Server) playerForUpdateLocked(name string) *Player {
 	if player == nil || player.exiting {
 		return nil
 	}
+	player.regenLocked(time.Now())
 	return player
 }
 
@@ -319,6 +309,15 @@ func handleConnect(s *Server, conn net.Conn, name *string, parts []string) bool 
 			}
 		}
 		s.broadcastPlayerCountLocked()
+		if player := s.players[requestedName]; player != nil {
+			// 初回接続時だけ運命の間のチュートリアルを自動で流す(以降は
+			// モイライへのTALKでいつでも聞き直せる)。
+			if !player.IntroSeen {
+				player.IntroSeen = true
+				s.sendGuideLocked(requestedName, 0)
+			}
+			s.announceQuestGiversLocked(player)
+		}
 	}
 	s.mu.Unlock()
 	if err != nil {
@@ -358,7 +357,7 @@ func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	items := make([]string, 0)
 	for itemID, item := range s.world.Items {
-		if item != nil && item.RoomID == roomID {
+		if item != nil && item.visibleTo(player, itemID, roomID) {
 			items = append(items, itemID)
 		}
 	}
@@ -442,8 +441,8 @@ func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 		client := conn.(*serverClient)
 		response, err := client.enqueueResponse("OK room=" + destination)
 		if err == nil {
-			s.respawnPlayerLocked(player, *name)
-			s.broadcastRoomEventLocked(encounterRoomID, fmt.Sprintf("EVT ROOM COMBAT %s tries to slip past %s and doesn't make it.", *name, blocker.Name.Get(locale)))
+			s.respawnPlayerLocked(player, *name, "slip_past", blocker.Name.Get(locale))
+			s.broadcastFlavorLocked(encounterRoomID, flavor{key: "slip_past", player: *name, npc: blocker})
 		}
 		s.mu.Unlock()
 		if err != nil {
@@ -470,10 +469,11 @@ func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 				}
 			}
 		}
-		s.initializeCrewLocked(player)
-		if flavor := s.applyRoomHazardLocked(player, *name, s.world.Rooms[destination], clientLocale(conn)); flavor != "" {
-			s.broadcastRoomEventLocked(destination, "EVT ROOM COMBAT "+flavor)
+		s.initializeCrewLocked(player, oldRoomID)
+		if event := s.applyRoomHazardLocked(player, *name, s.world.Rooms[destination], clientLocale(conn)); event != nil {
+			s.broadcastFlavorLocked(destination, *event)
 		}
+		s.announceQuestGiversLocked(player)
 	}
 	s.mu.Unlock()
 	if err != nil {
@@ -535,11 +535,11 @@ func handleTake(s *Server, conn net.Conn, name *string, parts []string) bool {
 
 	locale := clientLocale(conn)
 	itemID := ""
-	if item := s.world.Items[query]; item != nil && item.Obtainable && item.RoomID == player.RoomID {
+	if item := s.world.Items[query]; item != nil && item.availableTo(player, query) {
 		itemID = query
 	} else {
 		for id, item := range s.world.Items {
-			if item != nil && item.Obtainable && item.RoomID == player.RoomID && strings.EqualFold(item.Name.Get(locale), query) && (itemID == "" || id < itemID) {
+			if item != nil && item.availableTo(player, id) && strings.EqualFold(item.Name.Get(locale), query) && (itemID == "" || id < itemID) {
 				itemID = id
 			}
 		}
@@ -550,11 +550,15 @@ func handleTake(s *Server, conn net.Conn, name *string, parts []string) bool {
 		return false
 	}
 
-	if s.unsavedTakes[*name] == nil {
-		s.unsavedTakes[*name] = make(map[string]string)
+	if !s.world.Items[itemID].Renewable {
+		// 一意のアイテムは部屋から消える。Renewableな鍵アイテムは部屋に残り、
+		// このプレイヤー専用のコピーが所持品に入るだけ。
+		if s.unsavedTakes[*name] == nil {
+			s.unsavedTakes[*name] = make(map[string]string)
+		}
+		s.unsavedTakes[*name][itemID] = player.RoomID
+		s.world.Items[itemID].RoomID = ""
 	}
-	s.unsavedTakes[*name][itemID] = player.RoomID
-	s.world.Items[itemID].RoomID = ""
 	player.Inventory = append(player.Inventory, itemID)
 	s.checkQuestObjectiveLocked(player, "collect_item", itemID)
 	takenInRoomID := player.RoomID
@@ -562,8 +566,8 @@ func handleTake(s *Server, conn net.Conn, name *string, parts []string) bool {
 	client := conn.(*serverClient)
 	response, err := client.enqueueResponse("OK taken=" + itemID)
 	if err == nil {
-		if flavor := s.applyTakeConsequencesLocked(player, *name, itemID); flavor != "" {
-			s.broadcastRoomEventLocked(takenInRoomID, "EVT ROOM COMBAT "+flavor)
+		if event := s.applyTakeConsequencesLocked(player, *name, itemID); event != nil {
+			s.broadcastFlavorLocked(takenInRoomID, *event)
 		}
 	}
 	s.mu.Unlock()
@@ -612,7 +616,7 @@ func handleDrop(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	itemID := player.Inventory[index]
 	item := s.world.Items[itemID]
-	if item == nil || item.RoomID != "" {
+	if item == nil || (!item.Renewable && item.RoomID != "") {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
@@ -627,21 +631,29 @@ func handleDrop(s *Server, conn net.Conn, name *string, parts []string) bool {
 	snapshot.Inventory = append(make([]string, 0, len(player.Inventory)-1), player.Inventory[:index]...)
 	snapshot.Inventory = append(snapshot.Inventory, player.Inventory[index+1:]...)
 	s.ioMu.Lock()
-	locations, err := s.loadItemLocations()
-	if err == nil {
-		previousRoom, hadPreviousRoom := locations[itemID]
-		locations[itemID] = player.RoomID
-		err = s.writeItemLocations(locations)
+	var err error
+	if item.Renewable {
+		// 鍵アイテムのコピーは捨てるだけ(部屋には元から残っている)ので、
+		// アイテム位置の保存は不要で、プレイヤーの所持品だけ保存する。
+		err = s.savePlayer(&snapshot)
+	} else {
+		var locations map[string]string
+		locations, err = s.loadItemLocations()
 		if err == nil {
-			err = s.savePlayer(&snapshot)
-			if err != nil {
-				if hadPreviousRoom {
-					locations[itemID] = previousRoom
-				} else {
-					delete(locations, itemID)
-				}
-				if rollbackErr := s.writeItemLocations(locations); rollbackErr != nil {
-					log.Printf("restore item location %q after failed drop: %v", itemID, rollbackErr)
+			previousRoom, hadPreviousRoom := locations[itemID]
+			locations[itemID] = player.RoomID
+			err = s.writeItemLocations(locations)
+			if err == nil {
+				err = s.savePlayer(&snapshot)
+				if err != nil {
+					if hadPreviousRoom {
+						locations[itemID] = previousRoom
+					} else {
+						delete(locations, itemID)
+					}
+					if rollbackErr := s.writeItemLocations(locations); rollbackErr != nil {
+						log.Printf("restore item location %q after failed drop: %v", itemID, rollbackErr)
+					}
 				}
 			}
 		}
@@ -655,13 +667,15 @@ func handleDrop(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 
 	player.Inventory = snapshot.Inventory
-	item.RoomID = player.RoomID
+	if !item.Renewable {
+		item.RoomID = player.RoomID
+	}
 	delete(s.unsavedTakes, *name)
 	client := conn.(*serverClient)
 	response, err := client.enqueueResponse("OK dropped=" + itemID)
 	if err == nil {
-		if flavor := s.applyDropConsequencesLocked(player, *name, itemID); flavor != "" {
-			s.broadcastRoomEventLocked(player.RoomID, "EVT ROOM COMBAT "+flavor)
+		if event := s.applyDropConsequencesLocked(player, *name, itemID); event != nil {
+			s.broadcastFlavorLocked(player.RoomID, *event)
 		}
 	}
 	s.mu.Unlock()
@@ -734,8 +748,8 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 		client := conn.(*serverClient)
 		response, err := client.enqueueResponse("OK dead")
 		if err == nil {
-			s.respawnPlayerLocked(player, *name)
-			s.broadcastRoomEventLocked(encounterRoomID, fmt.Sprintf("EVT ROOM COMBAT %s speaks with %s unprepared, and does not survive it.", *name, npc.Name.Get(locale)))
+			s.respawnPlayerLocked(player, *name, "talk_unprepared", npc.Name.Get(locale), s.mythNeedText(npc, locale))
+			s.broadcastFlavorLocked(encounterRoomID, flavor{key: "talk_unprepared", player: *name, npc: npc})
 		}
 		s.mu.Unlock()
 		if err != nil {
@@ -756,6 +770,14 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	client := conn.(*serverClient)
 	response, err := client.enqueueResponse("OK " + dialogue)
+	if err == nil {
+		if npc.Guide {
+			// モイライのTALK: 1行目はレスポンス、残りはEVT PLAYER GUIDEで再生する。
+			s.sendGuideLocked(*name, 1)
+		}
+		s.sendQuestHintLocked(player, npcID)
+		s.talkEndingLocked(player, npc)
+	}
 	s.mu.Unlock()
 	if err != nil {
 		return true
@@ -779,6 +801,7 @@ func handleStatus(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
+	player.regenLocked(time.Now())
 	status := "healthy"
 	if player.CombatTargetID != "" {
 		status = "combat"
