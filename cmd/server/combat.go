@@ -14,7 +14,8 @@ import (
 )
 
 // randDamage は [min, max] の範囲(両端含む)でランダムなダメージ量を返す。
-func randDamage(min, max int) int {
+// テストが結果を固定できるよう、関数ではなく差し替え可能な変数にしている。
+var randDamage = func(min, max int) int {
 	return min + rand.IntN(max-min+1)
 }
 
@@ -22,7 +23,9 @@ func randDamage(min, max int) int {
 // (通常は運命の間)にHP respawnHP で送り返す。ATTACK・FLEE失敗・
 // 神話ゲート・部屋ハザードなど、あらゆる「死」の共通処理としてここに
 // まとめている。呼び出し側はs.muを保持していること。
-func (s *Server) respawnPlayerLocked(player *Player, name string) {
+func (s *Server) respawnPlayerLocked(player *Player, name, cause string, args ...any) {
+	outcome := s.applyDeathPenaltyLocked(player, name)
+	s.notifyDeathLocked(name, cause, outcome, args...)
 	oldRoomID := player.RoomID
 	destination := defaultStartRoomID
 	if s.world != nil {
@@ -86,50 +89,58 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		return false
 	}
 	npc := s.world.NPCs[npcID]
-	if npc.Role != "enemy" || npc.HP <= 0 {
+	enemyHP := player.enemyHP(npcID, npc)
+	if npc.Role != "enemy" || enemyHP <= 0 {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 405 NPC_NOT_HOSTILE")
 		return false
 	}
 	encounterRoomID := player.RoomID
 
-	var resultText string
+	var event flavor
 	var result combatResult
 
 	switch {
 	case npc.Unwinnable:
 		lost := spendCrewLocked(player, npc.CrewLossOnAttack)
 		player.CombatTargetID = ""
-		resultText = fmt.Sprintf("%s attacks %s and is driven back, losing %d crew.", *name, npc.Name.Get(locale), lost)
-		result = combatResult{player.HP, npc.HP, 0, "overwhelmed"}
+		event = flavor{key: "attack_unwinnable", player: *name, npc: npc, n: lost}
+		result = combatResult{player.HP, enemyHP, 0, "overwhelmed"}
 
 	case npc.hasMythRequirement() && !player.meetsMythRequirement(npc):
-		s.respawnPlayerLocked(player, *name)
-		resultText = fmt.Sprintf("%s attacks %s unprepared and is killed.", *name, npc.Name.Get(locale))
-		result = combatResult{0, npc.HP, 0, "dead"}
+		s.respawnPlayerLocked(player, *name, "attack_unprepared", npc.Name.Get(locale), s.mythNeedText(npc, locale))
+		event = flavor{key: "attack_unprepared", player: *name, npc: npc}
+		result = combatResult{0, enemyHP, 0, "dead"}
 
 	default:
-		damage := randDamage(combatMinDamage, combatMaxDamage)
-		npc.HP -= damage
-		if npc.HP < 0 {
-			npc.HP = 0
+		// 同じGROUPの仲間が同じ部屋にいれば、味方1人ごとにダメージが増え、
+		// 反撃が弱まり、倒した敵は全員の手柄になる(hardcore.go)。
+		allies := s.alliesInRoomLocked(*name)
+		bonus := allyBonusCount(allies)
+		damage := randDamage(combatMinDamage, combatMaxDamage) + bonus*allyDamageBonus
+		enemyHP -= damage
+		if enemyHP < 0 {
+			enemyHP = 0
 		}
-		if npc.HP == 0 {
+		player.setEnemyHP(npcID, enemyHP)
+		if enemyHP == 0 {
 			player.CombatTargetID = ""
 			s.checkQuestObjectiveLocked(player, "defeat_npc", npcID)
-			resultText = fmt.Sprintf("%s defeats %s.", *name, npc.Name.Get(locale))
+			s.shareVictoryLocked(*name, allies, npcID, npc)
+			event = flavor{key: "attack_defeat", player: *name, npc: npc}
 			result = combatResult{player.HP, 0, damage, "victory"}
 		} else {
 			player.CombatTargetID = npcID
 			counter := randDamage(counterMinDamage, counterMaxDamage)
+			counter = max(1, counter*(100-bonus*allyCounterReductionPercent)/100)
 			player.HP -= counter
 			if player.HP <= 0 {
-				s.respawnPlayerLocked(player, *name)
-				resultText = fmt.Sprintf("%s is struck down by %s.", *name, npc.Name.Get(locale))
-				result = combatResult{0, npc.HP, damage, "dead"}
+				s.respawnPlayerLocked(player, *name, "attack_counter", npc.Name.Get(locale))
+				event = flavor{key: "attack_struck_down", player: *name, npc: npc}
+				result = combatResult{0, enemyHP, damage, "dead"}
 			} else {
-				resultText = fmt.Sprintf("%s attacks %s for %d damage and takes %d in return.", *name, npc.Name.Get(locale), damage, counter)
-				result = combatResult{player.HP, npc.HP, damage, "combat"}
+				event = flavor{key: "attack_hit", player: *name, npc: npc, n: damage, m: counter}
+				result = combatResult{player.HP, enemyHP, damage, "combat"}
 			}
 		}
 	}
@@ -144,7 +155,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 	client := conn.(*serverClient)
 	response, err := client.enqueueResponse("OK " + string(data))
 	if err == nil {
-		s.broadcastRoomEventLocked(encounterRoomID, "EVT ROOM COMBAT "+resultText)
+		s.broadcastFlavorLocked(encounterRoomID, event)
 	}
 	s.mu.Unlock()
 	if err != nil {
@@ -175,22 +186,31 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	npc := s.world.NPCs[player.CombatTargetID]
-	if player.CombatTargetID == "" || npc == nil {
+	targetID := player.CombatTargetID
+	npc := s.world.NPCs[targetID]
+	if targetID == "" || npc == nil {
+		// 戦闘中でなくても、その部屋の行く手を阻む敵(まだ倒しても振り切っても
+		// いない生きた敵)から逃げることはできる。ライストリュゴネス族のように
+		// ATTACKしても戦闘状態にならない「倒せない敵」は、FLEEでしか部屋を出られ
+		// ないのに、以前は戦闘中でないとFLEEがERR 407になり、その部屋で詰んで
+		// いた。
 		player.CombatTargetID = ""
-		s.mu.Unlock()
-		fmt.Fprintln(conn, "ERR 407 NOT_IN_COMBAT")
-		return false
+		targetID, npc = s.blockingEnemyLocked(player, player.RoomID)
+		if npc == nil {
+			s.mu.Unlock()
+			fmt.Fprintln(conn, "ERR 407 NOT_IN_COMBAT")
+			return false
+		}
 	}
 	encounterRoomID := player.RoomID
 
-	targetID := player.CombatTargetID
 	fleeSucceeds := npc.FleeAccurate || (npc.FleeSucceedsOnce && !player.FledFrom[targetID])
 
-	var resultText, result string
+	var result string
+	var event flavor
 	if fleeSucceeds {
 		result = "success"
-		resultText = fmt.Sprintf("%s flees from %s.", *name, npc.Name.Get(locale))
+		event = flavor{key: "flee_success", player: *name, npc: npc}
 		player.CombatTargetID = ""
 		if player.FledFrom == nil {
 			player.FledFrom = make(map[string]bool)
@@ -200,12 +220,12 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 		counter := randDamage(counterMinDamage, counterMaxDamage)
 		player.HP -= counter
 		if player.HP <= 0 {
-			s.respawnPlayerLocked(player, *name)
+			s.respawnPlayerLocked(player, *name, "flee_failed", npc.Name.Get(locale))
 			result = "failure_dead"
-			resultText = fmt.Sprintf("%s tries to flee %s and is cut down.", *name, npc.Name.Get(locale))
+			event = flavor{key: "flee_dead", player: *name, npc: npc}
 		} else {
 			result = "failure"
-			resultText = fmt.Sprintf("%s tries to flee %s and is struck for %d.", *name, npc.Name.Get(locale), counter)
+			event = flavor{key: "flee_hit", player: *name, npc: npc, n: counter}
 		}
 	}
 
@@ -222,7 +242,7 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 	client := conn.(*serverClient)
 	response, err := client.enqueueResponse("OK " + string(data))
 	if err == nil {
-		s.broadcastRoomEventLocked(encounterRoomID, "EVT ROOM COMBAT "+resultText)
+		s.broadcastFlavorLocked(encounterRoomID, event)
 	}
 	s.mu.Unlock()
 	if err != nil {

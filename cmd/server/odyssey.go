@@ -4,8 +4,6 @@
 // アイテムID決め打ちの特殊ケースなのでここにまとめている(memo.md 7.6, 7.9)。
 package main
 
-import "fmt"
-
 const (
 	itemLotusFruit    = "item.lotus_fruit"
 	itemSacredCattle  = "item.sacred_cattle"
@@ -15,11 +13,14 @@ const (
 	windsCrewLoss = 3
 )
 
-// initializeCrewLocked は、プレイヤーが初めてオデュッセイア編の開始地点
-// (odysseyStartRoomID)に足を踏み入れた瞬間にクルーの初期値を設定する。
-// 一度きりの処理で、CrewInitialized フラグで二重付与を防いでいる。
-func (s *Server) initializeCrewLocked(player *Player) {
-	if player.CrewInitialized || player.RoomID != odysseyStartRoomID {
+// initializeCrewLocked は、プレイヤーが運命の間(ハブ)からオデュッセイア編の
+// 開始地点(odysseyStartRoomID)に入った瞬間に、クルーを startingCrew に戻す。
+// 航海をやり直すたびに仲間が満員に戻るので、クルーを減らしすぎても
+// 永久に詰むことはない(以前は初回の1回だけ付与していた)。開始地点へ
+// 途中の部屋から戻ってきただけでは戻らない(fromRoomIDで判定)ため、
+// 行き来してクルーを増やすことはできない。fromRoomID は移動前の部屋。
+func (s *Server) initializeCrewLocked(player *Player, fromRoomID string) {
+	if player.RoomID != odysseyStartRoomID || s.world == nil || fromRoomID != s.world.StartRoomID {
 		return
 	}
 	player.Crew = startingCrew
@@ -39,26 +40,26 @@ func spendCrewLocked(player *Player, amount int) int {
 
 // applyTakeConsequencesLocked は、特定アイテムをTAKEした際の追加の
 // 結末(ロトスの実=即死、ヘリオスの牛=即死)を適用する。該当しない
-// アイテムなら何もせず空文字列を返す。
-func (s *Server) applyTakeConsequencesLocked(player *Player, name, itemID string) string {
+// アイテムなら何もせずnilを返す。
+func (s *Server) applyTakeConsequencesLocked(player *Player, name, itemID string) *flavor {
 	switch itemID {
 	case itemLotusFruit:
-		s.respawnPlayerLocked(player, name)
-		return fmt.Sprintf("%s tastes the lotus, and forgets there ever was a home to return to.", name)
+		s.respawnPlayerLocked(player, name, "lotus")
+		return &flavor{key: "lotus", player: name}
 	case itemSacredCattle:
-		s.respawnPlayerLocked(player, name)
-		return fmt.Sprintf("%s lays a hand on the cattle of Helios, and the sky answers.", name)
+		s.respawnPlayerLocked(player, name, "cattle")
+		return &flavor{key: "cattle", player: name}
 	}
-	return ""
+	return nil
 }
 
 // applyDropConsequencesLocked は、風の革袋をイタケの浜以外でDROPした
 // (=早まって開けてしまった)場合にクルーを消費させる。それ以外の
-// アイテム/場所では何もしない。
-func (s *Server) applyDropConsequencesLocked(player *Player, name, itemID string) string {
+// アイテム/場所では何もせずnilを返す。
+func (s *Server) applyDropConsequencesLocked(player *Player, name, itemID string) *flavor {
 	if itemID != itemBagOfWinds || player.RoomID == ithacaShoreRoomID {
-		return ""
+		return nil
 	}
 	lost := spendCrewLocked(player, windsCrewLoss)
-	return fmt.Sprintf("%s opens the bag of winds too soon, and a storm drives the ship back, costing %d crew.", name, lost)
+	return &flavor{key: "winds_opened", player: name, n: lost}
 }
