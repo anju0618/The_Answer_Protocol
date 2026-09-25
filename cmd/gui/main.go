@@ -584,6 +584,23 @@ func (ui *gui) handleEvent(line string) {
 		ui.addChat("[" + parts[1] + "] " + parts[3] + ": " + parts[4])
 		return
 	}
+	if strings.HasPrefix(line, "EVT PLAYER ") {
+		// 自分宛ての通知(死亡理由・運命の間の案内・クエストの案内/進捗)。
+		// ストーリー欄に本文だけを表示し、状態が変わるものは表示を更新する。
+		kind, text, _ := strings.Cut(strings.TrimPrefix(line, "EVT PLAYER "), " ")
+		ui.addStory(text)
+		switch kind {
+		case "DEATH":
+			ui.refresh("LOOK", "INVENTORY", "STATUS")
+		case "QUEST":
+			ui.refresh("STATUS", "QUESTS")
+		case "ENDING":
+			ui.refresh("INVENTORY")
+		case "TEAM":
+			ui.refresh("STATUS", "QUESTS")
+		}
+		return
+	}
 	if strings.HasPrefix(line, "EVT STATS players=") {
 		ui.setTotal(strings.TrimPrefix(line, "EVT STATS players="))
 	}
