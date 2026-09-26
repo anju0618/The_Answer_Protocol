@@ -14,7 +14,7 @@ import (
 
 var errNameInUse = errors.New("player name in use")
 
-const defaultStartRoomID = "loc.square"
+const defaultStartRoomID = "loc.hall_of_fates"
 
 type Server struct {
 	mu      sync.Mutex
