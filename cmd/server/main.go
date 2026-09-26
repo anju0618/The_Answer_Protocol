@@ -1,24 +1,30 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net"
 )
 
 func main() {
-	ln, err := net.Listen("tcp", ":4242")
+	server := NewServer()
+
+	listener, err := net.Listen("tcp", "127.0.0.1:4242")
 	if err != nil {
-		log.Fatalf("listen failed: %v", err)
+		log.Fatal(err)
 	}
-	log.Println("listening on :4242")
+	defer listener.Close()
+
+	fmt.Println("Server started on port 4242")
 
 	for {
-		conn, err := ln.Accept()
+		conn, err := listener.Accept()
 		if err != nil {
-			log.Printf("accept error: %v", err)
+			log.Println(err)
 			continue
 		}
-		log.Printf("connection from %s", conn.RemoteAddr())
-		conn.Close()
+
+		fmt.Println("New connection:", conn.RemoteAddr())
+		go server.handleClient(conn)
 	}
 }
