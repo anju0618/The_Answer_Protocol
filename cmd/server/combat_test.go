@@ -151,7 +151,6 @@ func TestFleeSuccessAndFailureAndNotInCombat(t *testing.T) {
 	alice := startTestClient(t, server)
 	alice.connect(t, "alice")
 
-	// 敵のいない部屋で戦闘中でなければ、逃げる相手がいないのでERR 407。
 	server.mu.Lock()
 	server.players["alice"].RoomID = "loc.empty"
 	server.mu.Unlock()

@@ -8,7 +8,6 @@ import (
 	"time"
 )
 
-// arcOf は room ID から「どの物語に属するか」を返す("hub"は運命の間)。
 func arcOf(roomID string) string {
 	switch {
 	case strings.HasPrefix(roomID, "loc.argo_"):
@@ -21,9 +20,6 @@ func arcOf(roomID string) string {
 	return "hub"
 }
 
-// 3本の物語は互いに独立している: ゲート・クエスト・エンディングが要求する
-// アイテム/クエストは、すべて同じ物語の中にある(別の物語の持ち物が
-// 必要になってはいけない)。最終エンディングだけは3本すべてを要求する。
 func TestThreeArcsAreIndependent(t *testing.T) {
 	world := loadRealWorld(t)
 	itemArc := func(id string) string { return arcOf(world.Items[id].HomeRoomID) }
@@ -69,7 +65,6 @@ func TestThreeArcsAreIndependent(t *testing.T) {
 	}
 }
 
-// 決定的な戦闘(プレイヤーは最大ダメージ、敵の反撃は最小ダメージ)にする。
 func useBestCaseDice(t *testing.T) {
 	t.Helper()
 	original := randDamage
@@ -82,7 +77,6 @@ func useBestCaseDice(t *testing.T) {
 	t.Cleanup(func() { randDamage = original })
 }
 
-// run はコマンドを送り、届いた行(EVT含む)を応答行まで読んで返す。
 func (client *testClient) run(t *testing.T, command string) []string {
 	t.Helper()
 	if _, err := fmt.Fprintln(client.conn, command); err != nil {
@@ -91,7 +85,6 @@ func (client *testClient) run(t *testing.T, command string) []string {
 	return client.readLinesUntilResponse(t)
 }
 
-// walker は実データのワールドを、1人のプレイヤーで通しプレイするための道具。
 type walker struct {
 	t      *testing.T
 	server *Server
@@ -118,8 +111,6 @@ func (w *walker) room() string {
 	return w.server.players[w.name].RoomID
 }
 
-// do は1コマンド(または "kill <npc>")を実行する。ERRや、途中で死んで運命の間に
-// 戻されたときは、その手順名つきで失敗にする。
 func (w *walker) do(step string) {
 	w.t.Helper()
 	if target, ok := strings.CutPrefix(step, "kill "); ok {
@@ -156,7 +147,6 @@ func (w *walker) do(step string) {
 	}
 }
 
-// drain は、しばらく何も届かなくなるまでの行をすべて返す。
 func (client *testClient) drain(t *testing.T) []string {
 	t.Helper()
 	var lines []string
@@ -235,9 +225,6 @@ func newWalker(t *testing.T, server *Server, name string) *walker {
 	return &walker{t: t, server: server, client: client, name: name}
 }
 
-// 3本の物語は、それぞれ実データのまま最後まで(=エンディングまで)クリアできる。
-// 同じサーバーで2人続けてクリアできることが「アイテムが足りなくて詰む」問題の
-// 回帰テスト(鍵アイテムが取り合いにならず、敵もプレイヤーごとに戦える)。
 func TestEveryArcIsWinnableByEveryPlayer(t *testing.T) {
 	useBestCaseDice(t)
 	server := newServer(t.TempDir())
@@ -269,7 +256,6 @@ func TestEveryArcIsWinnableByEveryPlayer(t *testing.T) {
 			}
 		}
 
-		// 3本すべてを終えたら、運命の間のモイライから最終エンディング。
 		w.teleport(server.world.StartRoomID)
 		w.do("TALK npc.moirai")
 		if !w.reached("ending.final") || !w.has("item.thread_of_fate") || !w.eventsContain("42") {
@@ -278,8 +264,6 @@ func TestEveryArcIsWinnableByEveryPlayer(t *testing.T) {
 	}
 }
 
-// 条件が足りないままエンディングの人に話しかけても、結末は始まらず、
-// 何が足りないかを教えられる。
 func TestEndingNeedsItsRequirementsAndSaysWhatIsMissing(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = loadRealWorld(t)
@@ -297,14 +281,12 @@ func TestEndingNeedsItsRequirementsAndSaysWhatIsMissing(t *testing.T) {
 	}
 }
 
-// 鍵アイテムは取り合いにならず、一意のアイテムは従来どおり取ると消える。
 func TestRenewableKeyItemsAndUniqueItems(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = loadRealWorld(t)
 	alice := newWalker(t, server, "alice")
 	bob := newWalker(t, server, "bob")
 
-	// 鍵アイテム(renewable): 2人とも自分のコピーを取れる。持っている間は自分のLOOKから消える。
 	alice.teleport("loc.ody_circe")
 	bob.teleport("loc.ody_circe")
 	alice.do("TAKE item.beeswax")
@@ -322,7 +304,6 @@ func TestRenewableKeyItemsAndUniqueItems(t *testing.T) {
 	alice.do("DROP item.beeswax")
 	alice.do("TAKE item.beeswax") // 捨てたらまた取れる
 
-	// 一意のアイテム(装飾品): 取ると部屋から消え、DROPすると他人が拾える。
 	alice.teleport("loc.argo_lemnos")
 	bob.teleport("loc.argo_lemnos")
 	alice.do("TAKE item.hospitality_gift")
@@ -333,8 +314,6 @@ func TestRenewableKeyItemsAndUniqueItems(t *testing.T) {
 	bob.do("TAKE item.hospitality_gift")
 }
 
-// 死ぬと、報酬アイテム以外の持ち物をすべて失う。一意のアイテムは元の部屋に戻り、
-// 敵の傷も全快する。仲間が同じ部屋にいれば持ち物は守られる。
 func TestDeathLosesEverythingExceptTrophies(t *testing.T) {
 	useBestCaseDice(t)
 	server := newServer(t.TempDir())
@@ -350,7 +329,6 @@ func TestDeathLosesEverythingExceptTrophies(t *testing.T) {
 	server.players["alice"].setEnemyHP("npc.harpy", 5)
 	server.mu.Unlock()
 
-	// 神話の敵に備えなしで挑んで死ぬ。
 	alice.teleport("loc.ody_cyclops")
 	lines := alice.client.run(t, "ATTACK npc.polyphemus")
 	death := strings.Join(lines, "\n")
@@ -374,7 +352,6 @@ func TestDeathLosesEverythingExceptTrophies(t *testing.T) {
 		t.Errorf("enemies should recover after a death, harpy HP record = %d", woundedHP)
 	}
 
-	// 仲間が同じ部屋にいれば、持ち物は守られる。
 	bob := newWalker(t, server, "bob")
 	for _, cmd := range []struct {
 		client *testClient
@@ -394,7 +371,6 @@ func TestDeathLosesEverythingExceptTrophies(t *testing.T) {
 	}
 }
 
-// 同じGROUPの仲間が同じ部屋にいると、ダメージが増え、討伐の手柄を分け合う。
 func TestGroupAlliesShareCombatVictory(t *testing.T) {
 	useBestCaseDice(t)
 	server := newServer(t.TempDir())
@@ -413,7 +389,6 @@ func TestGroupAlliesShareCombatVictory(t *testing.T) {
 	bob.teleport("loc.argo_salmydessus")
 	bob.do("QUEST npc.phineus")
 
-	// 味方が1人いると、1撃のダメージが allyDamageBonus ぶん増える。
 	lines := alice.client.run(t, "ATTACK npc.harpy")
 	var result combatResult
 	if err := json.Unmarshal([]byte(strings.TrimPrefix(lines[len(lines)-1], "OK ")), &result); err != nil {
@@ -436,8 +411,6 @@ func TestGroupAlliesShareCombatVictory(t *testing.T) {
 	}
 }
 
-// 敵のHPはプレイヤーごと: 1人が倒しても、他の人は同じ敵と戦って
-// defeat_npcクエストを達成できる。
 func TestEnemiesAreDefeatedPerPlayer(t *testing.T) {
 	useBestCaseDice(t)
 	server := newServer(t.TempDir())
@@ -457,7 +430,6 @@ func TestEnemiesAreDefeatedPerPlayer(t *testing.T) {
 		t.Fatalf("bob should complete the harpy quest after his own fight: %+v", state)
 	}
 
-	// 倒し済みの敵のクエストは、後から受けても達成扱いになる。
 	alice.do("QUEST npc.phineus")
 	server.mu.Lock()
 	state = server.players["alice"].Quests["quest.phineus_harpies"]
@@ -467,7 +439,6 @@ func TestEnemiesAreDefeatedPerPlayer(t *testing.T) {
 	}
 }
 
-// 実況(EVT ROOM COMBAT)は、受信者それぞれの言語で届く。
 func TestCombatFlavorIsLocalizedPerRecipient(t *testing.T) {
 	useBestCaseDice(t)
 	server := newServer(t.TempDir())
@@ -499,7 +470,6 @@ func TestCombatFlavorIsLocalizedPerRecipient(t *testing.T) {
 	}
 }
 
-// HPは時間とともに自然回復し、満タンで止まる。
 func TestRegenRestoresHPOverTime(t *testing.T) {
 	start := time.Now()
 	p := &Player{HP: 20}
@@ -514,7 +484,6 @@ func TestRegenRestoresHPOverTime(t *testing.T) {
 	}
 }
 
-// ライストリュゴネス族の部屋は、戦闘中でなくてもFLEEで抜けられる(以前は詰みだった)。
 func TestLaestrygoniansCanBeFledWithoutFighting(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = loadRealWorld(t)
@@ -527,7 +496,6 @@ func TestLaestrygoniansCanBeFledWithoutFighting(t *testing.T) {
 	}
 }
 
-// 航海をやり直す(運命の間からオデュッセイア編に入り直す)と仲間が満員に戻る。
 func TestCrewResetsOnEachFreshVoyage(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = loadRealWorld(t)

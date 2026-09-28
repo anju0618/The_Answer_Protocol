@@ -1,14 +1,3 @@
-// 鬼畜難易度(死ぬと持ち物を失う)と、それを和らげる協力要素(GROUPの
-// 仲間が同じ部屋にいると助け合える)をまとめたファイル。
-//
-//   - 死ぬと、報酬アイテム(エンディングのクリア記念品。Item.RewardOnly)以外の
-//     持ち物をすべて失う。一意のアイテムは元の部屋に戻り、Renewableな鍵アイテムの
-//     コピーは消える(また取りに行ける)。敵のHPと「逃げ切った」記録もリセット
-//     され、敵は全快する。
-//   - ただし同じGROUPの仲間が同じ部屋にいれば、仲間が持ち物を守ってくれて
-//     何も失わない(協力して進む動機)。
-//   - 仲間が同じ部屋にいるATTACKは、味方1人につきダメージが増え、反撃が
-//     分散して弱まり、倒した敵の討伐(クエスト進捗を含む)は全員の手柄になる。
 package main
 
 import "log"
@@ -22,8 +11,6 @@ const (
 	maxAllyBonusCount = 3
 )
 
-// alliesInRoomLocked は name と同じGROUPで、同じ部屋にいる他のプレイヤーの
-// 名前(名前順ではなく順不同)を返す。GROUPに入っていなければ空。
 func (s *Server) alliesInRoomLocked(name string) []string {
 	player := s.players[name]
 	group := s.groups[s.groupByPlayer[name]]
@@ -40,7 +27,6 @@ func (s *Server) alliesInRoomLocked(name string) []string {
 	return allies
 }
 
-// allyBonusCount は加算対象になる味方の人数(上限あり)を返す。
 func allyBonusCount(allies []string) int {
 	if len(allies) > maxAllyBonusCount {
 		return maxAllyBonusCount
@@ -48,7 +34,6 @@ func allyBonusCount(allies []string) int {
 	return len(allies)
 }
 
-// deathOutcome は死亡時の持ち物の扱い。notifyDeathLocked が文言を選ぶのに使う。
 type deathOutcome string
 
 const (
@@ -57,10 +42,6 @@ const (
 	outcomeKept        deathOutcome = "kept" // 仲間が守ってくれた
 )
 
-// applyDeathPenaltyLocked は死亡時のペナルティ(持ち物の喪失、敵のリセット)を
-// 適用して結果を返す。仲間が同じ部屋にいれば持ち物は守られる(敵のリセットは
-// 起こる)。復活先への移動より前、つまり死んだ部屋にいるうちに呼ぶこと。
-// 呼び出し側はs.muを保持していること。
 func (s *Server) applyDeathPenaltyLocked(player *Player, name string) deathOutcome {
 	protected := len(s.alliesInRoomLocked(name)) > 0
 	player.EnemyHP = nil
@@ -69,7 +50,6 @@ func (s *Server) applyDeathPenaltyLocked(player *Player, name string) deathOutco
 		return outcomeNothingLost
 	}
 
-	// 失う対象は「報酬アイテム以外の持ち物」。
 	var kept, lost []string
 	for _, itemID := range player.Inventory {
 		if item := s.world.Items[itemID]; item == nil || item.RewardOnly {
@@ -96,8 +76,6 @@ func (s *Server) applyDeathPenaltyLocked(player *Player, name string) deathOutco
 	return outcomeLost
 }
 
-// returnItemsHomeLocked は失われた一意のアイテムを元の部屋へ戻し、その
-// 位置をディスクにも反映する(再起動後に取り残されないように)。
 func (s *Server) returnItemsHomeLocked(name string, itemIDs []string) {
 	if len(itemIDs) == 0 {
 		return
@@ -125,9 +103,6 @@ func (s *Server) returnItemsHomeLocked(name string, itemIDs []string) {
 	}
 }
 
-// shareVictoryLocked は attacker が倒した敵 npcID の討伐を、同じ部屋の
-// 味方全員の手柄にする(その味方の世界でも敵を倒し済みにし、defeat_npc
-// クエストも進める)。呼び出し側はs.muを保持していること。
 func (s *Server) shareVictoryLocked(attacker string, allies []string, npcID string, npc *NPC) {
 	for _, allyName := range allies {
 		ally := s.players[allyName]

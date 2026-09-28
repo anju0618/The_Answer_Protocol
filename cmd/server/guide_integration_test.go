@@ -16,7 +16,6 @@ func loadRealWorld(t *testing.T) *World {
 	return world
 }
 
-// 運命の間のガイドと、全クエストのヒントが、両言語ぶん実データに入っている。
 func TestRealWorldGuideAndQuestHintsExist(t *testing.T) {
 	world := loadRealWorld(t)
 	server := newServer(t.TempDir())
@@ -57,8 +56,6 @@ func TestRealWorldGuideAndQuestHintsExist(t *testing.T) {
 	}
 }
 
-// 日本語で接続した新規プレイヤーは、運命の間の案内を日本語で受け取り、
-// 備えなしで神話の敵に挑んで死ぬと、必要だったものを日本語で教えられる。
 func TestRealWorldJapaneseIntroAndDeathMessage(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = loadRealWorld(t)
@@ -88,8 +85,6 @@ func TestRealWorldJapaneseIntroAndDeathMessage(t *testing.T) {
 	}
 }
 
-// アルゴ編の最初の部屋に入ると、依頼を持つティピュスの案内が届き、
-// 受注すると進行中の依頼として記録される。
 func TestRealWorldQuestGiverAnnouncedOnEntry(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = loadRealWorld(t)

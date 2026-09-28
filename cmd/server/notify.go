@@ -1,16 +1,3 @@
-// プレイヤー1人だけに届く通知(EVT PLAYER ...)と、死亡理由の文言、
-// 運命の間の案内(ガイド)をまとめたファイル。
-//
-// これまでの「死」はEVT ROOM COMBATを死んだ部屋へ流すだけだったが、
-// 死んだ本人はその時点でもう運命の間へ送られているため、自分の死因が
-// 一切分からなかった。ここでは本人宛てに「何が起きたか・次にどうすれば
-// よいか」を届ける。RFCが定義するJSONレスポンスの形は一切変えず、
-// 新しいEVTのタイプ(PLAYER)を足すだけにしている(READMEの
-// 「Protocol Implementation」のEVT ROOM COMBATと同じ考え方)。
-//
-//	EVT PLAYER DEATH <text>  死亡理由とリスポーン先の説明
-//	EVT PLAYER GUIDE <text>  運命の間のチュートリアル(初回接続時/モイライへのTALK)
-//	EVT PLAYER QUEST <text>  クエストの案内・進捗・達成通知
 package main
 
 import (
@@ -19,12 +6,10 @@ import (
 	"strings"
 )
 
-// Format は t の locale 版テキストを fmt.Sprintf の書式として展開する。
 func (t LocalizedText) Format(locale string, args ...any) string {
 	return fmt.Sprintf(t.Get(locale), args...)
 }
 
-// localeOfLocked は接続中プレイヤー name の言語を返す(未接続なら既定言語)。
 func (s *Server) localeOfLocked(name string) string {
 	if client := s.clients[name]; client != nil && client.locale != "" {
 		return client.locale
@@ -32,9 +17,6 @@ func (s *Server) localeOfLocked(name string) string {
 	return defaultLocale
 }
 
-// sendPlayerEventLocked は name 1人だけに "EVT PLAYER <kind> <text>" を送る。
-// 呼び出し側はs.muを保持していること。1行=1メッセージのため、textに
-// 改行が混ざらないようここで空白に置き換える。
 func (s *Server) sendPlayerEventLocked(name, kind, text string) {
 	client := s.clients[name]
 	if client == nil {
@@ -44,10 +26,6 @@ func (s *Server) sendPlayerEventLocked(name, kind, text string) {
 	client.enqueueEvent("EVT PLAYER " + kind + " " + text)
 }
 
-// deathTexts は死亡理由の文言(fmt書式)。キーは respawnPlayerLocked の
-// cause に渡す。何が起きたかの事実だけを伝え、どうすれば防げたか・何が
-// 必要だったかは一切教えない(謎解きを台無しにしないため)。
-// 各文言が受け取る引数はコメントのとおり。
 var deathTexts = map[string]LocalizedText{
 	// 引数: 敵の名前
 	"attack_counter": {
@@ -99,14 +77,11 @@ var deathTexts = map[string]LocalizedText{
 	},
 }
 
-// respawnTail は死亡メッセージの末尾に付ける「どこで復活したか」の説明。
-// 引数: 復活先の部屋名, 復活後のHP。
 var respawnTail = LocalizedText{
 	"en": "You awaken in %s with %d HP.",
 	"ja": "%sで目を覚ました。HPは%dに減っている。",
 }
 
-// outcomeTexts は死亡時の持ち物の扱い(hardcore.go)の説明文。
 var outcomeTexts = map[deathOutcome]LocalizedText{
 	outcomeLost: {
 		"en": "You lost everything you were carrying except your trophies, so fetch what you need again.",
@@ -118,16 +93,11 @@ var outcomeTexts = map[deathOutcome]LocalizedText{
 	},
 }
 
-// enemiesRecoverTail は死亡すると傷つけた敵が全快することの説明。
 var enemiesRecoverTail = LocalizedText{
 	"en": "Every enemy you had wounded has recovered.",
 	"ja": "傷つけた敵はすべて全快した。",
 }
 
-// notifyDeathLocked は name 本人へEVT PLAYER DEATHで死亡理由を伝える。
-// cause は deathTexts のキー、args はその文言の引数。呼び出し側は、
-// args の中の名前などを name の言語(s.localeOfLocked(name))で解決して
-// 渡すこと(通常は同じ接続のclientLocaleがそのまま使える)。
 func (s *Server) notifyDeathLocked(name, cause string, outcome deathOutcome, args ...any) {
 	locale := s.localeOfLocked(name)
 	text, ok := deathTexts[cause]
@@ -147,9 +117,6 @@ func (s *Server) notifyDeathLocked(name, cause string, outcome deathOutcome, arg
 	s.sendPlayerEventLocked(name, "DEATH", message)
 }
 
-// guideNPC は開始部屋にいるガイドNPC(world.jsonで "guide": true が付いた
-// NPC。運命の間のモイライ)を返す。複数いればID辞書順で最小のもの、
-// いなければnil。
 func (s *Server) guideNPC() *NPC {
 	if s.world == nil {
 		return nil
@@ -167,10 +134,6 @@ func (s *Server) guideNPC() *NPC {
 	return s.world.NPCs[ids[0]]
 }
 
-// sendGuideLocked はガイドNPCのセリフのうち index 番目以降を、すべて
-// EVT PLAYER GUIDEとして name に送る。初回接続時は0番目から全部
-// (handleConnect)、モイライへのTALKでは0番目がOKレスポンスに乗るため
-// 1番目から(handleTalk)送る。
 func (s *Server) sendGuideLocked(name string, index int) {
 	guide := s.guideNPC()
 	if guide == nil {

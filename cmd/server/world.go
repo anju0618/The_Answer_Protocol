@@ -1,6 +1,3 @@
-// data/world.json をGoの構造体に読み込むデータモデルと、そのロード・検証処理。
-// ワールドは「部屋(Room, room.go)」「アイテム(Item)」「NPC」「クエスト(Quest)」
-// の4種類のマスタデータで構成される。
 package main
 
 import (
@@ -10,17 +7,6 @@ import (
 	"strings"
 )
 
-// Item はワールド内のアイテム。Obtainable が true のものだけTAKEできる
-// (false のものは「取れない設定物」用)。
-//
-// 通常のアイテムはワールド内に一意のインスタンスで、TAKEすると部屋から
-// 消え、DROPすると他のプレイヤーが拾える(課題の要件)。ただしクエストや
-// 神話ゲートに必要な「鍵アイテム」が一意のままだと、誰か1人が拾って
-// 放置(セーブ)しただけで他のプレイヤーは永久にその道をクリアできなくなる。
-// そこで Renewable が true のアイテムは部屋に残り続け、TAKEするたびに
-// そのプレイヤー専用のコピーが所持品に入る(既に持っている人には部屋の
-// 一覧から見えない)。RewardOnly が true のものはエンディングの報酬専用で、
-// どの部屋にも置かれない(RoomIDは空)。
 type Item struct {
 	Name        LocalizedText `json:"name"`
 	Description LocalizedText `json:"description"`
@@ -33,10 +19,6 @@ type Item struct {
 	HomeRoomID string `json:"-"`
 }
 
-// NPC はワールド内のNPC1体。Role は "dialogue"(会話専用)・
-// "quest_giver"(クエスト付与)・"enemy"(戦闘可能)のいずれか。
-// MythRequirementItem/Quest 以降は combat.go の神話ゲート判定
-// (Player.meetsMythRequirement)で使う。
 type NPC struct {
 	Name                 LocalizedText   `json:"name"`
 	Description          LocalizedText   `json:"description"`
@@ -54,21 +36,16 @@ type NPC struct {
 	Ending               *Ending         `json:"ending,omitempty"`
 }
 
-// QuestObjective はクエスト達成条件。Type は "collect_item"(アイテム所持)
-// または "defeat_npc"(NPC撃破)。
 type QuestObjective struct {
 	Type     string `json:"type"`
 	TargetID string `json:"target_id"`
 	Count    int    `json:"count"`
 }
 
-// QuestReward はクエスト達成時にプレイヤーへ付与される報酬(HP回復量)。
 type QuestReward struct {
 	HP int `json:"hp"`
 }
 
-// Quest はNPCから受注できるクエスト1件。進行状況自体はプレイヤーごとに
-// Player.Quests(player.go)で管理し、こちらは不変のマスタデータ。
 type Quest struct {
 	Name        LocalizedText  `json:"name"`
 	Description LocalizedText  `json:"description"`
@@ -77,10 +54,6 @@ type Quest struct {
 	Reward      QuestReward    `json:"reward"`
 }
 
-// World はワールド全体(全部屋・全アイテム・全NPC・全クエスト)。
-// data/world.json をそのままアンマーシャルしたもので、サーバー起動中は
-// 読み取り専用のマスタデータとして扱う(可変なのはNPC.HP・Item.RoomIDなど、
-// 各ハンドラがs.muの下で直接書き換える一部フィールドのみ)。
 type World struct {
 	StartRoomID string            `json:"start_room_id"`
 	Rooms       map[string]*Room  `json:"rooms"`
@@ -89,8 +62,6 @@ type World struct {
 	Quests      map[string]*Quest `json:"quests"`
 }
 
-// loadWorld は path からワールドデータを読み込み、validate で整合性を
-// 検証してから返す。
 func loadWorld(path string) (*World, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -112,9 +83,6 @@ func loadWorld(path string) (*World, error) {
 	return &world, nil
 }
 
-// validate はワールドデータの参照整合性(出口・アイテム・NPC・クエストが
-// 指すIDが実在するか等)を検証する。ロード時に一度だけ呼ばれ、壊れた
-// world.json でサーバーが起動しないようにするためのもの。
 func (w *World) validate() error {
 	if w == nil {
 		return fmt.Errorf("world is null")
@@ -221,10 +189,6 @@ func (w *World) validate() error {
 	return w.validateEndings()
 }
 
-// resolveNPCInRoom は roomID 内のNPCを、まずID完全一致、次に指定
-// localeでの表示名の大文字小文字を無視した一致で探す。同名NPCが複数
-// いる場合はID辞書順で最小のものを返す(TAKE/DROPのアイテム名解決と
-// 同じ決定的なタイブレーク方式)。見つからなければ空文字列を返す。
 func (w *World) resolveNPCInRoom(roomID, query, locale string) string {
 	if npc := w.NPCs[query]; npc != nil && npc.RoomID == roomID {
 		return query
@@ -238,8 +202,6 @@ func (w *World) resolveNPCInRoom(roomID, query, locale string) string {
 	return npcID
 }
 
-// questByGiver は npcID がgiver_npc_idとして設定されているクエストを
-// 返す。複数あった場合はID辞書順で最小のものを、無ければ ("", nil) を返す。
 func (w *World) questByGiver(npcID string) (string, *Quest) {
 	questID := ""
 	for id, quest := range w.Quests {
@@ -253,15 +215,10 @@ func (w *World) questByGiver(npcID string) (string, *Quest) {
 	return questID, w.Quests[questID]
 }
 
-// availableTo は player が今いる部屋で、このアイテムをTAKEできるかを返す。
-// Renewableなアイテムは、既に同じものを持っているプレイヤーには取れない
-// (1人1個)。id はこのアイテムのID。
 func (item *Item) availableTo(player *Player, id string) bool {
 	return item.Obtainable && item.visibleTo(player, id, player.RoomID)
 }
 
-// visibleTo は roomID にあるこのアイテムが player のLOOKに載るかを返す。
-// Renewableなアイテムは、既に持っているプレイヤーの一覧からだけ消える。
 func (item *Item) visibleTo(player *Player, id, roomID string) bool {
 	if item.RoomID != roomID {
 		return false

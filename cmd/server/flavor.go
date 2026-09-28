@@ -1,10 +1,3 @@
-// 部屋全体に流れる戦闘・ハザード・アイテム事故の実況テキスト
-// (EVT ROOM COMBAT)を、受信者ごとの言語で送るための仕組み。
-//
-// 以前は英語の文をその場で組み立てて全員に同じものを流していたため、
-// LANG ja でも文の大半が英語のままだった。ここでは「何が起きたか」を
-// flavor(キー+登場人物)として持ち、受信者1人ずつの言語(LANG)で
-// テンプレートを展開して送る。NPC名・部屋名は受信者の言語で解決される。
 package main
 
 import (
@@ -12,8 +5,6 @@ import (
 	"strings"
 )
 
-// flavor は実況テキスト1件ぶんの中身。key は flavorTexts のキー、
-// Player/NPC/Room/N/M がテンプレートの {player}/{npc}/{room}/{n}/{m} に入る。
 type flavor struct {
 	key    string
 	player string
@@ -23,7 +14,6 @@ type flavor struct {
 	m      int
 }
 
-// flavorTexts は実況テキストのテンプレート。{player}{npc}{room}{n}{m}を含む。
 var flavorTexts = map[string]LocalizedText{
 	"attack_unwinnable": {
 		"en": "{player} attacks {npc} and is driven back, losing {n} crew.",
@@ -95,7 +85,6 @@ var flavorTexts = map[string]LocalizedText{
 	},
 }
 
-// text は f を locale の言語のテキストに展開する。
 func (f flavor) text(locale string) string {
 	npcName, roomName := "", ""
 	if f.npc != nil {
@@ -113,9 +102,6 @@ func (f flavor) text(locale string) string {
 	).Replace(flavorTexts[f.key].Get(locale))
 }
 
-// broadcastFlavorLocked は roomID にいる全プレイヤーへ、受信者それぞれの
-// 言語で展開した f を EVT ROOM COMBAT として送る。呼び出し側はs.muを保持
-// していること。
 func (s *Server) broadcastFlavorLocked(roomID string, f flavor) {
 	for playerName, other := range s.players {
 		if other.RoomID != roomID {

@@ -1,13 +1,3 @@
-// 3本の物語(アルゴ船・トロイア戦争・オデュッセイア)それぞれのエンディングと、
-// 3本すべてを終えた人だけが見られる最終エンディングの仕組み。
-//
-// エンディングは新しいコマンドを増やさず、「最終地点にいるNPCにTALKする」
-// ことで発生する。NPCの Ending(data/world.json)に、必要なアイテム・クエスト・
-// (最終エンディングでは)他のエンディングが書かれていて、揃った状態で
-// TALKすると物語の結末が EVT PLAYER ENDING で流れ、報酬アイテムが所持品に
-// 入る。足りない場合は、何が足りないかを同じ EVT PLAYER ENDING で教える。
-// 必要アイテムは「見せる」だけで消費しない(鍵アイテムはRenewableな各自の
-// コピーなので、取り合いにならない。world.go の Item のコメント参照)。
 package main
 
 import (
@@ -17,7 +7,6 @@ import (
 	"strings"
 )
 
-// Ending は NPC が持つエンディング1つぶんの定義。
 type Ending struct {
 	ID              string          `json:"id"`
 	Name            LocalizedText   `json:"name"`
@@ -29,9 +18,6 @@ type Ending struct {
 	Text            []LocalizedText `json:"text"`
 }
 
-// validateEndings は全NPCのEndingの参照整合性(必要アイテム・クエスト・
-// 報酬アイテム・他のエンディングのIDが実在するか、IDが重複していないか)を
-// 検証する。World.validate から呼ばれる。
 func (w *World) validateEndings() error {
 	ids := make(map[string]string)
 	for npcID, npc := range w.NPCs {
@@ -76,8 +62,6 @@ func (w *World) validateEndings() error {
 	return nil
 }
 
-// routeEndings は「物語1本ぶんのエンディング」(他のエンディングを必要と
-// しないもの)をID順で返す。最終エンディングは含まない。
 func (w *World) routeEndings() []*Ending {
 	var list []*Ending
 	for _, npc := range w.NPCs {
@@ -89,7 +73,6 @@ func (w *World) routeEndings() []*Ending {
 	return list
 }
 
-// endingByID は id のエンディングを返す(無ければnil)。
 func (w *World) endingByID(id string) *Ending {
 	for _, npc := range w.NPCs {
 		if npc != nil && npc.Ending != nil && npc.Ending.ID == id {
@@ -99,8 +82,6 @@ func (w *World) endingByID(id string) *Ending {
 	return nil
 }
 
-// missingForEndingLocked は player が e の条件のうち、まだ満たしていない
-// ものを locale の言語で説明した断片のリストで返す(全部満たしていれば空)。
 func (s *Server) missingForEndingLocked(player *Player, e *Ending, locale string) []string {
 	var missing []string
 	for _, itemID := range e.RequiresItems {
@@ -130,13 +111,10 @@ func (s *Server) missingForEndingLocked(player *Player, e *Ending, locale string
 	return missing
 }
 
-// sendEndingLocked は name にEVT PLAYER ENDINGを1行送る。
 func (s *Server) sendEndingLocked(name, text string) {
 	s.sendPlayerEventLocked(name, "ENDING", text)
 }
 
-// sendEndingProgressLocked は「到達したエンディング n/3」と各エンディングの
-// 達成状況を1行で本人に伝える(モイライにTALKしたとき・エンディング到達時)。
 func (s *Server) sendEndingProgressLocked(player *Player) {
 	routes := s.world.routeEndings()
 	if len(routes) == 0 {
@@ -163,19 +141,12 @@ func (s *Server) sendEndingProgressLocked(player *Player) {
 	}.Format(locale, done, len(routes), strings.Join(parts, separator)))
 }
 
-// grantEndingRewardLocked は報酬アイテムを、まだ持っていなければ所持品に加える。
 func (s *Server) grantEndingRewardLocked(player *Player, e *Ending) {
 	if e.RewardItem != "" && !player.hasItem(e.RewardItem) {
 		player.Inventory = append(player.Inventory, e.RewardItem)
 	}
 }
 
-// talkEndingLocked は npc に Ending があるときの TALK の追加処理。
-//   - 既に到達済み: 結末をもう一度流す(報酬を落としていたら再度渡す)
-//   - 条件を満たした: 到達を記録し、結末と報酬を渡す
-//   - 足りない: 何が足りないかを教える
-//
-// 呼び出し側はs.muを保持していること。
 func (s *Server) talkEndingLocked(player *Player, npc *NPC) {
 	e := npc.Ending
 	if e == nil || s.world == nil {
