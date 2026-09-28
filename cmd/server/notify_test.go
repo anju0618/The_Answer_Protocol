@@ -6,8 +6,6 @@ import (
 	"testing"
 )
 
-// readLinesUntilResponse は response(OK/ERRで始まる行)が届くまでの全行を返す。
-// 返り値の最後の要素が応答行で、それより前はその間に届いたEVT行。
 func (client *testClient) readLinesUntilResponse(t *testing.T) []string {
 	t.Helper()
 	var lines []string
@@ -24,7 +22,6 @@ func (client *testClient) readLinesUntilResponse(t *testing.T) []string {
 	}
 }
 
-// waitEvent は prefix で始まるEVT行が届くまで読み進めて、その行を返す。
 func (client *testClient) waitEvent(t *testing.T, prefix string) string {
 	t.Helper()
 	for i := 0; i < 50; i++ {
@@ -54,7 +51,6 @@ func guideTestWorld() *World {
 	}
 }
 
-// 死んだ本人にだけ、死因・必要だったもの・復活先が届く。
 func TestDeathMessageReachesTheDyingPlayer(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = guideTestWorld()
@@ -76,7 +72,6 @@ func TestDeathMessageReachesTheDyingPlayer(t *testing.T) {
 	}
 }
 
-// 死亡文言は全キー・全言語で、渡す引数の数と書式が食い違っていない。
 func TestDeathTextsFormatCleanly(t *testing.T) {
 	args := map[string][]any{
 		"attack_counter":    {"Foe"},
@@ -106,7 +101,6 @@ func TestDeathTextsFormatCleanly(t *testing.T) {
 	}
 }
 
-// 初回接続でだけガイドが自動再生され、TALKでは1行目が応答・残りがEVTで届く。
 func TestGuidePlaysOnFirstConnectAndReplaysOnTalk(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = guideTestWorld()
@@ -156,8 +150,6 @@ func questTestWorld() *World {
 	}
 }
 
-// クエストを持つNPCがいる部屋に着くと通知が来て、達成すると通知が来る。
-// 受注前に拾ったアイテムも、受注した時点で数えられる。
 func TestQuestAnnouncedAndCompletedEvenIfItemTakenFirst(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = questTestWorld()

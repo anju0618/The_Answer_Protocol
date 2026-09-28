@@ -1,6 +1,3 @@
-// アイテムの現在位置(TAKE/DROPでworld.jsonの初期配置から動いた分)を
-// ディスク(itemdata.json)へ永続化する処理。サーバー再起動後もアイテムの
-// 場所が復元されるようにするためのもの。
 package main
 
 import (
@@ -13,13 +10,10 @@ import (
 
 const itemsSaveFile = "itemdata.json"
 
-// itemsSavePath はアイテム位置の保存先ファイルパスを返す。
 func (s *Server) itemsSavePath() string {
 	return filepath.Join(s.saveDir, itemsSaveFile)
 }
 
-// loadItemLocations は保存済みのアイテムID→部屋IDのマップを読み込む。
-// 保存ファイルが無ければ(初回起動時)空のマップを返す。
 func (s *Server) loadItemLocations() (map[string]string, error) {
 	data, err := os.ReadFile(s.itemsSavePath())
 	if errors.Is(err, os.ErrNotExist) {
@@ -38,10 +32,6 @@ func (s *Server) loadItemLocations() (map[string]string, error) {
 	return locations, nil
 }
 
-// restoreItemLocations は保存済みのアイテム位置をロードし、
-// s.world.Items の RoomID を上書きする。サーバー起動時に一度だけ
-// 呼ばれる(NewServer)。保存データが指すアイテム/部屋がworld.jsonに
-// 実在しなければエラーを返す。
 func (s *Server) restoreItemLocations() error {
 	locations, err := s.loadItemLocations()
 	if err != nil {
@@ -66,9 +56,6 @@ func (s *Server) restoreItemLocations() error {
 	return nil
 }
 
-// writeItemLocations は locations をitemdata.jsonへ書き込む。一時ファイルに
-// 書いてから rename する(=書き込み途中でクラッシュしても既存の保存
-// ファイルが壊れない)アトミックな保存パターン。
 func (s *Server) writeItemLocations(locations map[string]string) error {
 	data, err := json.MarshalIndent(locations, "", "  ")
 	if err != nil {

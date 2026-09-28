@@ -1,6 +1,3 @@
-// QUEST/QUESTSコマンドと、クエスト進行の自動判定。手動の完了報告コマンドは
-// 用意せず、TAKE/ATTACKが成功した瞬間にサーバー側で該当する進行中クエストを
-// 自動チェック・自動達成・自動報酬付与する(README「Quest System」参照)。
 package main
 
 import (
@@ -11,11 +8,6 @@ import (
 	"strings"
 )
 
-// checkQuestObjectiveLocked は、objType("collect_item"または"defeat_npc")と
-// targetID(取得したアイテムID/倒したNPC ID)に一致する、player が
-// 受注済み(active)の全クエストを1つ進める。目標数に達したクエストは
-// completedにし、報酬HPを即座に回復させる(上限maxPlayerHP)。
-// TAKE成功時・ATTACK勝利時から呼ばれる。
 func (s *Server) checkQuestObjectiveLocked(player *Player, objType, targetID string) {
 	if s.world == nil {
 		return
@@ -57,7 +49,6 @@ func (s *Server) advanceQuestLocked(player *Player, quest *Quest, state *PlayerQ
 	}.Format(locale, quest.Name.Get(locale), quest.Reward.HP, player.HP))
 }
 
-// questGiverNPCIDsLocked は roomID にいる、クエストを持つNPCのIDをID順で返す。
 func (s *Server) questGiverNPCIDsLocked(roomID string) []string {
 	var ids []string
 	for id, npc := range s.world.NPCs {
@@ -72,11 +63,6 @@ func (s *Server) questGiverNPCIDsLocked(roomID string) []string {
 	return ids
 }
 
-// announceQuestGiversLocked は player が今いる部屋に、まだ受けていない
-// クエストを持つNPCがいれば「依頼がある。QUEST <名前>で受けられる」と
-// 本人にEVT PLAYER QUESTで知らせる。LOOKのレスポンスにはNPCのIDしか
-// 載らず(RFCの形式は変えられない)、誰がクエストを持っているかが
-// 分からなかったため、部屋に入った瞬間に案内する。MOVE後・CONNECT後に呼ぶ。
 func (s *Server) announceQuestGiversLocked(player *Player) {
 	if s.world == nil {
 		return
@@ -95,8 +81,6 @@ func (s *Server) announceQuestGiversLocked(player *Player) {
 	}
 }
 
-// sendQuestHintLocked は quest_giver に TALK した後、そのNPCのクエストの
-// 状況(未受注なら受け方、進行中なら進捗)を本人へ知らせる。
 func (s *Server) sendQuestHintLocked(player *Player, npcID string) {
 	questID, quest := s.world.questByGiver(npcID)
 	if quest == nil {
@@ -119,10 +103,6 @@ func (s *Server) sendQuestHintLocked(player *Player, npcID string) {
 	}
 }
 
-// handleQuest はQUEST <npc> コマンドを処理する。指定NPCが持つクエストの
-// 情報(未達成なら)を返し、初回呼び出し時はそのクエストをプレイヤーの
-// アクティブなクエストとして登録する。達成済みクエストを再度尋ねたり、
-// クエストを持たないNPCに尋ねたりするとERR 406を返す。
 func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !requireArgs(conn, parts, 2) {
 		return false
@@ -192,9 +172,6 @@ func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 	return client.waitResponse(response) != nil
 }
 
-// handleQuests はQUESTS(引数なし)コマンドを処理する。プレイヤーがこれ
-// までに受注した(進行中・達成済み問わず)全クエストを、進行状況
-// "現在数/目標数" 付きでID順に一覧表示する。
 func handleQuests(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !requireExactArgs(conn, parts, 1) {
 		return false
@@ -247,9 +224,6 @@ func handleQuests(s *Server, conn net.Conn, name *string, parts []string) bool {
 	return client.waitResponse(response) != nil
 }
 
-// objectiveAlreadyMetLocked は、クエストを受ける前の時点で player が既に
-// 目標を果たしているか(対象アイテムを持っている/対象の敵を自分の世界で
-// 倒し済み)を返す。
 func (s *Server) objectiveAlreadyMetLocked(player *Player, quest *Quest) bool {
 	switch quest.Objective.Type {
 	case "collect_item":

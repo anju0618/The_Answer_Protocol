@@ -1,7 +1,3 @@
-// ATTACK/FLEEコマンドと、戦闘まわりの共通処理(ダメージ計算・死亡と
-// リスポーン)。神話ゲート(必要アイテム/クエスト)・FLEEの成否・
-// Unwinnableな敵の扱いなど、戦闘システムの設計判断はREADME
-// 「Combat System」とmemo.md 7章にまとめてある。
 package main
 
 import (
@@ -13,16 +9,10 @@ import (
 	"strings"
 )
 
-// randDamage は [min, max] の範囲(両端含む)でランダムなダメージ量を返す。
-// テストが結果を固定できるよう、関数ではなく差し替え可能な変数にしている。
 var randDamage = func(min, max int) int {
 	return min + rand.IntN(max-min+1)
 }
 
-// respawnPlayerLocked はプレイヤーを死亡させ、ワールドの安全な開始地点
-// (通常は運命の間)にHP respawnHP で送り返す。ATTACK・FLEE失敗・
-// 神話ゲート・部屋ハザードなど、あらゆる「死」の共通処理としてここに
-// まとめている。呼び出し側はs.muを保持していること。
 func (s *Server) respawnPlayerLocked(player *Player, name, cause string, args ...any) {
 	outcome := s.applyDeathPenaltyLocked(player, name)
 	s.notifyDeathLocked(name, cause, outcome, args...)
@@ -51,7 +41,6 @@ func (s *Server) respawnPlayerLocked(player *Player, name, cause string, args ..
 	}
 }
 
-// combatResult はATTACKのJSONレスポンス本体(RFC 5.4.5 の形式)。
 type combatResult struct {
 	AttackerHP int    `json:"attacker_hp"`
 	TargetHP   int    `json:"target_hp"`
@@ -59,11 +48,6 @@ type combatResult struct {
 	Status     string `json:"status"`
 }
 
-// handleAttack はATTACKコマンドを処理する。対象NPCの状態に応じて
-// 3パターンに分岐する:
-//  1. Unwinnable(倒せない敵): ダメージは発生させず、代わりにクルーを消費する。
-//  2. 神話ゲート未達成: 即死させる。
-//  3. それ以外: 通常の数値戦闘(固定範囲のランダムダメージ+反撃)を1ラウンド進める。
 func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !requireArgs(conn, parts, 2) {
 		return false
@@ -164,11 +148,6 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 	return client.waitResponse(response) != nil
 }
 
-// handleFlee はFLEEコマンド(独自拡張、引数なし)を処理する。現在戦闘中の
-// NPCから逃げようとする。成否はNPCごとの FleeAccurate(常に成功)/
-// FleeSucceedsOnce(そのNPCから初めて逃げる時だけ成功)で決まり、成功時は
-// Player.FledFrom に記録される(部屋封鎖の解除判定にも使われる、
-// hazard.go の blockingEnemyLocked を参照)。失敗すると反撃を受ける。
 func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !requireExactArgs(conn, parts, 1) {
 		return false
