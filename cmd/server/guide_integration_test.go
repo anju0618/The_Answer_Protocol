@@ -39,11 +39,17 @@ func TestRealWorldGuideAndQuestHintsExist(t *testing.T) {
 	}
 
 	for id, quest := range world.Quests {
-		if !strings.Contains(quest.Description["en"], "Hint: ") {
-			t.Errorf("quest %s has no English hint", id)
-		}
-		if !strings.Contains(quest.Description["ja"], "ヒント: ") {
-			t.Errorf("quest %s has no Japanese hint", id)
+		// クエスト文は状況の説明だけ。やり方・場所・答えを教えるヒントは書かない。
+		for _, locale := range []string{"en", "ja"} {
+			text := quest.Description[locale]
+			if strings.TrimSpace(text) == "" {
+				t.Errorf("quest %s has no %s description", id, locale)
+			}
+			for _, spoiler := range []string{"Hint", "ヒント", "TAKE", "ATTACK", "FLEE", "QUEST ", "TALK"} {
+				if strings.Contains(text, spoiler) {
+					t.Errorf("quest %s (%s) gives away the answer with %q: %s", id, locale, spoiler, text)
+				}
+			}
 		}
 		if quest.Name["ja"] == "" {
 			t.Errorf("quest %s has no Japanese name", id)
@@ -72,10 +78,13 @@ func TestRealWorldJapaneseIntroAndDeathMessage(t *testing.T) {
 		t.Fatal(err)
 	}
 	death := alice.waitEvent(t, "EVT PLAYER DEATH ")
-	for _, want := range []string{"ポリュペモス", "研がれたオリーブの杭", "運命の間"} {
+	for _, want := range []string{"ポリュペモス", "運命の間"} {
 		if !strings.Contains(death, want) {
 			t.Errorf("death message %q does not mention %q", death, want)
 		}
+	}
+	if strings.Contains(death, "杭") {
+		t.Errorf("death message gives away the answer: %q", death)
 	}
 }
 

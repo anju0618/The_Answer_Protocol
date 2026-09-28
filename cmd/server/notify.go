@@ -45,55 +45,57 @@ func (s *Server) sendPlayerEventLocked(name, kind, text string) {
 }
 
 // deathTexts は死亡理由の文言(fmt書式)。キーは respawnPlayerLocked の
-// cause に渡す。各文言が受け取る引数はコメントのとおり。
+// cause に渡す。何が起きたかの事実だけを伝え、どうすれば防げたか・何が
+// 必要だったかは一切教えない(謎解きを台無しにしないため)。
+// 各文言が受け取る引数はコメントのとおり。
 var deathTexts = map[string]LocalizedText{
 	// 引数: 敵の名前
 	"attack_counter": {
-		"en": "You were struck down by %s and your HP ran out. Tip: check STATUS often, and use FLEE to escape before your HP gets low.",
-		"ja": "%sに打ち倒され、HPが尽きた。ヒント: STATUSでHPをこまめに確認し、危なくなる前にFLEEで逃げよう。",
+		"en": "You were struck down by %s and your HP ran out.",
+		"ja": "%sに打ち倒され、HPが尽きた。",
 	},
-	// 引数: 敵の名前, 必要条件の説明
+	// 引数: 敵の名前
 	"attack_unprepared": {
-		"en": "%s is protected by an old myth, and you attacked it unprepared. You were killed instantly. %s",
-		"ja": "%sは古い神話に守られており、備えのないまま挑んだあなたは即座に殺された。%s",
+		"en": "You attacked %s and were killed instantly.",
+		"ja": "%sに挑み、即座に殺された。",
 	},
 	// 引数: 敵の名前
 	"flee_failed": {
-		"en": "You tried to flee from %s, but failed and were cut down. Some enemies can only be escaped from once, so think of another way.",
-		"ja": "%sから逃げようとしたが失敗し、斬り伏せられた。一度しか逃げられない敵もいる。別の手を考えよう。",
+		"en": "You tried to flee from %s, but failed and were cut down.",
+		"ja": "%sから逃げようとしたが失敗し、斬り伏せられた。",
 	},
 	// 引数: 敵の名前
 	"slip_past": {
-		"en": "You tried to leave while %s still blocked your way, and it cut you down. Defeat it with ATTACK, or escape it with FLEE first.",
-		"ja": "%sが道をふさいでいる間に立ち去ろうとして、斬り伏せられた。ATTACKで倒すか、先にFLEEで振り切ろう。",
+		"en": "You tried to leave while %s still blocked your way, and it cut you down.",
+		"ja": "%sが道をふさいでいる間に立ち去ろうとして、斬り伏せられた。",
 	},
-	// 引数: NPCの名前, 必要条件の説明
+	// 引数: NPCの名前
 	"talk_unprepared": {
-		"en": "%s cannot be faced unprepared, and speaking with them was fatal. %s",
-		"ja": "%sは備えなしに向き合える相手ではなく、話しかけたことが命取りになった。%s",
+		"en": "You spoke with %s, and it was fatal.",
+		"ja": "%sと言葉を交わし、命を落とした。",
 	},
 	// 引数: 部屋の名前
 	"hazard_lethal": {
-		"en": "There is no surviving %s. Some places must be avoided altogether: use LOOK to find another exit.",
-		"ja": "%sを生きて抜けることはできない。避けるべき場所もある。LOOKで別の出口を探そう。",
+		"en": "You did not survive %s.",
+		"ja": "%sを生きて抜けることはできなかった。",
 	},
-	// 引数: 部屋の名前, 必要アイテム名
+	// 引数: 部屋の名前
 	"hazard_item": {
-		"en": "You entered %s without the protection you needed. Next time, bring \"%s\" with you (TAKE it before you go).",
-		"ja": "%sに、必要な備えなしで踏み込んでしまった。次は「%s」を持ってから来よう(先にTAKEしておく)。",
+		"en": "You did not survive %s.",
+		"ja": "%sを生きて抜けることはできなかった。",
 	},
-	// 引数: 部屋の名前, 必要人数, 現在の人数
+	// 引数: 部屋の名前
 	"hazard_crew": {
-		"en": "Your crew was too small to get through %s (at least %d people were needed, but you had %d). Do not waste crew earlier on the voyage.",
-		"ja": "%sを抜けるには仲間が足りなかった(最低%d人必要だが、%d人しかいなかった)。航海の序盤で仲間を無駄にしないこと。",
+		"en": "Your crew was lost passing %s.",
+		"ja": "%sを通り抜けようとして、仲間もろとも全滅した。",
 	},
 	"lotus": {
-		"en": "You tasted the lotus and forgot the way home. Tempting items can be traps: think before you TAKE.",
-		"ja": "ロトスの実を口にして、故郷への道を忘れてしまった。魅力的なアイテムは罠かもしれない。TAKEの前によく考えよう。",
+		"en": "You tasted the lotus and forgot the way home.",
+		"ja": "ロトスの実を口にして、故郷への道を忘れてしまった。",
 	},
 	"cattle": {
-		"en": "You laid hands on the sacred cattle of Helios, and the gods answered with death. Some things must not be taken, however hungry you are.",
-		"ja": "ヘリオスの聖なる牛に手をかけ、神々は死をもって応えた。どれほど飢えていても、手を出してはいけないものがある。",
+		"en": "You laid hands on the sacred cattle of Helios, and the gods answered with death.",
+		"ja": "ヘリオスの聖なる牛に手をかけ、神々は死をもって応えた。",
 	},
 }
 
@@ -132,7 +134,7 @@ func (s *Server) notifyDeathLocked(name, cause string, outcome deathOutcome, arg
 	if !ok {
 		return
 	}
-	message := text.Format(locale, args...)
+	message := strings.TrimSpace(text.Format(locale, args...))
 	if s.world != nil {
 		if room := s.world.Rooms[s.world.StartRoomID]; room != nil {
 			message += " " + respawnTail.Format(locale, room.Name.Get(locale), respawnHP)
@@ -143,35 +145,6 @@ func (s *Server) notifyDeathLocked(name, cause string, outcome deathOutcome, arg
 	}
 	message += " " + enemiesRecoverTail.Get(locale)
 	s.sendPlayerEventLocked(name, "DEATH", message)
-}
-
-// mythNeedText は npc の神話ゲートを突破するために必要だったものを、
-// locale の言語で説明する(死亡メッセージのヒント用)。
-func (s *Server) mythNeedText(npc *NPC, locale string) string {
-	var needs []string
-	if npc.MythRequirementItem != "" && s.world != nil {
-		if item := s.world.Items[npc.MythRequirementItem]; item != nil {
-			needs = append(needs, LocalizedText{
-				"en": "obtain \"%s\"",
-				"ja": "「%s」を手に入れる",
-			}.Format(locale, item.Name.Get(locale)))
-		}
-	}
-	if npc.MythRequirementQuest != "" && s.world != nil {
-		if quest := s.world.Quests[npc.MythRequirementQuest]; quest != nil {
-			needs = append(needs, LocalizedText{
-				"en": "complete the quest \"%s\"",
-				"ja": "クエスト「%s」を達成する",
-			}.Format(locale, quest.Name.Get(locale)))
-		}
-	}
-	if len(needs) == 0 {
-		return ""
-	}
-	if locale == "ja" {
-		return "先にやるべきこと: " + strings.Join(needs, "、") + "。"
-	}
-	return "What you needed first: " + strings.Join(needs, " and ") + "."
 }
 
 // guideNPC は開始部屋にいるガイドNPC(world.jsonで "guide": true が付いた

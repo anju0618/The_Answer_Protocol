@@ -1778,8 +1778,8 @@
           "ja": "クエスト: 依頼を持つ人がいる部屋に入ると知らせが届く。QUEST <名前> で受注し、QUESTS で進み具合を確認できる。クエストは目的を果たした瞬間に自動で達成され、報酬としてHPが回復する。"
         },
         {
-          "en": "Fighting: ATTACK <enemy> to strike, FLEE to escape a fight, and STATUS to check your HP. Enemies strike back, so do not fight at low HP.",
-          "ja": "戦闘: ATTACK <敵> で攻撃、FLEE で戦闘から逃走、STATUS でHPを確認。敵は反撃してくるので、HPが少ないときは戦わないこと。"
+          "en": "Beware: the old myths are cruel. Some foes and places kill the unprepared at once, and nothing will tell you what you lacked. If you fall, you wake here with only 20 HP, stripped of all but your trophies. Try again, wiser.",
+          "ja": "心せよ、古い神話は残酷だ。備えのない者を即座に殺す敵や場所があり、何が足りなかったかは誰も教えてくれない。倒れればHP20でここに戻り、記念品以外はすべて失う。賢くなって、もう一度挑むがよい。"
         },
         {
           "en": "Beware: the old myths are cruel. Some foes and places kill the unprepared at once. If you fall, you wake here with only 20 HP, and we will tell you why you fell. Learn from it and try again.",
@@ -1905,8 +1905,8 @@
         "ja": "盲目の予言者の苦しみ"
       },
       "description": {
-        "en": "Drive off the Harpy tormenting Phineus, so he will share his knowledge of the Clashing Rocks. Hint: the Harpy is right here. Use ATTACK Harpy, watch your HP with STATUS, and FLEE if it gets low.",
-        "ja": "ピネウスを苦しめるハルピュイアを追い払い、衝突する岩についての知識を分けてもらおう。ヒント: ハルピュイアはこの場所にいる。ATTACK ハルピュイア で戦い、STATUSでHPを確認し、危なければFLEEで逃げよう。"
+        "en": "Blind Phineus, the seer, is cursed: winged Harpies snatch every meal from his table.",
+        "ja": "盲目の予言者ピネウスは呪いを受け、翼ある怪物ハルピュイアに毎回の食事を奪われている。"
       },
       "giver_npc_id": "npc.phineus",
       "objective": {
@@ -1924,8 +1924,8 @@
         "ja": "黄金の羊毛皮"
       },
       "description": {
-        "en": "Take the Golden Fleece from the sacred oak, with Medea's help against its sleepless guardian. Hint: the fleece lies in this grove, guarded by the Sleepless Dragon. Medea's Sleeping Draught (also here) is needed to face the dragon, and the Bronze Bulls before it require Medea's Fire-Flower Ointment from Aeetes' court. Then carry it home to King Pelias in the Harbor of Iolcus.",
-        "ja": "メデイアの助けを借りて眠らぬ守護者を出し抜き、聖なる樫の木から黄金の羊毛皮を手に入れよう。ヒント: 羊毛皮はこの森にあり、眠らぬ竜が守っている。竜に立ち向かうにはここにあるメデイアの眠り薬が必要で、その手前の青銅の雄牛にはアイエテス王の宮廷にあるメデイアの火花の軟膏が要る。その後、イオルコスの港にいるペリアス王のもとへ持ち帰ろう。"
+        "en": "The Golden Fleece hangs in Ares's sacred grove. Bring it home to Pelias in Iolcus.",
+        "ja": "黄金の羊毛皮はアレスの聖なる森にある。イオルコスのペリアスのもとへ持ち帰れ。"
       },
       "giver_npc_id": "npc.medea",
       "objective": {
@@ -1943,8 +1943,8 @@
         "ja": "アウリスの風"
       },
       "description": {
-        "en": "Bring Calchas an offering worthy of Artemis, so the fleet may finally sail for Troy. Hint: the White Hind of Aulis is in this harbor. TAKE it.",
-        "ja": "アルテミスにふさわしい供物をカルカスに届け、ついに艦隊がトロイアへ向けて出航できるようにしよう。ヒント: アウリスの白い牝鹿はこの港にいる。TAKEで手に入れよう。"
+        "en": "The fleet is becalmed at Aulis because Agamemnon offended Artemis.",
+        "ja": "アガメムノンがアルテミスを怒らせたせいで、艦隊はアウリスで凪に閉じ込められている。"
       },
       "giver_npc_id": "npc.calchas",
       "objective": {
@@ -1962,8 +1962,8 @@
         "ja": "アキレウスの武具"
       },
       "description": {
-        "en": "Bring Achilles the new armor forged by Hephaestus, so he will return to the war after Patroclus's death. Hint: the Shield of Achilles is in this tent. TAKE it (you will need it to face Hector later).",
-        "ja": "ヘファイストスが新たに鍛えた鎧をアキレウスに届け、パトロクロスの死を受けて彼を戦へ戻らせよう。ヒント: アキレウスの盾はこの天幕にある。TAKEで手に入れよう(後でヘクトールと戦うときにも必要になる)。"
+        "en": "Achilles sulks in his tent and will not fight in borrowed armor after Patroclus's death.",
+        "ja": "パトロクロスの死後、アキレウスは借り物の鎧では戦わないと天幕にこもっている。"
       },
       "giver_npc_id": "npc.achilles",
       "objective": {
@@ -1981,8 +1981,8 @@
         "ja": "ヘクトールの身代金"
       },
       "description": {
-        "en": "Deliver Priam's ransom in exchange for the return of Hector's body. Hint: Hector's Ransom is here in Priam's palace. TAKE it.",
-        "ja": "プリアモスの身代金を届け、ヘクトールの亡骸を取り戻そう。ヒント: ヘクトールの身代金はこのプリアモスの宮殿にある。TAKEで手に入れよう。"
+        "en": "Old King Priam wants only to bury his son.",
+        "ja": "老王プリアモスの願いは、息子を葬ることだけだ。"
       },
       "giver_npc_id": "npc.priam",
       "objective": {
@@ -2000,8 +2000,8 @@
         "ja": "木馬"
       },
       "description": {
-        "en": "Help Odysseus complete the horse that will finally bring down Troy's walls from within. Hint: the Trojan Horse stands on this shore. TAKE it. Then take it to Aeneas at the Burning of Troy, north of this shore, to see the war's end.",
-        "ja": "ついにトロイアの城壁を内側から崩すことになる、あの馬の完成をオデュッセウスとともに手伝おう。ヒント: トロイの木馬はこの岸辺にある。TAKEで手に入れよう。その後、この岸辺の北、トロイア炎上の地にいるアイネイアスのもとへ向かおう。"
+        "en": "Ten years of siege have failed. Odysseus has a plan to end the war.",
+        "ja": "十年の包囲は実らなかった。オデュッセウスには、戦を終わらせる策がある。"
       },
       "giver_npc_id": "npc.odysseus",
       "objective": {
@@ -2019,8 +2019,8 @@
         "ja": "「誰でもない」の脱出"
       },
       "description": {
-        "en": "Blind Polyphemus to free the crew trapped in his cave. Hint: Polyphemus is in this cave. TAKE the Sharpened Olive Stake here first, because attacking him without it is fatal. Then ATTACK Polyphemus, and FLEE if it goes badly.",
-        "ja": "ポリュペモスの目を潰し、洞窟に囚われた乗組員を救い出そう。ヒント: ポリュペモスはこの洞窟にいる。先にここにある研がれたオリーブの杭をTAKEしよう。杭なしで挑むと即死する。その後ATTACK ポリュペモス で戦い、危なければFLEEで逃げよう。"
+        "en": "Polyphemus keeps Odysseus's crew in his cave and eats two of them each night.",
+        "ja": "ポリュペモスは洞窟にオデュッセウスの仲間を閉じ込め、毎晩二人ずつ食らう。"
       },
       "giver_npc_id": "npc.trapped_sailor",
       "objective": {
@@ -2038,8 +2038,8 @@
         "ja": "風の革袋"
       },
       "description": {
-        "en": "Accept Aeolus's bag of winds, and guard it well until Ithaca is in sight. Hint: the Bag of the Winds is on this island. TAKE it, but do not DROP it anywhere except the shore of Ithaca, or a storm will cost you crew.",
-        "ja": "アイオロスから風の革袋を受け取り、イタケが見えるまで大切に守り抜こう。ヒント: 風の革袋はこの島にある。TAKEで手に入れよう。ただしイタケの岸辺以外でDROPすると嵐で仲間を失う。"
+        "en": "Aeolus, keeper of the winds, offers Odysseus a gift for the journey home.",
+        "ja": "風の番人アイオロスは、帰路のための贈り物をオデュッセウスに差し出す。"
       },
       "giver_npc_id": "npc.aeolus",
       "objective": {
@@ -2057,8 +2057,8 @@
         "ja": "モーリュの根"
       },
       "description": {
-        "en": "Take the moly root before drinking from Circe's cup, or join the pigs in her sty. Hint: the Moly Root grows on this island. TAKE it before you TALK to Circe: speaking with her without it is fatal.",
-        "ja": "キルケーの杯を飲む前にモーリュの根を口にせよ。さもなくば、豚小屋の仲間入りだ。ヒント: モーリュの根はこの島に生えている。キルケーにTALKする前にTAKEしておこう。根なしで話しかけると命を落とす。"
+        "en": "Circe turns men into swine with her cup.",
+        "ja": "キルケーは杯で男たちを豚に変える。"
       },
       "giver_npc_id": "npc.circe",
       "objective": {
@@ -2076,8 +2076,8 @@
         "ja": "禁じられた牛"
       },
       "description": {
-        "en": "Eurylochus would slaughter the cattle of Helios against every warning. What you do with them is yours to decide. Hint: this is a trap. The cattle of Helios are sacred, and touching them is fatal. Some requests are best left unanswered.",
-        "ja": "エウリュロコスは、あらゆる警告に逆らってヘリオスの牛を屠ろうとするだろう。それをどうするかは、あなた次第だ。ヒント: これは罠だ。ヘリオスの牛は神聖で、手を触れると命を落とす。引き受けない方がよい依頼もある。"
+        "en": "Eurylochus swears the crew is starving, and the cattle of Helios graze nearby.",
+        "ja": "エウリュロコスは、仲間たちが飢えていると訴える。近くではヘリオスの聖なる牛が草を食んでいる。"
       },
       "giver_npc_id": "npc.eurylochus",
       "objective": {
@@ -2095,8 +2095,8 @@
         "ja": "弓の試練"
       },
       "description": {
-        "en": "Take up Odysseus's bow, which no suitor could even bend, and prove who has truly come home. Hint: Odysseus's Bow is in this hall. TAKE it. Antinous is here too, and you cannot face him without the bow. Once the suitors are dealt with, speak to Penelope again to reach the ending.",
-        "ja": "どの求婚者も曲げることすらできなかったオデュッセウスの弓を手に取り、本当に帰ってきたのが誰かを証明せよ。ヒント: オデュッセウスの弓はこの広間にある。TAKEで手に入れよう。アンティノオスもここにいるが、弓なしでは立ち向かえない。求婚者たちを片付けたら、もう一度ペネロペイアに話しかけて結末を迎えよう。"
+        "en": "Penelope has promised to marry whoever can string her husband's great bow.",
+        "ja": "ペネロペイアは、夫の大弓に弦を張れた者と結婚すると約束した。"
       },
       "giver_npc_id": "npc.penelope",
       "objective": {
@@ -2114,8 +2114,8 @@
         "ja": "拳闘の王"
       },
       "description": {
-        "en": "King Amycus forces every crew that lands on his shore to fight him. Defeat him so the Argo can sail on. Hint: he is on the Shore of the Bebrycians, south of this harbor. Use ATTACK Amycus, watch your HP with STATUS, and FLEE if it gets low.",
-        "ja": "アミュコス王は、上陸するすべての乗組員に戦いを強いる。彼を倒し、アルゴ号を先へ進めよう。ヒント: 彼はこの港の南、ベブリュケス人の岸辺にいる。ATTACK アミュコス王 で戦い、STATUSでHPを確認し、危なければFLEEで逃げよう。"
+        "en": "King Amycus forces every crew that lands on his shore to fight him.",
+        "ja": "アミュコス王は、上陸するすべての乗組員に戦いを強いる。"
       },
       "giver_npc_id": "npc.tiphys",
       "objective": {
@@ -2133,8 +2133,8 @@
         "ja": "青銅の雄牛を制せ"
       },
       "description": {
-        "en": "King Aeetes sets Jason an impossible task: subdue the fire-breathing Bronze Bulls. Hint: the bulls are in the Field of the Bronze Bulls, east of this court. TAKE Medea's Fire-Flower Ointment here first, because facing them without it is fatal. Then ATTACK The Bronze Bulls.",
-        "ja": "アイエテス王はイアソンに不可能な課題を課す。火を吐く青銅の雄牛を従えよというのだ。ヒント: 雄牛はこの宮廷の東、青銅の雄牛の野にいる。先にここにあるメデイアの火花の軟膏をTAKEしよう。軟膏なしで挑むと即死する。その後 ATTACK 青銅の雄牛 で戦おう。"
+        "en": "King Aeetes sets Jason an impossible task: yoke his fire-breathing Bronze Bulls.",
+        "ja": "アイエテス王はイアソンに不可能な課題を課す。火を吐く青銅の雄牛に軛をつけよ、というのだ。"
       },
       "giver_npc_id": "npc.aeetes",
       "objective": {
@@ -2152,8 +2152,8 @@
         "ja": "城壁の下の決闘"
       },
       "description": {
-        "en": "Only Hector stands between the Greeks and Troy's gate. Defeat him. Hint: he guards the Scaean Gate, east of this camp past the Scamander Plain. You cannot face him without the Shield of Achilles from Achilles' tent, north of this camp, so finish The Arms of Achilles first.",
-        "ja": "ギリシア軍とトロイアの門の間に立ちはだかるのはヘクトールただ一人。彼を倒せ。ヒント: 彼はこの陣営の東、スカマンドロスの平野の先にあるスカイアの門を守っている。この陣営の北、アキレウスの天幕にあるアキレウスの盾なしでは立ち向かえないので、先に「アキレウスの武具」を済ませよう。"
+        "en": "Only Hector stands between the Greeks and Troy's gate.",
+        "ja": "ギリシア軍とトロイアの門の間に立つのはヘクトールただ一人。"
       },
       "giver_npc_id": "npc.agamemnon",
       "objective": {
@@ -2171,8 +2171,8 @@
         "ja": "求婚者たちへの報い"
       },
       "description": {
-        "en": "Antinous leads the suitors who devour Odysseus's household. Drive him out. Hint: he is in the Hall of the Suitors, north of this shore. You need Odysseus's Bow first, so take on Penelope's quest The Test of the Bow.",
-        "ja": "アンティノオスはオデュッセウスの家を食い荒らす求婚者たちの首領だ。彼を追い払え。ヒント: 彼はこの岸辺の北、求婚者たちの広間にいる。先にオデュッセウスの弓が必要なので、ペネロペイアの「弓の試練」を受けよう。"
+        "en": "Antinous leads the suitors devouring Odysseus's household.",
+        "ja": "アンティノオスは、オデュッセウスの家を食い荒らす求婚者たちの首領だ。"
       },
       "giver_npc_id": "npc.eumaeus",
       "objective": {
@@ -2190,8 +2190,8 @@
         "ja": "セイレーンへの蜜蝋"
       },
       "description": {
-        "en": "Tiresias warns that the Sirens' song lures every sailor to death. Prepare something to plug your ears. Hint: the Lump of Beeswax lies on Aeaea, west of this house. You cannot enter the Rocks of the Sirens without it.",
-        "ja": "テイレシアスは、セイレーンの歌がすべての船乗りを死へ誘うと警告する。耳をふさぐものを用意しよう。ヒント: 蜜蝋の塊は、この館の西、アイアイエにある。蜜蝋なしではセイレーンの岩礁に入れない。"
+        "en": "Tiresias warns that the Sirens' song lures every sailor to death.",
+        "ja": "テイレシアスは、セイレーンの歌がすべての船乗りを死へ誘うと警告する。"
       },
       "giver_npc_id": "npc.tiresias",
       "objective": {

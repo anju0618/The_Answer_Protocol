@@ -24,12 +24,12 @@ func (s *Server) applyRoomHazardLocked(player *Player, name string, room *Room, 
 		if player.hasItem(hazard.RequiredItemID) {
 			return nil
 		}
-		s.respawnPlayerLocked(player, name, "hazard_item", roomName, s.world.Items[hazard.RequiredItemID].Name.Get(locale))
+		s.respawnPlayerLocked(player, name, "hazard_item", roomName)
 		return &flavor{key: "hazard_item", player: name, room: room}
 
 	case "crew_gate":
 		if player.Crew+1 < hazard.MinPartyTotal {
-			s.respawnPlayerLocked(player, name, "hazard_crew", roomName, hazard.MinPartyTotal, player.Crew+1)
+			s.respawnPlayerLocked(player, name, "hazard_crew", roomName)
 			return &flavor{key: "hazard_crew_dead", player: name, room: room}
 		}
 		lost := spendCrewLocked(player, hazard.CrewLoss)

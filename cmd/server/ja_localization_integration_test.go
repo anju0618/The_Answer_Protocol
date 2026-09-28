@@ -2,7 +2,6 @@ package main
 
 import (
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -45,9 +44,8 @@ func TestJapaneseTranslationsAgainstRealWorldData(t *testing.T) {
 
 	teleport("loc.ody_cyclops")
 	quest := alice.cmdJSON(t, "QUEST 囚われた水夫")
-	// 説明文の本文に続いて、どこで何をすればよいかのヒントが付く。
 	description, _ := quest["description"].(string)
-	if !strings.HasPrefix(description, "ポリュペモスの目を潰し、洞窟に囚われた乗組員を救い出そう。") || !strings.Contains(description, "ヒント: ") {
+	if description != "ポリュペモスは洞窟にオデュッセウスの仲間を閉じ込め、毎晩二人ずつ食らう。" {
 		t.Fatalf("quest ja description = %v", quest)
 	}
 

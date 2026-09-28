@@ -748,7 +748,7 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 		client := conn.(*serverClient)
 		response, err := client.enqueueResponse("OK dead")
 		if err == nil {
-			s.respawnPlayerLocked(player, *name, "talk_unprepared", npc.Name.Get(locale), s.mythNeedText(npc, locale))
+			s.respawnPlayerLocked(player, *name, "talk_unprepared", npc.Name.Get(locale))
 			s.broadcastFlavorLocked(encounterRoomID, flavor{key: "talk_unprepared", player: *name, npc: npc})
 		}
 		s.mu.Unlock()

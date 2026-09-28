@@ -108,7 +108,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		result = combatResult{player.HP, enemyHP, 0, "overwhelmed"}
 
 	case npc.hasMythRequirement() && !player.meetsMythRequirement(npc):
-		s.respawnPlayerLocked(player, *name, "attack_unprepared", npc.Name.Get(locale), s.mythNeedText(npc, locale))
+		s.respawnPlayerLocked(player, *name, "attack_unprepared", npc.Name.Get(locale))
 		event = flavor{key: "attack_unprepared", player: *name, npc: npc}
 		result = combatResult{0, enemyHP, 0, "dead"}
 
