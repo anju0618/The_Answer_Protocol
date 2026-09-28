@@ -288,16 +288,12 @@ func TestEndingNeedsItsRequirementsAndSaysWhatIsMissing(t *testing.T) {
 
 	lines := append(w.client.run(t, "TALK npc.pelias"), w.client.drain(t)...)
 	joined := strings.Join(lines, "\n")
-	if !strings.Contains(joined, "EVT PLAYER ENDING ") || !strings.Contains(joined, "You still need") || !strings.Contains(joined, "Golden Fleece") {
-		t.Fatalf("expected a hint naming the missing fleece, got %q", lines)
+	// 断られるが、何が足りないかの一覧は教えない。
+	if !strings.Contains(joined, "EVT PLAYER ENDING ") || strings.Contains(joined, "You still need") {
+		t.Fatalf("expected only a refusal with no list of requirements, got %q", lines)
 	}
 	if w.reached("ending.argo") {
 		t.Fatal("ending reached without its requirements")
-	}
-	w.teleport(server.world.StartRoomID)
-	lines = append(w.client.run(t, "TALK npc.moirai"), w.client.drain(t)...)
-	if !strings.Contains(strings.Join(lines, "\n"), "the ending \"The Fleece Returns\"") {
-		t.Fatalf("Moirai should list the endings still missing, got %q", lines)
 	}
 }
 

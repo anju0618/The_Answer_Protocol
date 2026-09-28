@@ -194,14 +194,8 @@ func (s *Server) talkEndingLocked(player *Player, npc *NPC) {
 		return
 	}
 	if missing := s.missingForEndingLocked(player, e, locale); len(missing) > 0 {
-		separator := ", "
-		if locale == "ja" {
-			separator = "、"
-		}
-		s.sendEndingLocked(player.Name, e.Hint.Get(locale)+" "+LocalizedText{
-			"en": "You still need: %s.",
-			"ja": "まだ足りないもの: %s。",
-		}.Format(locale, strings.Join(missing, separator)))
+		// 何が足りないかは教えない。NPCの一言だけを返す。
+		s.sendEndingLocked(player.Name, e.Hint.Get(locale))
 		return
 	}
 

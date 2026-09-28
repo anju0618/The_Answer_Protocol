@@ -65,10 +65,14 @@ func TestDeathMessageReachesTheDyingPlayer(t *testing.T) {
 		t.Fatal(err)
 	}
 	death := alice.waitEvent(t, "EVT PLAYER DEATH ")
-	for _, want := range []string{"Beast", "\"Stake\"", "Hall", "20 HP"} {
+	for _, want := range []string{"Beast", "Hall", "20 HP"} {
 		if !strings.Contains(death, want) {
 			t.Errorf("death message %q does not mention %q", death, want)
 		}
+	}
+	// 何が足りなかったか(答え)は教えない。
+	if strings.Contains(death, "Stake") {
+		t.Errorf("death message gives away the answer: %q", death)
 	}
 }
 
@@ -76,13 +80,13 @@ func TestDeathMessageReachesTheDyingPlayer(t *testing.T) {
 func TestDeathTextsFormatCleanly(t *testing.T) {
 	args := map[string][]any{
 		"attack_counter":    {"Foe"},
-		"attack_unprepared": {"Foe", "hint"},
+		"attack_unprepared": {"Foe"},
 		"flee_failed":       {"Foe"},
 		"slip_past":         {"Foe"},
-		"talk_unprepared":   {"Foe", "hint"},
+		"talk_unprepared":   {"Foe"},
 		"hazard_lethal":     {"Place"},
-		"hazard_item":       {"Place", "Thing"},
-		"hazard_crew":       {"Place", 7, 3},
+		"hazard_item":       {"Place"},
+		"hazard_crew":       {"Place"},
 		"lotus":             {},
 		"cattle":            {},
 	}
