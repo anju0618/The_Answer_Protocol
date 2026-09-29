@@ -173,11 +173,12 @@ func TestRoomHazards(t *testing.T) {
 		StartRoomID: "loc.start",
 		Rooms: map[string]*Room{
 			"loc.start": {ID: "loc.start", Exits: map[string]string{
-				"east": "loc.gate", "south": "loc.pit", "west": "loc.strait",
+				"east": "loc.gate", "south": "loc.pit", "west": "loc.strait", "north": "loc.toll",
 			}},
 			"loc.gate":   {ID: "loc.gate", Name: en("Gate"), Exits: map[string]string{"west": "loc.start"}, Hazard: &RoomHazard{Type: "item_gate", RequiredItemID: "item.key"}},
 			"loc.pit":    {ID: "loc.pit", Name: en("Pit"), Hazard: &RoomHazard{Type: "lethal"}},
 			"loc.strait": {ID: "loc.strait", Name: en("Strait"), Hazard: &RoomHazard{Type: "crew_gate", CrewLoss: 6, MinPartyTotal: 7}},
+			"loc.toll":   {ID: "loc.toll", Name: en("Toll Road"), Hazard: &RoomHazard{Type: "crew_cost", CrewLoss: 2}},
 		},
 		Items: map[string]*Item{
 			"item.key": {Name: en("Brass Key"), RoomID: "loc.start", Obtainable: true},
@@ -214,6 +215,90 @@ func TestRoomHazards(t *testing.T) {
 	server.mu.Unlock()
 	if crew != 4 {
 		t.Fatalf("crew after passing scylla-like gate = %d, want 4 (10-6)", crew)
+	}
+
+	server.mu.Lock()
+	server.players["alice"].RoomID = "loc.start"
+	server.players["alice"].Crew = 5
+	server.mu.Unlock()
+	alice.cmd(t, "MOVE north", "OK room=loc.toll")
+	server.mu.Lock()
+	crew = server.players["alice"].Crew
+	server.mu.Unlock()
+	if crew != 3 {
+		t.Fatalf("crew after a flat crew_cost hazard = %d, want 3 (5-2)", crew)
+	}
+}
+
+func TestLiveEnemyBlocksMove(t *testing.T) {
+	server := newServer(t.TempDir())
+	server.world = &World{
+		StartRoomID: "loc.safe",
+		Rooms: map[string]*Room{
+			"loc.safe":  {ID: "loc.safe", Exits: map[string]string{"east": "loc.start"}},
+			"loc.start": {ID: "loc.start", Exits: map[string]string{"west": "loc.safe", "east": "loc.den"}},
+			"loc.den":   {ID: "loc.den", Exits: map[string]string{"west": "loc.start"}},
+		},
+		NPCs: map[string]*NPC{
+			"npc.guard":  {Name: en("Guard"), Role: "enemy", RoomID: "loc.den", HP: 8},
+			"npc.runner": {Name: en("Runner"), Role: "enemy", RoomID: "loc.den", HP: 1000, FleeAccurate: true},
+		},
+	}
+	alice := startTestClient(t, server)
+	alice.connect(t, "alice")
+
+	alice.cmd(t, "MOVE east", "OK room=loc.start")
+	alice.cmd(t, "MOVE east", "OK room=loc.den")
+
+	alice.cmd(t, "MOVE west", "OK room=loc.start")
+	server.mu.Lock()
+	respawned := server.players["alice"].RoomID == "loc.safe"
+	server.mu.Unlock()
+	if !respawned {
+		t.Fatalf("moving out of a room with two live, unresolved enemies should kill and respawn alice at the safe room")
+	}
+
+	server.mu.Lock()
+	server.players["alice"].RoomID = "loc.den"
+	server.mu.Unlock()
+	atk := alice.cmdJSON(t, "ATTACK npc.runner")
+	if atk["status"] != "combat" {
+		t.Fatalf("runner should survive one hit (HP 1000), got %v", atk)
+	}
+	flee := alice.cmdJSON(t, "FLEE")
+	if flee["result"] != "success" {
+		t.Fatalf("fleeing an flee-accurate NPC should succeed, got %v", flee)
+	}
+
+	alice.cmd(t, "MOVE west", "OK room=loc.start")
+	server.mu.Lock()
+	respawned = server.players["alice"].RoomID == "loc.safe"
+	server.mu.Unlock()
+	if !respawned {
+		t.Fatalf("the guard is still alive and unresolved, so leaving should still be blocked and kill alice")
+	}
+
+	server.mu.Lock()
+	server.players["alice"].RoomID = "loc.den"
+	server.mu.Unlock()
+	won := false
+	for range 5 {
+		result := alice.cmdJSON(t, "ATTACK npc.guard")
+		if result["status"] == "victory" {
+			won = true
+			break
+		}
+	}
+	if !won {
+		t.Fatalf("did not defeat the guard (HP 8) within 5 rounds")
+	}
+
+	alice.cmd(t, "MOVE west", "OK room=loc.start")
+	server.mu.Lock()
+	leftDen := server.players["alice"].RoomID == "loc.start"
+	server.mu.Unlock()
+	if !leftDen {
+		t.Fatalf("both enemies are now resolved (fled/defeated), leaving should succeed")
 	}
 }
 
