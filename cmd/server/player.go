@@ -5,4 +5,5 @@ type Player struct {
 	HP        int      `json:"hp"`
 	RoomID    string   `json:"room_id"`
 	Inventory []string `json:"inventory"`
+	exiting   bool
 }
