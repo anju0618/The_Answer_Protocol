@@ -8,10 +8,6 @@ import (
 	"strings"
 )
 
-// checkQuestObjectiveLocked advances any of the player's active quests whose
-// objective matches (objType, targetID) — called after a successful TAKE or
-// a successful ATTACK. Completing a quest heals the player by its reward,
-// capped at maxPlayerHP. Callers must hold s.mu.
 func (s *Server) checkQuestObjectiveLocked(player *Player, objType, targetID string) {
 	if s.world == nil {
 		return
@@ -44,6 +40,7 @@ func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 		return false
 	}
 	query := strings.Join(parts[1:], " ")
+	locale := clientLocale(conn)
 
 	s.mu.Lock()
 	player := s.playerForUpdateLocked(*name)
@@ -52,7 +49,7 @@ func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	npcID := s.world.resolveNPCInRoom(player.RoomID, query)
+	npcID := s.world.resolveNPCInRoom(player.RoomID, query, locale)
 	if npcID == "" {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 404 NPC_NOT_FOUND")
@@ -81,7 +78,7 @@ func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 		Description string `json:"description"`
 		Reward      int    `json:"reward"`
 		Status      string `json:"status"`
-	}{questID, quest.Description, quest.Reward.HP, "available"})
+	}{questID, quest.Description.Get(locale), quest.Reward.HP, "available"})
 	if err != nil {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")

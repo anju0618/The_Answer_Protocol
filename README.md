@@ -2,111 +2,239 @@
 
 # The Answer Protocol (TAP)
 
-> TODO: 正式な提出用READMEはTASKS.md記載の必須フォーマット（1行目のイタリック文言、Description/Instructions/Resources、Architecture/Protocol Implementation/Combat System/Quest System/World Design/Server Logging/Group Contributions/Building and Running/Testingの各セクション、英語必須）に沿って後で整備すること。以下は開発中のGo学習メモ。
+[日本語版はこちら](#日本語版) ・ [English version below](#english-original-submission)
 
-## RFC
+---
 
-`RFC`という文書形式自体の説明
+# 日本語版
 
-### 何の略か、何のための文書か
+> このセクションはチーム内の開発者向け解説です。42への提出用ドキュメントは、このページ下部の英語セクション([English original submission](#english-original-submission))です。要件(TASKS.md 9章)により、提出用READMEは英語で書く必要があるため、内容の正本は英語セクション側になります。このセクションは同じ内容の日本語での要約・補足という位置づけです。
 
-**RFC = Request for Comments**（意見募集）。1969年、初期のインターネット(ARPANET)の技術者たちが「こういう仕様どう？意見ちょうだい」という形でメモを回覧しはじめたのが起源で、そのまま名前が定着した。現在は**IETF**(Internet Engineering Task Force)という団体が管理していて、インターネットで使われるプロトコル(TCP/IP, HTTP, SMTP, DNSなど)のほぼ全てが、最終的にRFCという形式の文書で正式に定義されている。
+## これは何か
 
-つまりRFCは「みんなが同じ実装をできるように、通信の約束事を文章で厳密に定めたもの」。ブラウザを作る会社とサーバーを作る会社が違っても、同じRFCに従っていれば通信できる、というのがポイント（今回の課題で「他チームのサーバーと繋がらないといけない」のと本質的に同じ理由）。
+**The Answer Protocol (TAP)** は、共有ワールド型のレトロテキストアドベンチャー(MUD)。TCPサーバー1つ(`cmd/server`)と、生プロトコルをそのまま中継するCLIクライアント(`cmd/cli`)からなる。配布されたRFC(`protocol-rfc.html`、42が課題用に定義した架空の独自プロトコル)に厳密準拠しつつ、戦闘・クエストなど意図的に仕様が空けられている部分は自分たちで設計している。
 
-### 基本的な構成要素
+ワールドは「アルゴナウタイの航海」「イリアス(トロイア戦争)」「オデュッセイア」という3つのギリシア神話を、`loc.hall_of_fates`(運命の間)という共通のハブ部屋から枝分かれする3本の物語として再構成したもの。この上に、**「神話上正しい行動を取らないと死ぬ」**という独自コンセプトの戦闘・クエストシステムを組んでいる(例: ポリュペモスは研がれたオリーブの杭を持たずに攻撃すると即死する、など)。詳細な設計判断は`memo.md`の7章・8章にまとめてある。
 
-実際のRFCにだいたい共通して出てくる要素：
+GUIクライアント(`cmd/gui`)は現時点で未着手(`.gitkeep`のみ)。構造化JSONログ(接続元IP・全コマンド・全レスポンス・不正利用検知など、TASKS.md 5章の全項目)も未実装で、現状は標準の`log`パッケージによる接続/切断と内部エラーのログのみ。この2点が現状の最大の残タスク。
 
-- **番号**: 発行された順に連番が振られる。一度発行されたRFCは内容を変更できず、改訂する場合は新しい番号のRFCが発行されて古い方を「obsolete(廃止)」にする
-- **ステータス分類**: `Standards Track`(正式な標準)、`Informational`(参考情報)、`Experimental`(実験的)、`Best Current Practice`(推奨運用)など。今回の課題のRFCは`Category: Experimental`を名乗っている(実際は42が課題用に作った架空の文書だが、体裁を real RFC に寄せている)
-- **キーワード規定(RFC 2119)**: `MUST`/`MUST NOT`/`SHOULD`/`SHOULD NOT`/`MAY`などの単語を、文書内で「絶対守るべき」「推奨」「任意」という強制力の強さを表す専門用語として定義したルール。RFCを読むときはこの単語の重みを意識する必要がある(`protocol-rfc.html`もこの規約に従うと明記している)
-- **ABNF(RFC 5234)**: "Augmented Backus-Naur Form"の略で、コマンドの文法を数式のように厳密に書くための記法。例えば`command-line = command-name [SP arguments] LF`のような書き方がこれ。曖昧な自然言語だけでなく、機械的にも解釈できる文法定義を添えるのがRFCの伝統
-- **セクション構成の型**: Introduction → 用語定義 → 本体仕様 → エラー処理 → セキュリティ考慮事項 → 参考文献 → 著者情報、という並びはほぼ全RFCで共通のテンプレート
+## 動かし方
 
-### 実在するRFCの例
+リポジトリのルートで実行すること(`data/world.json`・`saves/`を相対パスで読むため)。
 
-`protocol-rfc.html`の11章(References)に挙がっている本物のRFC：
+```sh
+# サーバー起動(ポート4242で待ち受け、Ctrl-Cで終了)
+go run ./cmd/server
 
-- **RFC 2119**: 前述の MUST/SHOULD/MAY のキーワード定義そのもの
-- **RFC 5234**: ABNF記法自体の仕様
-- **RFC 793**: TCP(今回サーバーが使う通信の土台そのもの)
-- **RFC 3629**: UTF-8エンコーディングの仕様
+# 別ターミナルでCLIクライアント接続(デフォルトは127.0.0.1:4242)
+go run ./cmd/cli
+go run ./cmd/cli 127.0.0.1:4242   # ホスト:ポートを指定する場合
 
-つまり今回配布された`protocol-rfc.html`は、これら本物のRFCのルール(MUST/SHOULDの使い方、ABNFの書き方)を借りて、42が課題用に独自プロトコルを定義した**非公式の模倣RFC**、という位置づけ。中身の位置づけとしては「本物ではないが、本物と同じ厳密さで読むことが要求されている文書」。
-
-## Goメモ
-
-Goの基本文法・標準ライブラリの整理
-
-### `package main` の意味
-
-Goのソースファイルは先頭で必ず所属パッケージを宣言する。これは同じフォルダ内の全`.go`ファイルに共通する所属先。
-
-- `package main` は特別な宣言で、「実行可能なプログラムである」という宣言
-- ビルドツール(`go build`)は「`package main`かつ`func main()`がある」フォルダを実行可能ファイルとしてコンパイルする
-- 逆に `package mylib` のような名前なら、他のプログラムから`import`して使うライブラリ扱いになり、単体では実行できない
-
-### `log` パッケージ
-
-ログ出力専用の標準ライブラリ。`fmt.Println`等と違い、自動でタイムスタンプが付き、致命的エラー用の便利関数もある。
-
-```go
-log.Println("hello")           // 2024/01/01 12:00:00 hello  ← 自動で日時が先頭に付く
-log.Printf("count=%d", 5)      // フォーマット付き出力
-log.Fatalf("boom: %v", err)    // 出力した直後にプログラムを終了(os.Exit(1))させる
+# バイナリとしてビルドする場合
+go build -o server ./cmd/server && ./server
+go build -o cli ./cmd/cli && ./cli
 ```
 
-出力先はデフォルトで標準エラー出力(stderr)。
+CLIは「生プロトコルをそのまま中継する」方針(打った行がそのままサーバーに送られ、サーバーの応答行がそのまま表示される)。最初のコマンドは必ず`CONNECT <name>`。日本語版で遊びたい場合は、`CONNECT`より前に`LANG ja`を送る(8章参照)。
 
-### `net` パッケージ
-
-ネットワーク通信（TCP/UDP/IPソケット）全般を扱う標準ライブラリ。C言語の`socket()/bind()/listen()/accept()/connect()`相当の機能がまとまっている。
-
-```go
-net.Listen("tcp", ":4242")   // TCPソケットを作ってポート4242で待ち受け開始 → net.Listenerを返す
-ln.Accept()                   // 誰かが接続してくるまで待って、繋がったら net.Conn を返す
-conn.RemoteAddr()             // 接続してきた相手のIPアドレス:ポートを取得
-conn.Close()                  // 接続を閉じる
+```
+$ go run ./cmd/cli
+Connected to 127.0.0.1:4242
+OK hello proto=1
+LANG ja
+OK lang=ja
+CONNECT alice
+OK connected
+LOOK
+OK {"room":{...,"name":"運命の間",...}, ...}
 ```
 
-### Goのエラー処理パターン（例外なし、戻り値ベース）
+## テストの実行
 
-Goには例外(try/catch)が無い。関数は「結果」と「エラー」の2つを同時に返すのが基本パターンで、呼び出し側は毎回チェックする。
-
-```go
-ln, err := net.Listen("tcp", ":4242")
-if err != nil {
-    log.Fatalf("listen failed: %v", err)
-}
+```sh
+go vet ./...
+gofmt -l .            # 何も出なければOK
+go test ./...
+go test -race ./cmd/server/...
 ```
 
-`:=` は「宣言＋代入」を同時に行う演算子（型は右辺から自動推論される）。
-
-### `net.Listener` はインターフェース
-
-具体的な構造体ではなく、以下のメソッドを持つ型なら何でも当てはまる「インターフェース」型。
-
-```go
-type Listener interface {
-	Accept() (Conn, error)
-	Close() error
-	Addr() Addr
-}
+特定のテストだけ実行したいとき:
+```sh
+go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
 ```
 
-`net.Listen("tcp", ...)`が返す実体は`*net.TCPListener`だが、これが上記3メソッドを実装しているため`net.Listener`型の変数に代入できる。Unixドメインソケット用の`*net.UnixListener`やTLSを被せた`*tls.Listener`など実装が複数あっても、呼び出し側はインターフェースだけ見て統一的に扱える（構造的部分型／ダックタイピング）。
+## 各システムの概要
 
-### `error` もインターフェース
+英語セクションの各見出し([Architecture](#architecture)、[Protocol Implementation](#protocol-implementation)、[Combat System](#combat-system)、[Quest System](#quest-system)、[World Design](#world-design)、[Server Logging](#server-logging))に詳しく書いてあるので、ここでは要点だけ:
 
-```go
-type error interface {
-	Error() string
-}
+- **並行モデル**: 接続ごとに1 goroutine + サーバー状態全体を単一の`sync.Mutex`で保護、という単純な方式。実装の正しさを優先した(`memo.md` 2章)。
+- **戦闘**: ATTACKは基本8〜14ダメージ・反撃6〜12ダメージのランダム。一部の敵は「正しいアイテム/達成済みクエスト」を持っていないとATTACKで即死する「神話ゲート」付き。HP0で運命の間にHP20でリスポーン。
+- **クエスト**: `QUEST <npc>`で受注、TAKE/ATTACKの成否をサーバー側が自動で判定して進行・達成・報酬付与まで行う(完了報告コマンドは無し)。
+- **ワールド**: 40部屋・アイテム17種・NPC 40強・クエスト11種。アルゴナウタイ編はクレタ→イオルコスでループし、ハブ部屋は3分岐なので、「ループ+分岐、一直線不可」の要件を満たす。
+- **多言語対応**: `LANG ja`をCONNECT前に送るとLOOK/TALK/QUESTのテキストが日本語になる。RFC規定のJSON構造・コマンド名は一切変更していないので、他チームのサーバー/クライアントとの相互接続には影響しない。詳細は`memo.md` 8章。
+
+## チーム分担
+
+git履歴から確認できる大まかな分担(詳しくは英語セクションの[Group Contributions](#group-contributions)):
+- **takawaka**: サーバーの土台(TCP受付・行単位ディスパッチ、CONNECT/LOOK/MOVE、CHAT、GROUP、アイテムの永続化)とCLIクライアント
+- **amakino**: ワールド・ストーリー設計、RFC/課題分析(`TASKS.md`/`memo.md`)、戦闘・クエスト・ハザード・クルーシステムの設計と実装、神話ゲートのデータ設計、多言語対応
+
+---
+
+# English (Original Submission)
+
+## Description
+
+**The Answer Protocol (TAP)** is a shared-world, multiplayer, text-based adventure (MUD): a single TCP server (`cmd/server`) plus a CLI client (`cmd/cli`), built strictly against the attached RFC (`rfc.tar.gz` / `protocol-rfc.html`) so that our server and client can interoperate with any other team's implementation of the same protocol.
+
+The world retells three Greek myths — the Voyage of the Argonauts, the Iliad, and the Odyssey — as three branching story arcs that share a single hub room (`loc.hall_of_fates`, the Hall of the Fates). On top of that world, we designed an original combat and quest system around one idea, left deliberately undefined by the RFC (see "Combat System" below): **acting against the myth gets you killed.** For example, attacking Polyphemus without first taking the sharpened olive stake is an instant kill, not a normal fight.
+
+A GUI client (`cmd/gui`) has not been started yet (the directory only holds a placeholder). Structured JSON logging (per-command/response audit logs, abuse-pattern detection) is also not implemented yet; see "Server Logging" for what exists today. These are this project's two most significant known gaps.
+
+## Instructions
+
+The server listens on TCP port 4242 and speaks the line-oriented TAP protocol described in `protocol-rfc.html`. Any RFC-compliant client — ours or another team's — can connect to it, and our CLI client can connect to any RFC-compliant server.
+
+Our CLI client is a **raw protocol relay**: every line you type is sent to the server unmodified, and every line the server sends back is printed unmodified. We chose this over a "friendly commands translated to protocol" client because it keeps the client trivial and lets anyone see exactly what is going over the wire, which matters for debugging interop with other teams (see "Building and Running" for how to start it).
+
+Minimal example session (after connecting):
+
+```
+OK hello proto=1
+CONNECT alice
+OK connected
+LOOK
+OK {"room":{"id":"loc.hall_of_fates","name":"Hall of the Fates","description":"Outside time itself, the three Moirai spin, measure, and cut the thread of every hero's life. Three great tapestries hang before you, each depicting a different age of heroes.","exits":{"east":"loc.ody_troy_shore","north":"loc.troy_ida","west":"loc.argo_iolcus"}},"players":["alice"],"items":[],"npcs":[]}
+MOVE east
+OK room=loc.ody_troy_shore
+STATUS
+OK {"hp":100,"max_hp":100,"status":"healthy"}
+QUIT
+OK bye
 ```
 
-`Error() string`を持つ型なら何でも`error`として扱える。`nil`は「エラーが起きなかった」を意味する。`%v`で表示すると内部で`err.Error()`が呼ばれて文字列化される。
+To play the Japanese-language version of the story, send `LANG ja` **before** `CONNECT` (it is rejected once you are connected as a player — language is chosen at the start of a session, not switched mid-game):
 
-`net.Listen`の失敗時に実際に返るのは`*net.OpError`という具体型で、操作名・アドレス・OSレベルのエラー(`syscall.Errno`)まで構造化されているが、普段は`%v`で丸ごと文字列化するか、特定のエラー種別判定が必要な時だけ`errors.Is()`等を使う。
+```
+LANG ja
+OK lang=ja
+CONNECT alice
+OK connected
+LOOK
+OK {"room":{"id":"loc.hall_of_fates","name":"運命の間","description":"時そのものの外側で...","exits":{...}},...}
+```
 
+All 15 RFC commands work identically regardless of language; only story text (room/NPC/quest text) changes.
 
+## Resources
+
+- The protocol specification: `protocol-rfc.html` (from `rfc.tar.gz`), the "42TAP" RFC supplied with the subject.
+- Go standard library only — `net`, `encoding/json`, `bufio`, `log`, `sync`, `math/rand/v2`, etc. `go.mod` declares no third-party dependencies.
+- **AI assistance**: Claude (Anthropic) was used throughout this project as a coding/design assistant, with all output reviewed, built, and tested by the team before committing. Specifically, AI assistance was used for: reading and summarizing the subject PDF and RFC into `TASKS.md` and `memo.md` at the start of the project; collaboratively designing the combat/quest/crew/myth-gate game systems described below; implementing the corresponding Go code (`combat.go`, `quest.go`, `hazard.go`, `odyssey.go`, `locale.go`) and its automated tests; authoring the Japanese localization text in `data/world.json`; and writing this README.
+
+## Architecture
+
+- **Dispatch**: `cmd/server/server.go` maps each command name to a handler function (`commandHandlers map[string]commandHandler`). `main.go` calls `net.Listen("tcp", ":4242")` and spawns one goroutine per accepted connection (`go server.handleClient(conn)`); each connection's goroutine reads newline-delimited commands with `bufio.Scanner` and dispatches them in a loop, one at a time.
+- **Concurrency model**: goroutine-per-connection, with all shared game state (connected players, the world, groups) guarded by a single `sync.Mutex` (`Server.mu`). We picked this over an event-loop/epoll design because it is far simpler to reason about and to keep correct under the RFC's strict interop requirement (memo.md §2 "並行モデルの選択"); the tradeoff is that it will not scale to very high connection counts as gracefully as an async design would, which we judged acceptable for this project's scope. A second, separate mutex (`Server.ioMu`) serializes on-disk persistence (`playerdata.json`, item locations) so that disk I/O never blocks in-memory game state under `Server.mu`.
+- **Non-blocking broadcast**: each connection owns an asynchronous outbound write queue (`client_conn.go`, a buffered channel drained by a dedicated `writeLoop` goroutine). Handlers enqueue a response or event and return immediately; they never write to the socket while holding `Server.mu`. This means broadcasting an event to every player in a room is O(number of players) non-blocking enqueues rather than blocking network writes, and one slow/stalled client cannot stall the mutex for everyone else.
+- **Package layout**:
+  - `server.go` — command dispatch table, connection lifecycle, LOOK/MOVE/CONNECT/QUIT/TAKE/DROP/INVENTORY/TALK/STATUS
+  - `combat.go` — ATTACK/FLEE and the myth-gate/damage logic
+  - `quest.go` — QUEST/QUESTS and automatic objective tracking
+  - `hazard.go` — room-entry hazards (lethal / item-gated / crew-gated exits)
+  - `odyssey.go` — Odyssey-arc-specific item side effects (lotus fruit, bag of winds) and crew initialization
+  - `locale.go` — `LANG` command and `LocalizedText`/`roomView` localization plumbing
+  - `chat.go` / `group.go` — CHAT (GLOBAL/ROOM/GROUP) and GROUP management
+  - `world.go` / `room.go` / `player.go` — the world data model, JSON loading, and validation
+  - `item_store.go` / `player_store.go` — on-disk persistence of item locations and player state
+
+## Protocol Implementation
+
+All 15 RFC commands are implemented: `CONNECT, LOOK, MOVE, CHAT, TAKE, DROP, INVENTORY, TALK, ATTACK, STATUS, QUEST, QUESTS, WHO, GROUP, QUIT`, with the response/error shapes and error codes defined in `protocol-rfc.html` §5. Input is validated for UTF-8 validity, control characters, and the 1024-byte practical line-length ceiling suggested by the RFC (`maxProtocolLineBytes`); TCP message splitting/coalescing is handled by buffering with `bufio.Scanner` rather than assuming one read equals one command.
+
+We added a small number of **additive** extensions. None of them change the shape or meaning of any RFC-defined command, response, or event, so an RFC-only client from another team continues to interoperate with our server without modification, and our client works against a plain RFC-only server (it simply never sends the extra commands):
+
+- **`FLEE`** — a combat command with no arguments, retreating from the player's current fight. The RFC explicitly names `FLEE` as an example of a team-defined combat extension (§6.1.1).
+- **`LANG <code>`** — must be sent before `CONNECT`; selects the language (`en`, the default, or `ja`) that this connection's story text (room/NPC/quest text) is returned in for the rest of the session. Sending it after `CONNECT` returns `ERR 400 BAD_REQUEST`, since language is a start-of-session choice, not a runtime setting. See "World Design" / `memo.md` §8 for the full localization design.
+- **`EVT ROOM COMBAT <text>`** — a new event *type*, not a new event *format*: the RFC's event grammar (`event-line = "EVT" SP event-type SP event-data LF`) does not close off the set of valid event-type tokens, so a well-behaved client that only recognizes the RFC's own event types (`ROOM PRESENCE ...`, `ROOM CHAT ...`, etc.) can safely ignore an unrecognized `COMBAT` type rather than fail to parse it. We use it to broadcast combat/hazard flavor text to everyone in the room.
+- **`ERR 407 NOT_IN_COMBAT`** — a new error code (the RFC defines up to `406`), returned by `FLEE` when the player isn't currently fighting anything.
+- **No new fields on any RFC-defined JSON response.** In particular, our internal `Crew` resource (see "World Design") is deliberately kept out of `STATUS`/`ATTACK`'s JSON bodies, even though the RFC does not explicitly forbid extra JSON keys — we didn't want to gamble on how strictly another team's JSON parser is written. It is only ever revealed as plain narrative text over `EVT ROOM COMBAT`.
+
+## Combat System
+
+RFC §6.1.1 leaves damage calculation, turn/initiative handling, combat state transitions, and any additional commands entirely up to each team, while fixing only the `ATTACK`/`STATUS` request/response shapes. Our design axis for all of it is: **the world punishes acting against the myth**, not just raw stat-checking. Concretely:
+
+- **Baseline numbers.** Players start at 100 HP (`STATUS`'s `max_hp`). A successful `ATTACK` deals a uniformly random 8–14 damage to the target; if the target survives, it counters for a uniformly random 6–12 damage back at the attacker. There is no explicit initiative system beyond "the attacker's `ATTACK` resolves, then the defender's counter resolves in the same round" — we judged a separate initiative roll unnecessary complexity for a text MUD at this scope.
+- **Myth gates.** Some `enemy`-role NPCs require the player to be holding a specific item (`myth_requirement_item` in `data/world.json`) or to have completed a specific quest (`myth_requirement_quest`) before `ATTACK` engages in ordinary combat at all; without it, `ATTACK` is an instant kill (`{"status":"dead", ...}`), and the player respawns exactly as on any other death. For example: Polyphemus requires the sharpened olive stake; Talos requires the `quest.golden_fleece` quest to be completed (Medea's magical aid); the suitors require Odysseus's strung bow. This mirrors how each of these fights is actually won in the myths — force alone never works.
+- **FLEE.** Each NPC declares whether fleeing from it is myth-accurate. Some (Polyphemus, the Laestrygonians) always let the player flee successfully, matching the myth. Most default to always failing (a counter-attack lands). Hector is a special case: `FLEE` against him succeeds exactly **once, ever** (tracked per-player, per-NPC, and it does *not* reset if you re-engage him later) — a nod to his three laps around Troy's walls before he finally turns to fight Achilles — and always fails after that.
+- **Unwinnable fights.** The Laestrygonians can never be defeated by force: `ATTACK` against them never rolls damage at all and instead costs the player's crew (see "World Design"), while `FLEE` (the historically correct choice — only Odysseus's own ship escaped by anchoring outside the harbor) always succeeds. This uses the fight to spend the crew resource narratively instead of pretending it's a winnable stat check.
+- **Death and respawn.** Any death — ordinary attrition, a myth-gate instant kill, or a fatal room hazard — sets HP to 0 and respawns the player at the world's safe hub room (`loc.hall_of_fates`) with 20 HP, matching the subject's "HP 0 respawns in a safe zone, with reduced HP" requirement (`respawnPlayerLocked` in `combat.go`).
+- **Logging/broadcast.** Every `ATTACK`/`FLEE` resolution is broadcast to the room via `EVT ROOM COMBAT <flavor text>`, in addition to the structured response sent to the acting player.
+
+We did not add a `DEFEND` command: none of the myth gates we designed call for a "reduce incoming damage" mechanic, so we judged it unnecessary complexity rather than adding it just because the RFC mentions it as an example.
+
+## Quest System
+
+RFC §6.1.2 fixes only the `QUEST`/`QUESTS` request/response shapes and leaves objective tracking, completion, rewards, and any additional commands up to each team. Our design:
+
+- `QUEST <npc>` looks up the quest offered by that NPC (`giver_npc_id` in `data/world.json`). The first time a player asks, the quest is marked `active` for that player; the RFC's own example response (`"status": "available"`) describes the offer itself, and is returned every time the quest hasn't been completed yet. Asking again after completion returns `ERR 406 NO_QUEST_AVAILABLE`.
+- **Progress is fully automatic**, not player-reported: a successful `TAKE` checks every one of the player's `active` quests with a `collect_item` objective for that item, and a winning `ATTACK` does the same for `defeat_npc` objectives. Reaching the objective's target count marks the quest `completed` and immediately heals the player by the quest's HP reward (capped at 100). We deliberately did **not** add a `COMPLETE_QUEST` command — nearly every quest in this world is already something the player does naturally in the course of surviving (e.g. defeating Polyphemus with the stake both wins that fight and completes the trapped sailor's quest), so a manual completion step would just be extra client-side bookkeeping for no real benefit.
+- `QUESTS` returns every quest the player has ever started (active or completed), each with `"progress": "<current>/<target>"`.
+- Some quests are deliberately framed as traps rather than good advice — accepting Eurylochus's quest to slaughter the sacred cattle of Helios and doing so (`item.sacred_cattle`) kills the player instantly, matching the myth's own moral.
+
+## World Design
+
+- **Structure.** One shared hub room, the Hall of the Fates (`loc.hall_of_fates`), branches three ways into the Voyage of the Argonauts (12 rooms), the Iliad (11 rooms), and the Odyssey (17 rooms) — 40 rooms in total. The hub's own 3-way branch, plus the Argonauts arc looping back on itself (Crete → Iolcus), satisfies the "rooms form a loop and at least one branch, not a straight line" requirement.
+- **NPCs.** All three required roles are represented throughout: `dialogue` (lore/flavor), `quest_giver`, and `enemy`. Well over 30 NPCs total.
+- **Items.** 17 obtainable items, nearly all of them load-bearing for either a myth gate or a quest objective (e.g. the beeswax that protects against the Sirens, the moly root that protects against Circe).
+- **Quests.** 11 quests across the three arcs, every one a `collect_item` or `defeat_npc` objective (see "Quest System" for how progress/reward is handled).
+- **Room hazards** (`hazard.go`), separate from NPC combat, gate certain rooms on entry via `MOVE`:
+  - `lethal` — always fatal (the whirlpool of Charybdis: the myth gives no way to survive it).
+  - `item_gate` — fatal without a specific item (the Sirens' rocks, without beeswax).
+  - `crew_gate` — costs a fixed amount of crew on entry, and is fatal outright if the player doesn't have enough crew left to absorb the loss (Scylla, requiring `crew + 1 ≥ 7` to survive losing 6 crew — mirroring how Scylla takes exactly six of Odysseus's men but never the ship itself).
+- **Crew resource** (Odyssey arc only). The player is granted a crew of 12 (`Player.Crew`) the moment they first set foot in the Odyssey arc (`loc.ody_troy_shore`). It represents the companions accompanying Odysseus and is spent — not the player's own HP — by specific bad choices: eating the lotus fruit (−2), opening the bag of winds anywhere but Ithaca (−3), being attacked by the Laestrygonians (−8), and passing Scylla (−6, unavoidable). It is never exposed in any RFC-defined JSON response (see "Protocol Implementation"); the player only learns about it through `EVT ROOM COMBAT` narration and their own play. Kept purely in `Player` (server-side, and persisted per-player like the rest of that struct).
+- **Circe/Sirens are engagement-gated, not entry-gated**, for one deliberate reason: `item.moly`, the item that protects against Circe, is located *inside* her own room. A room-entry hazard would kill the player before they could ever pick it up. So Circe's gate instead triggers on `TALK` (the moment the player actually engages her), which also better matches the myth — simply walking onto her island was never dangerous; drinking her cup was.
+
+## Server Logging
+
+**What's implemented today:** connection lifecycle (a line per connect/disconnect, including the player name) and internal error conditions (failed JSON encodes, failed saves, failed item-location restores, etc.) are logged via the Go standard library `log` package, which timestamps every line and writes to stderr by default.
+
+**What's not implemented yet (known gap):** the subject's full logging checklist is not built. Specifically missing: structured (JSON) log output; one log line per received command with the player's name and arguments; one log line per response/error code sent; a dedicated record of world-state changes (item moves, NPC interactions, combat/quest outcomes) beyond the in-game `EVT ROOM COMBAT` broadcasts already sent to players; INFO/WARN/ERROR log levels; and detection of abusive usage patterns (command flooding, rapid reconnects). This is the most significant remaining gap against the subject, and the next priority after finishing this README.
+
+## Group Contributions
+
+Reconstructed from `git log`; please double-check and expand this section yourselves before final submission.
+
+- **takawaka** built the initial server framework: the TCP accept loop and line-based command dispatch, `CONNECT`/`LOOK`/`MOVE`, `CHAT` (`GLOBAL`/`ROOM`/`GROUP`), `GROUP` management, item pickup/drop persistence (`item_store.go`, `player_store.go`), and the CLI client (`cmd/cli`), along with their test suites.
+- **amakino** wrote the world/story content across all three arcs (`data/world.json`), the subject/RFC analysis notes (`TASKS.md`, `memo.md`), and designed and implemented the combat/quest/hazard/crew game systems (`combat.go`, `quest.go`, `hazard.go`, `odyssey.go`), the myth-gate data for every enemy/gated NPC, the `LANG`/localization system (`locale.go`) and the Japanese translations in `data/world.json`, and the corresponding automated tests.
+
+## Building and Running
+
+Run these from the repository root — the server loads `data/world.json` and reads/writes `saves/` using relative paths.
+
+```sh
+# Run directly
+go run ./cmd/server                    # starts the server on :4242
+go run ./cmd/cli                       # connects to 127.0.0.1:4242
+go run ./cmd/cli 127.0.0.1:4242        # or connect to a specific host:port
+
+# Or build binaries first
+go build -o server ./cmd/server && ./server
+go build -o cli ./cmd/cli && ./cli
+
+# Lint / format check
+go vet ./...
+gofmt -l .                              # prints nothing if everything is formatted
+```
+
+There is no Makefile yet; the commands above are the full build/run/lint surface for this Go project (`go build`/`go run`/`go vet`/`gofmt` are themselves Go's standard tooling, playing the role a Makefile's `build`/`run`/`lint` targets would in a C/C++ project).
+
+## Testing
+
+```sh
+go test ./...                           # full suite (cli + server)
+go test -race ./cmd/server/...          # with the race detector
+go test ./cmd/server/... -run TestName -v   # a single test, verbose
+```
+
+The server package's test suite covers, among other things: the full connection/auth lifecycle and disconnect/reconnect persistence; every RFC command's success and error paths; TCP message splitting/coalescing; concurrent multi-client scenarios (room presence, chat scopes, groups); world-data validation (`TestLoadWorldData` loads the real `data/world.json`); and, specific to this project's combat/quest/localization design, integration tests that exercise every myth-gate NPC and room hazard **against the real `data/world.json`** (not just a synthetic test world) in both English and Japanese — `TestOdysseyArcAgainstRealWorldData`, `TestArgonautsAndTroyMythGatesAgainstRealWorldData`, and `TestJapaneseTranslationsAgainstRealWorldData`.

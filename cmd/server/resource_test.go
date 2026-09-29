@@ -13,11 +13,11 @@ func TestInventoryDropAndTalk(t *testing.T) {
 	server.world = takeTestWorld()
 	server.world.Rooms["loc.start"].Exits = map[string]string{"east": "loc.other"}
 	server.world.NPCs = map[string]*NPC{
-		"npc.a":         {Name: "Old Guide", RoomID: "loc.start", Dialogue: []string{"Welcome back.", "Second line."}},
-		"npc.z":         {Name: "Old Guide", RoomID: "loc.start", Dialogue: []string{"bye"}},
-		"npc.remote":    {Name: "Far Guide", RoomID: "loc.other", Dialogue: []string{"You found me."}},
-		"npc.silent":    {Name: "Silent", RoomID: "loc.start"},
-		"npc.multiline": {Name: "Multiline", RoomID: "loc.start", Dialogue: []string{"Hi\nthere"}},
+		"npc.a":         {Name: en("Old Guide"), RoomID: "loc.start", Dialogue: ens("Welcome back.", "Second line.")},
+		"npc.z":         {Name: en("Old Guide"), RoomID: "loc.start", Dialogue: ens("bye")},
+		"npc.remote":    {Name: en("Far Guide"), RoomID: "loc.other", Dialogue: ens("You found me.")},
+		"npc.silent":    {Name: en("Silent"), RoomID: "loc.start"},
+		"npc.multiline": {Name: en("Multiline"), RoomID: "loc.start", Dialogue: ens("Hi\nthere")},
 	}
 	alice := startTestClient(t, server)
 	alice.command(t, "INVENTORY", "ERR 400 BAD_REQUEST")

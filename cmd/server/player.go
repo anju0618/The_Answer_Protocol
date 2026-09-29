@@ -13,6 +13,7 @@ type Player struct {
 	Crew            int                     `json:"crew,omitempty"`
 	CrewInitialized bool                    `json:"crew_initialized,omitempty"`
 	CombatTargetID  string                  `json:"combat_target_id,omitempty"`
+	FledFrom        map[string]bool         `json:"fled_from,omitempty"`
 	Quests          map[string]*PlayerQuest `json:"quests,omitempty"`
 	exiting         bool
 }
@@ -24,4 +25,21 @@ func (p *Player) hasItem(itemID string) bool {
 		}
 	}
 	return false
+}
+
+func (p *Player) meetsMythRequirement(npc *NPC) bool {
+	if npc.MythRequirementItem != "" && !p.hasItem(npc.MythRequirementItem) {
+		return false
+	}
+	if npc.MythRequirementQuest != "" {
+		state := p.Quests[npc.MythRequirementQuest]
+		if state == nil || state.Status != "completed" {
+			return false
+		}
+	}
+	return true
+}
+
+func (npc *NPC) hasMythRequirement() bool {
+	return npc.MythRequirementItem != "" || npc.MythRequirementQuest != ""
 }

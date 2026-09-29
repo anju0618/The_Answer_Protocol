@@ -117,7 +117,7 @@ TCPはストリーム指向で「メッセージの境界」を保証しない�
 5. 他チームとの相互接続テストを早めに一度やっておく(プロトコル解釈のズレを早期発見できる)。
 
 ## 7. ゲームシステム設計(戦闘・クエスト固有ギミック)
-RFC 6.1.1/6.1.2で「未定義=チームが決めてREADMEで正当化する部分」とされている、戦闘・クエストの中身の設計方針。現状 `cmd/server/server.go` の `handleAttack` / `handleStatus` / `handleQuest` / `handleQuests` はまだ引数チェックのみのスタブで、ロジック未実装(2026-09-29時点)。
+RFC 6.1.1/6.1.2で「未定義=チームが決めてREADMEで正当化する部分」とされている、戦闘・クエストの中身の設計方針。**2026-09-29時点で実装完了**: `combat.go`(ATTACK/FLEE)、`quest.go`(QUEST/QUESTS)、`hazard.go`(部屋ハザード)、`odyssey.go`(オデュッセイア固有のアイテム処理)。3部作(アルゴナウタイ/トロイア/オデュッセイア)全編の神話ゲートと`world.json`の日本語訳(後述8章)も実装済み。
 
 ### 7.1 コンセプト
 **「神話に忠実な行動を取らないと死ぬ」**を戦闘・クエスト設計の軸にする。単純なHP削り合いではなく、各NPC・各場面ごとに神話上の正しい対策(アイテム所持・事前クエスト達成・正しい選択)を要求し、満たしていなければ即死させる「神話ゲート」を仕込む。
@@ -130,12 +130,12 @@ RFC 6.1.1/6.1.2で「未定義=チームが決めてREADMEで正当化する部�
 ### 7.3 神話ゲート一覧(戦闘)
 | NPC/場面 | 必要条件 | 未達成時 | FLEE |
 |---|---|---|---|
-| 青銅の雄牛 (khalkotauroi) | `item.medeas_ointment`(**新規アイテム、要追加**)所持 | 即死(焼かれる) | 失敗 |
+| 青銅の雄牛 (khalkotauroi) | `item.medeas_ointment` 所持 | 即死(焼かれる) | 失敗 |
 | コルキスの竜 (colchis_dragon) | `item.medeas_draught` 所持 | 即死(丸呑み) | 失敗 |
-| タロス (talos) | `quest.golden_fleece` 達成済み(メデイアの魔術による援護) | 即死(投石) | 失敗 |
+| タロス (talos) | `quest.golden_fleece` 達成済み(メデイアの魔術による援護、`myth_requirement_quest`で判定) | 即死(投石) | 失敗 |
 | ポリュペモス (polyphemus) | `item.olive_stake` 所持 | 即死(食われる) | **成功**(羊の下に隠れて脱出) |
 | ライストリュゴネス族 | なし(対抗不可) | ATTACKは常に即死→代わりに**乗組員が死ぬ**扱いに変更予定(7.5参照) | **成功**(オデュッセウスの船だけ湾外に停泊、これが正解) |
-| ヘクトール (hector) | `item.shield_of_achilles` 所持 | 即死 | 同一戦闘中**1回目のみ成功**(3周城壁を逃げた話を再現)、2回目以降は失敗(アテナに唆され引き戻される) |
+| ヘクトール (hector) | `item.shield_of_achilles` 所持 | 即死 | **そのNPCから初めて逃げた1回だけ成功**(3周城壁を逃げた話を再現、`Player.FledFrom`で永続管理)、以降は何度再戦しても失敗(アテナに唆され引き戻される) |
 | 求婚者たち (antinous) | `item.odysseus_bow` 所持(弓を張った状態=`quest.string_the_bow`達成) | 即死(素手で100人は不可能) | 失敗 |
 | アミュコス (amycus) / ハルピュイア (harpy) | なし(通常戦闘) | — | 失敗 |
 
@@ -172,9 +172,27 @@ RFCはJSONレスポンスへの独自フィールド追加を明示的に禁止�
 - `world.json`の各クエストの`objective`(`collect_item`/`defeat_npc`)を、TAKE/ATTACK成功のタイミングでサーバー側が自動照合し、達成なら自動で`reward`(HP回復)を付与する(手動COMPLETE_QUESTコマンドは追加しない)。
 - クエストの内容自体が「神話上の正しい行動」と一致するよう設計する(例: `quest.blind_the_cyclops`の裏でolive_stake所持がATTACK生存条件になっている、など7.3と連動)。
 
-### 7.9 未着手・追加で必要な新規データ(world.json編集時のチェックリスト)
+### 7.9 world.jsonに追加したデータ(実装済み)
 - アイテム追加: `item.medeas_ointment`(雄牛の火傷除け)、`item.beeswax`(セイレーン用耳栓)、`item.lotus_fruit`(`loc.ody_lotus`、obtainable)
 - 部屋追加: `loc.ody_charybdis`
 - `loc.ody_sirens`のexitsに`south`(→`loc.ody_charybdis`)を追加
-- Player構造体に`Crew int`フィールド追加、オデュッセイア編開始時に12をセット
-- ヘクトール戦専用のFLEE試行回数カウンタ(戦闘状態に付随、1回目のみ成功)
+- `Player.Crew`、`Player.CombatTargetID`、`Player.FledFrom`(NPC単位でのFLEE一度きり管理)、`Player.Quests`を追加
+- 全戦闘NPCに`myth_requirement_item`/`myth_requirement_quest`/`flee_accurate`/`flee_succeeds_once`/`unwinnable`/`crew_loss_on_attack`を設定(該当するもののみ)
+
+## 8. 多言語対応(日本語版)
+最初に`LANG ja`を送ってからCONNECTすると、以降そのコネクションのLOOK/TALK/QUESTのテキストが日本語で返る。デフォルトは英語。
+
+### 8.1 プロトコル面の設計判断
+- RFCの`CONNECT <name>`はそのまま変更しない(他チームサーバー/クライアントとの相互接続を壊さないため、引数を増やさない)。
+- 代わりに、認証前(CONNECT前)にだけ送れる独自コマンド`LANG <code>`を追加。対応コードは`en`/`ja`。CONNECT後に送るとERR 400。未知のコードもERR 400。
+- RFC規定のJSON構造(LOOK/ATTACK/STATUS/QUEST等)のキー・形は変更しない。`Room.Name`等の`LocalizedText`(`map[string]string`、言語コード→テキスト)はサーバー内部のデータモデルのみで使い、実際にワイヤーに乗せる直前(`roomView`など)でリクエストした接続の言語に解決してから通常の`string`として送る。他チームのクライアントが言語システムを知らなくても、常に見慣れた形式のJSONが届く。
+- 日本語訳が存在しないフィールドは自動的に英語にフォールバックする(`LocalizedText.Get(locale)`)。
+
+### 8.2 実装ファイル
+- `locale.go`: `LocalizedText`型、`LANG`コマンド、`roomView`(LOOK応答用のロケール解決済みDTO)
+- `world.go`/`room.go`: `Room.Name`/`Description`、`Item.Name`/`Description`、`NPC.Name`/`Description`/`Dialogue`、`Quest.Name`/`Description`を`LocalizedText`化
+- TAKE/DROP/TALK/ATTACK/QUESTでのNPC・アイテム名によるマッチングも、接続の言語での表記に対して行う(例: 日本語ロケールなら`TALK ポリュペモス`が通る)
+- `data/world.json`: 3部作全ての`name`/`description`/`dialogue`に`"ja"`キーを追加済み
+
+### 8.3 スコープ外にしたもの
+- ATTACK/FLEE/MOVEハザードの戦闘フレーバーテキスト(`EVT ROOM COMBAT ...`のブロードキャスト)は英語固定。行為者本人の言語で組み立てているが、同じ部屋にいる他言語プレイヤーへの翻訳配信はしていない(複数受信者に別々の文言を送る仕組みが必要になるため、今回は見送り)。
