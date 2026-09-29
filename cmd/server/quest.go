@@ -20,17 +20,16 @@ func (s *Server) checkQuestObjectiveLocked(player *Player, objType, targetID str
 		if state == nil || state.Status != "active" {
 			continue
 		}
-		s.advanceQuestLocked(player, quest, state)
+		s.advanceQuestLocked(player, questID, quest, state)
 	}
 }
 
-// advanceQuestLocked は player の進行中クエスト1件を1つ進める。目標数に
-// 達したら達成にして報酬HPを与える(上限maxPlayerHP)。進捗も達成も、
-// 本人にEVT PLAYER QUESTで知らせる(以前は何も通知されず、達成したかどうかが
-// QUESTSを打つまで分からなかった)。
-func (s *Server) advanceQuestLocked(player *Player, quest *Quest, state *PlayerQuest) {
+func (s *Server) advanceQuestLocked(player *Player, questID string, quest *Quest, state *PlayerQuest) {
 	locale := s.localeOfLocked(player.Name)
 	state.Progress++
+	if state.Progress < quest.Objective.Count {
+		logger.Info("quest_progress", "player", player.Name, "quest", questID, "progress", state.Progress, "target", quest.Objective.Count)
+	}
 	if state.Progress < quest.Objective.Count {
 		s.sendPlayerEventLocked(player.Name, "QUEST", LocalizedText{
 			"en": "Quest \"%s\" progress: %d/%d.",
@@ -39,6 +38,7 @@ func (s *Server) advanceQuestLocked(player *Player, quest *Quest, state *PlayerQ
 		return
 	}
 	state.Status = "completed"
+	logger.Info("quest_completed", "player", player.Name, "quest", questID, "reward_hp", quest.Reward.HP)
 	player.HP += quest.Reward.HP
 	if player.HP > maxPlayerHP {
 		player.HP = maxPlayerHP
@@ -144,6 +144,7 @@ func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 	newlyAccepted := player.Quests[questID] == nil
 	if newlyAccepted {
 		player.Quests[questID] = &PlayerQuest{Status: "active"}
+		logger.Info("quest_accepted", "player", *name, "quest", questID, "giver", quest.GiverNPCID)
 	}
 
 	data, err := json.Marshal(struct {
@@ -160,10 +161,8 @@ func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 	client := conn.(*serverClient)
 	response, err := client.enqueueResponse("OK " + string(data))
 	if err == nil && newlyAccepted && s.objectiveAlreadyMetLocked(player, quest) {
-		// 受注前に済ませていた分も数える(進捗はTAKE/ATTACKの瞬間にしか
-		// 判定しないため、先に拾ったり倒したりしていると永遠に達成できなく
-		// なってしまう)。
-		s.advanceQuestLocked(player, quest, player.Quests[questID])
+
+		s.advanceQuestLocked(player, questID, quest, player.Quests[questID])
 	}
 	s.mu.Unlock()
 	if err != nil {

@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/rand/v2"
 	"net"
 	"strings"
@@ -17,6 +16,7 @@ func (s *Server) respawnPlayerLocked(player *Player, name, cause string, args ..
 	outcome := s.applyDeathPenaltyLocked(player, name)
 	s.notifyDeathLocked(name, cause, outcome, args...)
 	oldRoomID := player.RoomID
+	logger.Info("player_died", "player", name, "cause", cause, "room", oldRoomID, "belongings", string(outcome))
 	destination := defaultStartRoomID
 	if s.world != nil {
 		destination = s.world.StartRoomID
@@ -97,8 +97,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		result = combatResult{0, enemyHP, 0, "dead"}
 
 	default:
-		// 同じGROUPの仲間が同じ部屋にいれば、味方1人ごとにダメージが増え、
-		// 反撃が弱まり、倒した敵は全員の手柄になる(hardcore.go)。
+
 		allies := s.alliesInRoomLocked(*name)
 		bonus := allyBonusCount(allies)
 		damage := randDamage(combatMinDamage, combatMaxDamage) + bonus*allyDamageBonus
@@ -129,10 +128,11 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		}
 	}
 
+	logger.Info("combat_attack", "player", *name, "npc", npcID, "status", result.Status, "damage", result.Damage, "attacker_hp", result.AttackerHP, "target_hp", result.TargetHP)
 	data, err := json.Marshal(result)
 	if err != nil {
 		s.mu.Unlock()
-		log.Printf("encode ATTACK response: %v", err)
+		logger.Error("encode_response_failed", "command", "ATTACK", "error", err.Error())
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
@@ -168,11 +168,7 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 	targetID := player.CombatTargetID
 	npc := s.world.NPCs[targetID]
 	if targetID == "" || npc == nil {
-		// 戦闘中でなくても、その部屋の行く手を阻む敵(まだ倒しても振り切っても
-		// いない生きた敵)から逃げることはできる。ライストリュゴネス族のように
-		// ATTACKしても戦闘状態にならない「倒せない敵」は、FLEEでしか部屋を出られ
-		// ないのに、以前は戦闘中でないとFLEEがERR 407になり、その部屋で詰んで
-		// いた。
+
 		player.CombatTargetID = ""
 		targetID, npc = s.blockingEnemyLocked(player, player.RoomID)
 		if npc == nil {
@@ -208,13 +204,14 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 		}
 	}
 
+	logger.Info("combat_flee", "player", *name, "npc", targetID, "result", result, "hp", player.HP)
 	data, err := json.Marshal(struct {
 		HP     int    `json:"hp"`
 		Result string `json:"result"`
 	}{player.HP, result})
 	if err != nil {
 		s.mu.Unlock()
-		log.Printf("encode FLEE response: %v", err)
+		logger.Error("encode_response_failed", "command", "FLEE", "error", err.Error())
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}

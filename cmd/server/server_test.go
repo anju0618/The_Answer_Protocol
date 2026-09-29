@@ -588,8 +588,7 @@ func TestQuitSavesAndConnectRestoresPlayer(t *testing.T) {
 	server.mu.Lock()
 	restored := *server.players[want.Name]
 	server.mu.Unlock()
-	// 初回案内(IntroSeen)がまだだった保存データで再接続すると、案内が流れて
-	// IntroSeenだけがtrueになる。それ以外の状態は保存どおり復元される。
+
 	wantRestored := want
 	wantRestored.IntroSeen = true
 	if !reflect.DeepEqual(restored, wantRestored) {

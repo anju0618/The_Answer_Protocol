@@ -27,42 +27,42 @@ func (s *Server) sendPlayerEventLocked(name, kind, text string) {
 }
 
 var deathTexts = map[string]LocalizedText{
-	// 引数: 敵の名前
+
 	"attack_counter": {
 		"en": "You were struck down by %s and your HP ran out.",
 		"ja": "%sに打ち倒され、HPが尽きた。",
 	},
-	// 引数: 敵の名前
+
 	"attack_unprepared": {
 		"en": "You attacked %s and were killed instantly.",
 		"ja": "%sに挑み、即座に殺された。",
 	},
-	// 引数: 敵の名前
+
 	"flee_failed": {
 		"en": "You tried to flee from %s, but failed and were cut down.",
 		"ja": "%sから逃げようとしたが失敗し、斬り伏せられた。",
 	},
-	// 引数: 敵の名前
+
 	"slip_past": {
 		"en": "You tried to leave while %s still blocked your way, and it cut you down.",
 		"ja": "%sが道をふさいでいる間に立ち去ろうとして、斬り伏せられた。",
 	},
-	// 引数: NPCの名前
+
 	"talk_unprepared": {
 		"en": "You spoke with %s, and it was fatal.",
 		"ja": "%sと言葉を交わし、命を落とした。",
 	},
-	// 引数: 部屋の名前
+
 	"hazard_lethal": {
 		"en": "You did not survive %s.",
 		"ja": "%sを生きて抜けることはできなかった。",
 	},
-	// 引数: 部屋の名前
+
 	"hazard_item": {
 		"en": "You did not survive %s.",
 		"ja": "%sを生きて抜けることはできなかった。",
 	},
-	// 引数: 部屋の名前
+
 	"hazard_crew": {
 		"en": "Your crew was lost passing %s.",
 		"ja": "%sを通り抜けようとして、仲間もろとも全滅した。",

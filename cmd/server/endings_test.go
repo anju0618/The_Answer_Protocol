@@ -138,7 +138,7 @@ func (w *walker) do(step string) {
 		w.t.Fatalf("step %q: %s", step, resp)
 	}
 	if strings.HasPrefix(step, "TALK") {
-		// TALKの追加イベント(案内・エンディング)は応答の後に届くので読み尽くす。
+
 		w.events = append(w.events, w.client.drain(w.t)...)
 		return
 	}
@@ -272,7 +272,7 @@ func TestEndingNeedsItsRequirementsAndSaysWhatIsMissing(t *testing.T) {
 
 	lines := append(w.client.run(t, "TALK npc.pelias"), w.client.drain(t)...)
 	joined := strings.Join(lines, "\n")
-	// 断られるが、何が足りないかの一覧は教えない。
+
 	if !strings.Contains(joined, "EVT PLAYER ENDING ") || strings.Contains(joined, "You still need") {
 		t.Fatalf("expected only a refusal with no list of requirements, got %q", lines)
 	}
@@ -302,7 +302,7 @@ func TestRenewableKeyItemsAndUniqueItems(t *testing.T) {
 		t.Fatalf("second TAKE of a held key item = %v, want ERR 404", lines)
 	}
 	alice.do("DROP item.beeswax")
-	alice.do("TAKE item.beeswax") // 捨てたらまた取れる
+	alice.do("TAKE item.beeswax")
 
 	alice.teleport("loc.argo_lemnos")
 	bob.teleport("loc.argo_lemnos")
@@ -321,9 +321,9 @@ func TestDeathLosesEverythingExceptTrophies(t *testing.T) {
 	alice := newWalker(t, server, "alice")
 
 	alice.teleport("loc.argo_lemnos")
-	alice.do("TAKE item.hospitality_gift") // 一意
+	alice.do("TAKE item.hospitality_gift")
 	alice.teleport("loc.ody_circe")
-	alice.do("TAKE item.beeswax") // 鍵アイテム
+	alice.do("TAKE item.beeswax")
 	server.mu.Lock()
 	server.players["alice"].Inventory = append(server.players["alice"].Inventory, "item.thread_of_fate")
 	server.players["alice"].setEnemyHP("npc.harpy", 5)
@@ -400,8 +400,7 @@ func TestGroupAlliesShareCombatVictory(t *testing.T) {
 	alice.setHP(maxPlayerHP)
 	alice.do("kill npc.harpy")
 
-	// bobは自分では戦っていないのに、討伐済みになり、クエストも達成している。
-	bob.client.run(t, "STATUS") // 届いているEVTを読み進める
+	bob.client.run(t, "STATUS")
 	server.mu.Lock()
 	bobHarpy := server.players["bob"].enemyHP("npc.harpy", server.world.NPCs["npc.harpy"])
 	questState := server.players["bob"].Quests["quest.phineus_harpies"]
@@ -512,7 +511,7 @@ func TestCrewResetsOnEachFreshVoyage(t *testing.T) {
 	if crew != startingCrew {
 		t.Fatalf("crew after re-entering from the hall = %d, want %d", crew, startingCrew)
 	}
-	// 途中の部屋から開始地点に戻ってきただけでは増えない。
+
 	server.mu.Lock()
 	server.players["alice"].Crew = 3
 	server.mu.Unlock()

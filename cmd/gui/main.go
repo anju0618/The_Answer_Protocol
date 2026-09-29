@@ -585,8 +585,7 @@ func (ui *gui) handleEvent(line string) {
 		return
 	}
 	if strings.HasPrefix(line, "EVT PLAYER ") {
-		// 自分宛ての通知(死亡理由・運命の間の案内・クエストの案内/進捗)。
-		// ストーリー欄に本文だけを表示し、状態が変わるものは表示を更新する。
+
 		kind, text, _ := strings.Cut(strings.TrimPrefix(line, "EVT PLAYER "), " ")
 		ui.addStory(text)
 		switch kind {

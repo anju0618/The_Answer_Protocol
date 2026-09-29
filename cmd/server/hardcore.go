@@ -1,13 +1,10 @@
 package main
 
-import "log"
-
 const (
-	// allyDamageBonus は同じ部屋の味方1人ごとに加わるATTACKのダメージ。
 	allyDamageBonus = 5
-	// allyCounterReductionPercent は味方1人ごとに減る反撃ダメージの割合(%)。
+
 	allyCounterReductionPercent = 20
-	// maxAllyBonusCount は効果が加算される味方の人数の上限。
+
 	maxAllyBonusCount = 3
 )
 
@@ -37,9 +34,9 @@ func allyBonusCount(allies []string) int {
 type deathOutcome string
 
 const (
-	outcomeNothingLost deathOutcome = ""     // 失うものが元から無かった
-	outcomeLost        deathOutcome = "lost" // 持ち物を失った
-	outcomeKept        deathOutcome = "kept" // 仲間が守ってくれた
+	outcomeNothingLost deathOutcome = ""
+	outcomeLost        deathOutcome = "lost"
+	outcomeKept        deathOutcome = "kept"
 )
 
 func (s *Server) applyDeathPenaltyLocked(player *Player, name string) deathOutcome {
@@ -92,14 +89,14 @@ func (s *Server) returnItemsHomeLocked(name string, itemIDs []string) {
 	defer s.ioMu.Unlock()
 	locations, err := s.loadItemLocations()
 	if err != nil {
-		log.Printf("return lost items of %q: %v", name, err)
+		logger.Error("return_lost_items_failed", "player", name, "error", err.Error())
 		return
 	}
 	for _, itemID := range itemIDs {
 		locations[itemID] = s.world.Items[itemID].RoomID
 	}
 	if err := s.writeItemLocations(locations); err != nil {
-		log.Printf("save returned items of %q: %v", name, err)
+		logger.Error("save_item_locations_failed", "player", name, "error", err.Error())
 	}
 }
 
@@ -110,6 +107,7 @@ func (s *Server) shareVictoryLocked(attacker string, allies []string, npcID stri
 			continue
 		}
 		ally.setEnemyHP(npcID, 0)
+		logger.Info("victory_shared", "player", allyName, "ally_of", attacker, "npc", npcID)
 		ally.CombatTargetID = ""
 		s.checkQuestObjectiveLocked(ally, "defeat_npc", npcID)
 		locale := s.localeOfLocked(allyName)

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"sort"
 	"strings"
 )
@@ -165,7 +164,7 @@ func (s *Server) talkEndingLocked(player *Player, npc *NPC) {
 		return
 	}
 	if missing := s.missingForEndingLocked(player, e, locale); len(missing) > 0 {
-		// 何が足りないかは教えない。NPCの一言だけを返す。
+
 		s.sendEndingLocked(player.Name, e.Hint.Get(locale))
 		return
 	}
@@ -175,7 +174,7 @@ func (s *Server) talkEndingLocked(player *Player, npc *NPC) {
 	}
 	player.Endings[e.ID] = true
 	s.grantEndingRewardLocked(player, e)
-	log.Printf("ending reached: player=%q ending=%q", player.Name, e.ID)
+	logger.Info("ending_reached", "player", player.Name, "ending", e.ID)
 	s.sendEndingLocked(player.Name, LocalizedText{
 		"en": "=== ENDING: %s ===",
 		"ja": "=== エンディング: %s ===",
