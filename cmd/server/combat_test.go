@@ -164,7 +164,7 @@ func TestFleeSuccessAndFailureAndNotInCombat(t *testing.T) {
 	if fleeData["result"] != "success" || fleeData["hp"] != atk["attacker_hp"] {
 		t.Fatalf("flee from a myth-accurate retreat should succeed with unchanged hp, attack=%v flee=%v", atk, fleeData)
 	}
-	// 逃げ切った後は戦闘中ではなくなる(敵のいない部屋なら再びERR 407)。
+
 	server.mu.Lock()
 	if server.players["alice"].CombatTargetID != "" {
 		t.Errorf("combat target after fleeing = %q, want none", server.players["alice"].CombatTargetID)
@@ -292,7 +292,7 @@ func TestLiveEnemyBlocksMove(t *testing.T) {
 	server.mu.Lock()
 	server.players["alice"].RoomID = "loc.den"
 	server.mu.Unlock()
-	// 死ぬと「逃げ切った」記録も敵の傷もリセットされるので、runnerからもう一度逃げる。
+
 	alice.cmdJSON(t, "ATTACK npc.runner")
 	alice.cmdJSON(t, "FLEE")
 	won := false

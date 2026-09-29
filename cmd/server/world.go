@@ -14,8 +14,7 @@ type Item struct {
 	Obtainable  bool          `json:"obtainable"`
 	Renewable   bool          `json:"renewable,omitempty"`
 	RewardOnly  bool          `json:"reward_only,omitempty"`
-	// HomeRoomID はworld.jsonでの元の配置(ロード時に記録、保存しない)。死んで失われた
-	// 一意のアイテムはここへ戻る。
+
 	HomeRoomID string `json:"-"`
 }
 

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -29,6 +30,9 @@ type serverClient struct {
 	writeTimeout time.Duration
 	closeOnce    sync.Once
 	locale       string
+
+	remote string
+	ctx    atomic.Pointer[clientContext]
 }
 
 func newServerClient(conn net.Conn) *serverClient {
@@ -38,6 +42,7 @@ func newServerClient(conn net.Conn) *serverClient {
 func newServerClientWithWriteTimeout(conn net.Conn, timeout time.Duration) *serverClient {
 	client := &serverClient{
 		Conn:         conn,
+		remote:       remoteOf(conn),
 		out:          make(chan outboundMessage, 64),
 		done:         make(chan struct{}),
 		writeTimeout: timeout,
@@ -57,6 +62,9 @@ func (client *serverClient) writeLoop() {
 			}
 			if err == nil && n != len(message.data) {
 				err = io.ErrShortWrite
+			}
+			if err == nil {
+				logOutbound(client, message.data)
 			}
 			if message.done != nil {
 				message.done <- writeResult{n: n, err: err}
@@ -134,4 +142,27 @@ func (client *serverClient) Close() error {
 		err = client.Conn.Close()
 	})
 	return err
+}
+
+type clientContext struct {
+	player  string
+	command string
+}
+
+func (client *serverClient) setContext(player, command string) {
+	client.ctx.Store(&clientContext{player: player, command: command})
+}
+
+func (client *serverClient) context() (player, command string) {
+	if c := client.ctx.Load(); c != nil {
+		return c.player, c.command
+	}
+	return "", ""
+}
+
+func remoteOf(conn net.Conn) string {
+	if addr := conn.RemoteAddr(); addr != nil {
+		return addr.String()
+	}
+	return ""
 }

@@ -256,7 +256,7 @@ RFC §6.1.2 fixes only the `QUEST`/`QUESTS` request/response shapes and leaves o
 
 ## Server Logging
 
-**What's implemented today:** connection lifecycle (a line per connect/disconnect, including the player name) and internal error conditions (failed JSON encodes, failed saves, failed item-location restores, etc.) are logged via the Go standard library `log` package, which timestamps every line and writes to stderr by default.
+Everything is logged as **structured JSON, one object per line**, with Go's standard `log/slog` (`cmd/server/logging.go`). Every record has a nanosecond-precision RFC 3339 `time`, a `level` (`INFO`, `WARN` or `ERROR`; `DEBUG` when enabled) and a `msg` naming the event type. Output goes to **stderr**; set `TAP_LOG_FILE=path` to also append the same records to a file, and `TAP_LOG_LEVEL=debug|info|warn|error` to change the threshold (`debug` also logs every `EVT` line sent). Logging is a synchronous write of a small JSON line, so it does not noticeably slow the server.
 
 **What's not implemented yet (known gap):** the subject's full logging checklist is not built. Specifically missing: structured (JSON) log output; one log line per received command with the player's name and arguments; one log line per response/error code sent; a dedicated record of world-state changes (item moves, NPC interactions, combat/quest outcomes) beyond the in-game `EVT ROOM COMBAT` broadcasts already sent to players; INFO/WARN/ERROR log levels; and detection of abusive usage patterns (command flooding, rapid reconnects). This is the most significant remaining gap against the subject, and the next priority after finishing this README.
 
@@ -272,7 +272,6 @@ Reconstructed from `git log`; please double-check and expand this section yourse
 Run these from the repository root — the server loads `data/world.json` and reads/writes `saves/` using relative paths.
 
 ```sh
-# Run directly
 go run ./cmd/server                    # starts the server on :4242
 go run ./cmd/cli                       # connects to 127.0.0.1:4242
 go run ./cmd/cli 127.0.0.1:4242        # or connect to a specific host:port

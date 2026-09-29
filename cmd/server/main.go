@@ -1,30 +1,32 @@
 package main
 
 import (
-	"fmt"
-	"log"
 	"net"
+	"os"
 )
 
 func main() {
+	closeLog := setupLogging()
+	defer closeLog()
+
 	server := NewServer()
 
 	listener, err := net.Listen("tcp", ":4242")
 	if err != nil {
-		log.Fatal(err)
+		closeLog()
+		fatal("listen_failed", err)
 	}
 	defer listener.Close()
 
-	fmt.Println("Server started on port 4242")
+	logger.Info("server_started", "port", 4242, "pid", os.Getpid())
 
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
-			log.Println(err)
+			logger.Warn("accept_failed", "error", err.Error())
 			continue
 		}
 
-		fmt.Println("New connection:", conn.RemoteAddr())
 		go server.handleClient(conn)
 	}
 }

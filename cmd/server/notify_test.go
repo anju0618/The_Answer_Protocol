@@ -66,7 +66,7 @@ func TestDeathMessageReachesTheDyingPlayer(t *testing.T) {
 			t.Errorf("death message %q does not mention %q", death, want)
 		}
 	}
-	// 何が足りなかったか(答え)は教えない。
+
 	if strings.Contains(death, "Stake") {
 		t.Errorf("death message gives away the answer: %q", death)
 	}

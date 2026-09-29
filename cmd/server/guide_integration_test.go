@@ -38,7 +38,7 @@ func TestRealWorldGuideAndQuestHintsExist(t *testing.T) {
 	}
 
 	for id, quest := range world.Quests {
-		// クエスト文は状況の説明だけ。やり方・場所・答えを教えるヒントは書かない。
+
 		for _, locale := range []string{"en", "ja"} {
 			text := quest.Description[locale]
 			if strings.TrimSpace(text) == "" {

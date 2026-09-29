@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"sort"
 	"strings"
@@ -41,6 +40,7 @@ type Server struct {
 	groupByPlayer map[string]string
 	unsavedTakes  map[string]map[string]string
 	nextGroupID   uint64
+	abuse         *abuseMonitor
 	saveDir       string
 	world         *World
 }
@@ -49,14 +49,14 @@ func NewServer() *Server {
 	s := newServer("saves")
 	world, err := loadWorld("data/world.json")
 	if err != nil {
-		log.Fatalf("load world: %v", err)
+		fatal("load_world_failed", err)
 	}
 	s.world = world
 	if err := s.restoreItemLocations(); err != nil {
-		log.Fatalf("restore item locations: %v", err)
+		fatal("restore_item_locations_failed", err)
 	}
 	if err := s.restoreItemOwnership(); err != nil {
-		log.Fatalf("restore item ownership: %v", err)
+		fatal("restore_item_ownership_failed", err)
 	}
 	return s
 }
@@ -68,6 +68,7 @@ func newServer(saveDir string) *Server {
 		groups:        make(map[string]*Group),
 		groupByPlayer: make(map[string]string),
 		unsavedTakes:  make(map[string]map[string]string),
+		abuse:         newAbuseMonitor(),
 		saveDir:       saveDir,
 	}
 }
@@ -250,11 +251,12 @@ func handleConnect(s *Server, conn net.Conn, name *string, parts []string) bool 
 		fmt.Fprintln(conn, "ERR 201 NAME_IN_USE")
 		return false
 	} else if err != nil {
-		log.Printf("connect player %q: %v", requestedName, err)
+		logger.Error("connect_player_failed", "player", requestedName, "error", err.Error())
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
 	*name = requestedName
+	client.setContext(requestedName, "CONNECT")
 	s.mu.Lock()
 	response, err := client.enqueueResponse("OK connected")
 	if err == nil {
@@ -269,8 +271,7 @@ func handleConnect(s *Server, conn net.Conn, name *string, parts []string) bool 
 		}
 		s.broadcastPlayerCountLocked()
 		if player := s.players[requestedName]; player != nil {
-			// 初回接続時だけ運命の間のチュートリアルを自動で流す(以降は
-			// モイライへのTALKでいつでも聞き直せる)。
+
 			if !player.IntroSeen {
 				player.IntroSeen = true
 				s.sendGuideLocked(requestedName, 0)
@@ -333,7 +334,7 @@ func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}{room, players, items, npcs})
 	if err != nil {
 		s.mu.Unlock()
-		log.Printf("encode LOOK response: %v", err)
+		logger.Error("encode_response_failed", "command", "LOOK", "error", err.Error())
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
@@ -404,6 +405,7 @@ func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if err == nil {
 		oldRoomID := player.RoomID
 		player.RoomID = destination
+		logger.Info("player_moved", "player", *name, "from", oldRoomID, "to", destination)
 		if oldRoomID != destination {
 			for playerName, current := range s.players {
 				recipient := s.clients[playerName]
@@ -452,11 +454,11 @@ func handleQuit(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	if *name != "" {
 		if err := s.saveAndRemovePlayer(*name); err != nil {
-			log.Printf("save player %q on quit: %v", *name, err)
+			logger.Error("save_player_failed", "player", *name, "when", "quit", "error", err.Error())
 			fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 			return false
 		}
-		log.Println(*name, "disconnected")
+		logger.Info("player_quit", "player", *name)
 		*name = ""
 	}
 	fmt.Fprintln(conn, "OK bye")
@@ -499,8 +501,7 @@ func handleTake(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 
 	if !s.world.Items[itemID].Renewable {
-		// 一意のアイテムは部屋から消える。Renewableな鍵アイテムは部屋に残り、
-		// このプレイヤー専用のコピーが所持品に入るだけ。
+
 		if s.unsavedTakes[*name] == nil {
 			s.unsavedTakes[*name] = make(map[string]string)
 		}
@@ -508,6 +509,7 @@ func handleTake(s *Server, conn net.Conn, name *string, parts []string) bool {
 		s.world.Items[itemID].RoomID = ""
 	}
 	player.Inventory = append(player.Inventory, itemID)
+	logger.Info("item_taken", "player", *name, "item", itemID, "room", player.RoomID, "renewable", s.world.Items[itemID].Renewable)
 	s.checkQuestObjectiveLocked(player, "collect_item", itemID)
 	takenInRoomID := player.RoomID
 
@@ -581,8 +583,7 @@ func handleDrop(s *Server, conn net.Conn, name *string, parts []string) bool {
 	s.ioMu.Lock()
 	var err error
 	if item.Renewable {
-		// 鍵アイテムのコピーは捨てるだけ(部屋には元から残っている)ので、
-		// アイテム位置の保存は不要で、プレイヤーの所持品だけ保存する。
+
 		err = s.savePlayer(&snapshot)
 	} else {
 		var locations map[string]string
@@ -600,7 +601,7 @@ func handleDrop(s *Server, conn net.Conn, name *string, parts []string) bool {
 						delete(locations, itemID)
 					}
 					if rollbackErr := s.writeItemLocations(locations); rollbackErr != nil {
-						log.Printf("restore item location %q after failed drop: %v", itemID, rollbackErr)
+						logger.Error("restore_item_location_failed", "item", itemID, "error", rollbackErr.Error())
 					}
 				}
 			}
@@ -609,7 +610,7 @@ func handleDrop(s *Server, conn net.Conn, name *string, parts []string) bool {
 	s.ioMu.Unlock()
 	if err != nil {
 		s.mu.Unlock()
-		log.Printf("drop item %q for %q: %v", itemID, *name, err)
+		logger.Error("drop_item_failed", "player", *name, "item", itemID, "error", err.Error())
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
@@ -618,6 +619,7 @@ func handleDrop(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !item.Renewable {
 		item.RoomID = player.RoomID
 	}
+	logger.Info("item_dropped", "player", *name, "item", itemID, "room", player.RoomID)
 	delete(s.unsavedTakes, *name)
 	client := conn.(*serverClient)
 	response, err := client.enqueueResponse("OK dropped=" + itemID)
@@ -719,8 +721,9 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 	client := conn.(*serverClient)
 	response, err := client.enqueueResponse("OK " + dialogue)
 	if err == nil {
+		logger.Info("npc_interaction", "player", *name, "npc", npcID, "room", player.RoomID)
 		if npc.Guide {
-			// モイライのTALK: 1行目はレスポンス、残りはEVT PLAYER GUIDEで再生する。
+
 			s.sendGuideLocked(*name, 1)
 		}
 		s.sendQuestHintLocked(player, npcID)
@@ -761,7 +764,7 @@ func handleStatus(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}{player.HP, maxPlayerHP, status})
 	if err != nil {
 		s.mu.Unlock()
-		log.Printf("encode STATUS response: %v", err)
+		logger.Error("encode_response_failed", "command", "STATUS", "error", err.Error())
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
@@ -777,17 +780,22 @@ func handleStatus(s *Server, conn net.Conn, name *string, parts []string) bool {
 func (s *Server) handleClient(rawConn net.Conn) {
 	conn := newServerClient(rawConn)
 	var name string
+	lastPlayer := ""
+	openedAt := time.Now()
+
+	logger.Info("connection_open", "remote", conn.remote)
+	s.abuse.noteConnection(hostOf(conn.remote), openedAt)
 
 	defer func() {
 		if name != "" {
 			if err := s.saveAndRemovePlayer(name); err != nil {
-				log.Printf("save player %q on disconnect: %v", name, err)
+				logger.Error("save_player_failed", "player", name, "when", "disconnect", "error", err.Error())
 				s.mu.Lock()
 				s.removePlayerLocked(name, true)
 				s.mu.Unlock()
 			}
-			log.Println(name, "disconnected")
 		}
+		logger.Info("connection_close", "remote", conn.remote, "player", lastPlayer, "duration_ms", time.Since(openedAt).Milliseconds())
 		conn.Close()
 	}()
 
@@ -796,6 +804,7 @@ func (s *Server) handleClient(rawConn net.Conn) {
 	}
 
 	scanner := bufio.NewScanner(conn)
+	var flood floodTracker
 
 	for scanner.Scan() {
 		parts := parseCommandParts(scanner.Text())
@@ -804,17 +813,28 @@ func (s *Server) handleClient(rawConn net.Conn) {
 		}
 
 		command := strings.ToUpper(parts[0])
+		conn.setContext(name, command)
+		logger.Info("command", "remote", conn.remote, "player", name, "command", command, "args", clip(strings.Join(parts[1:], " ")))
+		if count, warn := flood.record(time.Now()); warn {
+			logger.Warn("abuse_command_flood", "remote", conn.remote, "player", name, "commands", count, "window_ms", commandWindow.Milliseconds())
+		}
+
 		handler, ok := commandHandlers[command]
 		if !ok {
 			fmt.Fprintln(conn, "ERR 400 BAD_REQUEST")
 			continue
 		}
-		if handler(s, conn, &name, parts) {
+		stop := handler(s, conn, &name, parts)
+		conn.setContext(name, command)
+		if name != "" {
+			lastPlayer = name
+		}
+		if stop {
 			return
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		log.Println(err)
+		logger.Warn("connection_read_error", "remote", conn.remote, "player", name, "error", err.Error())
 	}
 }
