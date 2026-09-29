@@ -204,13 +204,19 @@
       "id": "loc.ody_sirens",
       "name": "Rocks of the Sirens",
       "description": "Bones litter the rocks below a song so beautiful that every sailor who has heard it clearly has also died hearing it.",
-      "exits": { "north": "loc.ody_circe", "east": "loc.ody_scylla" }
+      "exits": { "north": "loc.ody_circe", "east": "loc.ody_scylla", "south": "loc.ody_charybdis" }
     },
     "loc.ody_scylla": {
       "id": "loc.ody_scylla",
       "name": "The Strait of Scylla and Charybdis",
       "description": "On one side a six-headed monster snatches sailors from the deck; on the other, a whirlpool swallows the sea itself three times a day.",
       "exits": { "west": "loc.ody_sirens", "east": "loc.ody_thrinacia" }
+    },
+    "loc.ody_charybdis": {
+      "id": "loc.ody_charybdis",
+      "name": "The Whirlpool of Charybdis",
+      "description": "The sea itself opens its throat here, swallowing the strait three times a day and spewing it back just as violently. No ship that has entered this maw has ever been seen again.",
+      "exits": { "north": "loc.ody_sirens" }
     },
     "loc.ody_thrinacia": {
       "id": "loc.ody_thrinacia",
@@ -246,6 +252,7 @@
 
   "items": {
     "item.hospitality_gift": { "name": "Woven Cloak of Lemnos", "description": "A finely woven cloak, a parting gift from the women of Lemnos.", "room_id": "loc.argo_lemnos", "obtainable": true },
+    "item.medeas_ointment": { "name": "Medea's Fire-Flower Ointment", "description": "A jar of ointment brewed from a flower rooted in Prometheus's spilled blood, left for Jason under cover of night — proof against the bronze bulls' fire, and an unspoken price for a promise not yet made.", "room_id": "loc.argo_court_aeetes", "obtainable": true },
     "item.medeas_draught": { "name": "Medea's Sleeping Draught", "description": "A potion brewed from grave-herbs, strong enough to close a dragon's sleepless eyes.", "room_id": "loc.argo_grove", "obtainable": true },
     "item.dragons_teeth": { "name": "Dragon's Teeth", "description": "Teeth drawn from the slain guardian dragon of Ares, said to grow into armed warriors when sown.", "room_id": "loc.argo_bull_field", "obtainable": true },
     "item.golden_fleece": { "name": "The Golden Fleece", "description": "The shining pelt of the ram Chrysomallos, which once carried Phrixus safely across the sea.", "room_id": "loc.argo_grove", "obtainable": true },
@@ -255,10 +262,12 @@
     "item.hectors_ransom": { "name": "Hector's Ransom", "description": "A king's weight in gold and fine cloth, Priam's price for the return of his son's body.", "room_id": "loc.troy_city", "obtainable": true },
     "item.trojan_horse": { "name": "The Trojan Horse", "description": "A hollow horse of fir planking, tall as the city walls, with a rope ladder coiled in its belly.", "room_id": "loc.troy_horse", "obtainable": true },
 
+    "item.lotus_fruit": { "name": "Honeyed Lotus Fruit", "description": "A fruit as sweet as forgetting itself. One bite and home stops mattering.", "room_id": "loc.ody_lotus", "obtainable": true },
     "item.olive_stake": { "name": "Sharpened Olive Stake", "description": "A great stake of green olive wood, hardened in the fire and sharpened to a point.", "room_id": "loc.ody_cyclops", "obtainable": true },
     "item.strong_wine": { "name": "Unwatered Wine", "description": "Wine strong enough to fell a god, carried ashore from the ship's stores.", "room_id": "loc.ody_cyclops", "obtainable": true },
     "item.bag_of_winds": { "name": "Bag of the Winds", "description": "A leather bag holding every wind but the one already loosed to carry the ship home. Best left unopened.", "room_id": "loc.ody_aeolus", "obtainable": true },
     "item.moly": { "name": "Moly Root", "description": "A small herb with white flowers and a black root, a gift from Hermes proof against any enchantment of Circe's.", "room_id": "loc.ody_circe", "obtainable": true },
+    "item.beeswax": { "name": "Lump of Beeswax", "description": "Soft wax from Circe's own hives, warm enough to knead and press into a sailor's ears against any song, however beautiful.", "room_id": "loc.ody_circe", "obtainable": true },
     "item.sacred_cattle": { "name": "Cattle of Helios", "description": "One of the sun god's own immortal cattle, coat bright as noon. Touching it is forbidden.", "room_id": "loc.ody_thrinacia", "obtainable": true },
     "item.odysseus_bow": { "name": "Odysseus's Bow", "description": "A great bow that no suitor could even bend, let alone string. It has waited twenty years for its owner's return.", "room_id": "loc.ody_palace", "obtainable": true }
   },
