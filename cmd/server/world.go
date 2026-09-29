@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 )
 
 type Item struct {
@@ -14,12 +15,16 @@ type Item struct {
 }
 
 type NPC struct {
-	Name        string   `json:"name"`
-	Description string   `json:"description"`
-	Role        string   `json:"role"`
-	RoomID      string   `json:"room_id"`
-	HP          int      `json:"hp"`
-	Dialogue    []string `json:"dialogue"`
+	Name                string   `json:"name"`
+	Description         string   `json:"description"`
+	Role                string   `json:"role"`
+	RoomID              string   `json:"room_id"`
+	HP                  int      `json:"hp"`
+	Dialogue            []string `json:"dialogue"`
+	MythRequirementItem string   `json:"myth_requirement_item,omitempty"`
+	FleeAccurate        bool     `json:"flee_accurate,omitempty"`
+	Unwinnable          bool     `json:"unwinnable,omitempty"`
+	CrewLossOnAttack    int      `json:"crew_loss_on_attack,omitempty"`
 }
 
 type QuestObjective struct {
@@ -86,6 +91,21 @@ func (w *World) validate() error {
 				return fmt.Errorf("room %q exit %q points to unknown room %q", id, dir, dest)
 			}
 		}
+		if h := room.Hazard; h != nil {
+			switch h.Type {
+			case "lethal":
+			case "item_gate":
+				if w.Items[h.RequiredItemID] == nil {
+					return fmt.Errorf("room %q hazard points to unknown item %q", id, h.RequiredItemID)
+				}
+			case "crew_gate":
+				if h.CrewLoss < 1 {
+					return fmt.Errorf("room %q crew_gate hazard has invalid crew_loss %d", id, h.CrewLoss)
+				}
+			default:
+				return fmt.Errorf("room %q has unknown hazard type %q", id, h.Type)
+			}
+		}
 	}
 	for id, item := range w.Items {
 		if id == "" {
@@ -107,6 +127,12 @@ func (w *World) validate() error {
 		}
 		if w.Rooms[npc.RoomID] == nil {
 			return fmt.Errorf("NPC %q points to unknown room %q", id, npc.RoomID)
+		}
+		if npc.MythRequirementItem != "" && w.Items[npc.MythRequirementItem] == nil {
+			return fmt.Errorf("NPC %q myth requirement points to unknown item %q", id, npc.MythRequirementItem)
+		}
+		if npc.Unwinnable && npc.CrewLossOnAttack < 1 {
+			return fmt.Errorf("NPC %q is unwinnable but has invalid crew_loss_on_attack %d", id, npc.CrewLossOnAttack)
 		}
 	}
 	for id, quest := range w.Quests {
@@ -136,4 +162,34 @@ func (w *World) validate() error {
 		}
 	}
 	return nil
+}
+
+// resolveNPCInRoom finds an NPC in roomID by ID first, then by case-insensitive
+// display name. When several NPCs share a name, the lexicographically smallest
+// ID wins, matching the tie-break already used for items in TAKE/DROP.
+func (w *World) resolveNPCInRoom(roomID, query string) string {
+	if npc := w.NPCs[query]; npc != nil && npc.RoomID == roomID {
+		return query
+	}
+	npcID := ""
+	for id, npc := range w.NPCs {
+		if npc != nil && npc.RoomID == roomID && strings.EqualFold(npc.Name, query) && (npcID == "" || id < npcID) {
+			npcID = id
+		}
+	}
+	return npcID
+}
+
+// questByGiver returns the quest offered by npcID, or "", nil if it gives none.
+func (w *World) questByGiver(npcID string) (string, *Quest) {
+	questID := ""
+	for id, quest := range w.Quests {
+		if quest != nil && quest.GiverNPCID == npcID && (questID == "" || id < questID) {
+			questID = id
+		}
+	}
+	if questID == "" {
+		return "", nil
+	}
+	return questID, w.Quests[questID]
 }
