@@ -258,7 +258,17 @@ RFC §6.1.2 fixes only the `QUEST`/`QUESTS` request/response shapes and leaves o
 
 Everything is logged as **structured JSON, one object per line**, with Go's standard `log/slog` (`cmd/server/logging.go`). Every record has a nanosecond-precision RFC 3339 `time`, a `level` (`INFO`, `WARN` or `ERROR`; `DEBUG` when enabled) and a `msg` naming the event type. Output goes to **stderr**; set `TAP_LOG_FILE=path` to also append the same records to a file, and `TAP_LOG_LEVEL=debug|info|warn|error` to change the threshold (`debug` also logs every `EVT` line sent). Logging is a synchronous write of a small JSON line, so it does not noticeably slow the server.
 
-**What's not implemented yet (known gap):** the subject's full logging checklist is not built. Specifically missing: structured (JSON) log output; one log line per received command with the player's name and arguments; one log line per response/error code sent; a dedicated record of world-state changes (item moves, NPC interactions, combat/quest outcomes) beyond the in-game `EVT ROOM COMBAT` broadcasts already sent to players; INFO/WARN/ERROR log levels; and detection of abusive usage patterns (command flooding, rapid reconnects). This is the most significant remaining gap against the subject, and the next priority after finishing this README.
+| What the subject requires | Event (`msg`) | Level | Main fields |
+| --- | --- | --- | --- |
+| Connections and disconnections with timestamps and IP | `connection_open`, `connection_close`, `player_quit` | INFO | `remote` (`ip:port`), `player`, `duration_ms` |
+| Every command received | `command` | INFO | `remote`, `player` (empty before `CONNECT`), `command`, `args` (clipped to 300 characters) |
+| Every response and error code sent | `response` (`OK ...`), `error_response` (`ERR ...`) | INFO / WARN | `remote`, `player`, `command`, `code` (errors), `line`. Logged at the single point where bytes are written (`writeLoop`), so no response can be missed |
+| World state changes | `item_taken`, `item_dropped`, `player_moved`, `npc_interaction`, `combat_attack`, `combat_flee`, `player_died`, `victory_shared` | INFO | `player`, `item` / `npc` / `room`, combat `status`, `damage`, HPs, death `cause` and what happened to the belongings |
+| Quest progress and completion | `quest_accepted`, `quest_progress`, `quest_completed`, `ending_reached` | INFO | `player`, `quest` / `ending`, `progress`, `target`, `reward_hp` |
+| Abuse patterns | `abuse_command_flood`, `abuse_rapid_connections` | WARN | see below |
+| Failures | `save_player_failed`, `drop_item_failed`, `encode_response_failed`, ... | ERROR | `error` |
+
+**Abuse monitoring.** The server only observes and logs; it never disconnects anyone. A connection that sends more than 20 commands within one second produces `abuse_command_flood` (at most once per 5 seconds per connection). More than 8 connections from one IP within 10 seconds produces `abuse_rapid_connections` (at most once per 5 seconds per IP). To watch the server live, run `make run-server` and pipe it through a JSON tool, for example `make run-server 2>&1 | jq -c 'select(.level != "INFO")'` shows only warnings and errors, and `jq 'select(.player == "alice")'` follows one player.
 
 ## Group Contributions
 
@@ -269,23 +279,27 @@ Reconstructed from `git log`; please double-check and expand this section yourse
 
 ## Building and Running
 
-Run these from the repository root — the server loads `data/world.json` and reads/writes `saves/` using relative paths.
+Run these from the repository root — the server loads `data/world.json` and reads/writes `saves/` using relative paths. A `Makefile` wraps everything (`make help` lists the targets):
+
+| Target | What it does |
+| --- | --- |
+| `make install` | download the Go module dependencies (`go mod download`) |
+| `make build` | compile the server, CLI client and GUI client into `bin/` |
+| `make run-server` | run the server on `:4242` (JSON logs on stderr) |
+| `make run-client` | run the CLI client; `make run-client ADDR=host:port` for another server |
+| `make run-client-gui` | run the GUI client |
+| `make lint` | fail if any file needs `gofmt`, then run `go vet ./...` |
+| `make test` | run all automated tests |
+| `make clean` | remove `bin/` (the `saves/` directory is kept) |
+
+The same commands without `make`:
 
 ```sh
 go run ./cmd/server                    # starts the server on :4242
-go run ./cmd/cli                       # connects to 127.0.0.1:4242
-go run ./cmd/cli 127.0.0.1:4242        # or connect to a specific host:port
-
-# Or build binaries first
-go build -o server ./cmd/server && ./server
-go build -o cli ./cmd/cli && ./cli
-
-# Lint / format check
-go vet ./...
-gofmt -l .                              # prints nothing if everything is formatted
+go run ./cmd/cli 127.0.0.1:4242        # CLI client (host:port optional)
+go run ./cmd/gui                       # GUI client
+go vet ./... && gofmt -l .             # lint (gofmt prints nothing if all is formatted)
 ```
-
-There is no Makefile yet; the commands above are the full build/run/lint surface for this Go project (`go build`/`go run`/`go vet`/`gofmt` are themselves Go's standard tooling, playing the role a Makefile's `build`/`run`/`lint` targets would in a C/C++ project).
 
 ## Testing
 
