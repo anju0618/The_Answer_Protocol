@@ -588,8 +588,12 @@ func TestQuitSavesAndConnectRestoresPlayer(t *testing.T) {
 	server.mu.Lock()
 	restored := *server.players[want.Name]
 	server.mu.Unlock()
-	if !reflect.DeepEqual(restored, want) {
-		t.Fatalf("restored player = %+v, want %+v", restored, want)
+	// 初回案内(IntroSeen)がまだだった保存データで再接続すると、案内が流れて
+	// IntroSeenだけがtrueになる。それ以外の状態は保存どおり復元される。
+	wantRestored := want
+	wantRestored.IntroSeen = true
+	if !reflect.DeepEqual(restored, wantRestored) {
+		t.Fatalf("restored player = %+v, want %+v", restored, wantRestored)
 	}
 
 	duplicate := startTestClient(t, server)
@@ -604,8 +608,8 @@ func TestQuitSavesAndConnectRestoresPlayer(t *testing.T) {
 	restarted.mu.Lock()
 	restored = *restarted.players[want.Name]
 	restarted.mu.Unlock()
-	if !reflect.DeepEqual(restored, want) {
-		t.Fatalf("restored after restart = %+v, want %+v", restored, want)
+	if !reflect.DeepEqual(restored, wantRestored) {
+		t.Fatalf("restored after restart = %+v, want %+v", restored, wantRestored)
 	}
 	third.command(t, "QUIT", "OK bye")
 	<-third.done
