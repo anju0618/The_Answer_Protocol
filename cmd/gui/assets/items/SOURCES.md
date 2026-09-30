@@ -1,10 +1,10 @@
 # Item illustration references
 
-These photos show representative objects or materials. They are not literal images of the fictional items. The GUI displays pixel-art illustrations in this directory, made with the corresponding photo as a shape and material reference. The reference links are listed below; the downloaded JPEGs are not needed by the GUI.
+The GUI displays pixel-art illustrations rather than photographs. Most existing illustrations use the referenced objects below as shape or material guides; the four reward illustrations marked as generated are original artwork created from text prompts and have no external image references. Reference photos are not included in the GUI assets.
 
-The Metropolitan Museum of Art marks the listed object images as public domain in its Collection API and releases its Open Access images under [CC0](https://metmuseum.github.io/). The three Wikimedia Commons files below are also marked CC0 on their file pages.
+The Metropolitan Museum of Art marks the listed reference images as public domain in its Collection API and releases its Open Access images under [CC0](https://metmuseum.github.io/). The three Wikimedia Commons references below are also marked CC0 on their file pages.
 
-| Game item | Photographed subject | Source | License |
+| Game item | Depicted subject / reference | Source | Reference license / notes |
 | --- | --- | --- | --- |
 | `item.hospitality_gift` | Cloak | [The Met, 107737](https://www.metmuseum.org/art/collection/search/107737) | CC0 |
 | `item.medeas_ointment` | Aryballos | [The Met, 246117](https://www.metmuseum.org/art/collection/search/246117) | CC0 |
@@ -23,7 +23,7 @@ The Metropolitan Museum of Art marks the listed object images as public domain i
 | `item.beeswax` | Beeswax pellets | [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:Homemade_beeswax_wrap_step_1,_beewax_pellets.jpg) | CC0 |
 | `item.sacred_cattle` | Terracotta bull | [The Met, 240954](https://www.metmuseum.org/art/collection/search/240954) | CC0 |
 | `item.odysseus_bow` | Bow | [The Met, 25830](https://www.metmuseum.org/art/collection/search/25830) | CC0 |
-| `item.laurel_of_the_argo` | Placeholder: color-shifted copy of the `item.golden_fleece` illustration. Replace with dedicated art. | this repository | derived from the row above |
-| `item.ember_of_troy` | Placeholder: color-shifted copy of the `item.trojan_horse` illustration. Replace with dedicated art. | this repository | derived from the row above |
-| `item.olive_branch_of_ithaca` | Placeholder: color-shifted copy of the `item.moly` illustration. Replace with dedicated art. | this repository | derived from the row above |
-| `item.thread_of_fate` | Placeholder: color-shifted copy of the `item.hospitality_gift` illustration. Replace with dedicated art. | this repository | derived from the row above |
+| `item.laurel_of_the_argo` | Golden laurel wreath with an Argo medallion | OpenAI image generation | Original generated illustration; no external reference |
+| `item.ember_of_troy` | Glowing ember from the burning city | OpenAI image generation | Original generated illustration; no external reference |
+| `item.olive_branch_of_ithaca` | Olive sprig with dark olives | OpenAI image generation | Original generated illustration; no external reference |
+| `item.thread_of_fate` | Luminous thread wound around a spindle | OpenAI image generation | Original generated illustration; no external reference |
