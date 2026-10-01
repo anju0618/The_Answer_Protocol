@@ -62,7 +62,10 @@ func (ui *gui) build() {
 	ui.photoStrip = photos
 	ui.photoStrip.Hide()
 	ui.flash = newFlashLayer()
-	sceneVisual := container.NewScroll(container.New(&sceneVisualLayout{photos: ui.itemPhotoBox}, ui.scene, ui.flash, ui.photoStrip))
+	ui.sceneMapBox = container.New(&mapLayout{})
+	ui.sceneMapPanel = framed(ui.tr("Map", "地図"), ui.mapView(ui.sceneMapBox))
+	ui.sceneMapPanel.Hide()
+	sceneVisual := container.NewScroll(container.New(&sceneVisualLayout{photos: ui.itemPhotoBox}, ui.scene, ui.flash, ui.photoStrip, ui.sceneMapPanel))
 	sceneVisual.Direction = container.ScrollNone
 	sceneFrame := canvas.NewRectangle(ink)
 	sceneFrame.StrokeColor = gold
@@ -347,6 +350,17 @@ func (l *sceneVisualLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) 
 	for _, layer := range objects[:2] {
 		layer.Move(fyne.NewPos(gap, gap))
 		layer.Resize(inside)
+	}
+	mapPanel := objects[3]
+	renderedWidth := min(inside.Width, inside.Height*float32(artWidth)/float32(artHeight))
+	leftSpace := (inside.Width - renderedWidth) / 2
+	mapSize := mapPanel.MinSize()
+	if leftSpace >= mapSize.Width+2*gap && inside.Height >= mapSize.Height {
+		mapPanel.Show()
+		mapPanel.Move(fyne.NewPos(gap+(leftSpace-mapSize.Width)/2, gap+(inside.Height-mapSize.Height)/2))
+		mapPanel.Resize(mapSize)
+	} else {
+		mapPanel.Hide()
 	}
 	if objects[2].Visible() {
 		thumbnail := fyne.NewSquareSize(min(104, max(48, inside.Height*0.3)))
