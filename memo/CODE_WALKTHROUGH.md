@@ -8,6 +8,8 @@
 - コードの下の `-` の箇条書きが、上のコードの**1行ずつの解説**です。
 - 初めて出てくる Go の文法は、そこで説明します(後ろの章では説明を省略します)。
 - 読む順番は「分からないものが少ない順」に並べています。前の章で説明済みのものは、後ろの章で使えるようになっています。
+- 対象は `cmd/server/`、`cmd/cli/`、`cmd/gui/` の実装コードです。`*_test.go` は関連する処理を確認するためのテストとして参照します。
+- コード中の単独の `...` は省略の印です。完全な関数は対応するソースファイルを参照します。7-10の `handleXxx` は共通の流れを説明するための例です。
 
 ## 読む順番(全体の予定)
 
@@ -69,7 +71,7 @@ func main() {
 ```
 
 - `func main() {`
-  - `func` は関数を定義する印です。`main` という名前の関数が、**プログラムが起動したときに最初に呼ばれる**関数です。
+  - `func` は関数を定義する印です。`main` という名前の関数が、**実行プログラムの入口**になります。パッケージの変数や`init`関数の初期化が済んだあとに呼ばれます。
   - `()` は引数なし。`{` から対応する `}` までが関数の中身です。
 - `closeLog := setupLogging()`
   - `setupLogging()` は `logging.go` にある関数で、ログの出力先を準備します。
@@ -77,7 +79,7 @@ func main() {
   - この関数は「ログファイルを閉じる関数」を返します。それを `closeLog` という変数に入れています。**関数も値として変数に入れられる**のがGoの特徴です。
 - `defer closeLog()`
   - `defer` は「**この関数(`main`)が終わるときに実行する**」という予約です。
-  - ここで予約だけしておけば、`main` がどこで終わっても(途中で `return` しても)最後に必ずログファイルが閉じられます。後片付けの書き忘れを防ぐための仕組みです。
+  - `main`が通常の`return`で終わるときにログファイルを閉じます。`os.Exit`での終了では`defer`は実行されないので、下のエラー処理では`closeLog()`を先に呼びます。
   - 今はまだ実行されません。`main` の最後で実行されます。
 - 空行は読みやすさのためだけです。
 - `server := NewServer()`
@@ -1093,7 +1095,7 @@ func (w *World) resolveNPCInRoom(roomID, query, locale string) string {
 - `(npcID == "" || id < npcID)`:同じ名前のNPCが複数見つかったら、**ID(文字列順)が一番小さいもの**を採用する。辞書の `range` の順序はランダムなので、こう決めないと結果が毎回変わってしまう。
 - 見つからなければ `""`(呼び出し側が「NPCがいない」エラーにする)。
 
-## 5-9 `questByGiver`(216〜226行目の前半)
+## 5-9 `questByGiver`
 
 ```go
 func (w *World) questByGiver(npcID string) (string, *Quest) {
@@ -1352,7 +1354,7 @@ func (client *serverClient) enqueueResponse(line string) (<-chan writeResult, er
 
 - 戻り値の `<-chan writeResult` は「**受信専用**のチャネル」。呼び出し側は読むだけで、書けない。
 - `select` に **`default:`** がある:どのcaseも今すぐ動かせないなら、**待たずに `default` を実行**する。ここでは「キューが満杯ならすぐ `errSendQueueFull`」。
-- **ここが重要**:ロックを持ったままでも、この関数は**絶対に待たされない**。遅い相手のために他の人を止めない設計。
+- **ここが重要**:送信キューへ積む段階では、ネットワークへの書き込み完了を待たない。キューが満杯なら接続を閉じてエラーを返す。実際の書き込みを待つ`waitResponse`は、サーバーのロックを外してから呼ぶ。
 - 呼ぶ側は `response, err := client.enqueueResponse("OK ...")` と書き、後で `waitResponse(response)` で完了を待つ。
 
 ```go
@@ -2597,7 +2599,7 @@ func (s *Server) handleClient(rawConn net.Conn) {
 
 「神話に逆らうと死ぬ」というゲームの核の部分です。短い順に `hazard.go` → `hardcore.go` → `combat.go` の順で読みます。
 
-## 8-1 `hazard.go`(54行)— 部屋の危険と、出口を塞ぐ敵
+## 8-1 `hazard.go`(57行)— 部屋の危険と、出口を塞ぐ敵
 
 ```go
 package main
@@ -2618,11 +2620,15 @@ func (s *Server) applyRoomHazardLocked(player *Player, name string, room *Room, 
 ```go
 	switch hazard.Type {
 	case "lethal":
+		if description := room.Description.Get(locale); description != "" {
+			s.sendPlayerEventLocked(name, "DEATH", description)
+		}
 		s.respawnPlayerLocked(player, name, "hazard_lethal", roomName)
 		return &flavor{key: "hazard_lethal", player: name, room: room}
 ```
 
-- **`lethal`**:入った時点で必ず死亡。 `respawnPlayerLocked`(8-4)で復活処理。
+- **`lethal`**:入った時点で必ず死亡。部屋の説明文があれば、本人の言語で `EVT PLAYER DEATH 説明文` を先に送信キューへ積む。
+- `respawnPlayerLocked`(8-4)は持ち物などの死亡処理と復活を行い、死因と復活先を知らせる。説明文がある即死部屋では、個人向けの死亡通知が2件になる。
 - `&flavor{...}`:実況データを作ってポインタを返す。
 
 ```go
@@ -3619,12 +3625,28 @@ func (s *Server) missingForEndingLocked(player *Player, e *Ending, locale string
 			}.Format(locale, s.world.Items[itemID].Name.Get(locale)))
 		}
 	}
-	(クエスト・エンディングも同様に、足りないものを `missing` に追加)
+	for _, questID := range e.RequiresQuests {
+		if state := player.Quests[questID]; state == nil || state.Status != "completed" {
+			missing = append(missing, LocalizedText{
+				"en": "the completed quest \"%s\"",
+				"ja": "クエスト「%s」の達成",
+			}.Format(locale, s.world.Quests[questID].Name.Get(locale)))
+		}
+	}
+	for _, endingID := range e.RequiresEndings {
+		if !player.Endings[endingID] {
+			missing = append(missing, LocalizedText{
+				"en": "the ending \"%s\"",
+				"ja": "エンディング「%s」への到達",
+			}.Format(locale, s.world.endingByID(endingID).Name.Get(locale)))
+		}
+	}
 	return missing
 }
 ```
 
 - エンディングを迎えるのに**足りないもの**を、文章のリストにして返す。 `len(missing) == 0` なら条件を満たしている。
+- 必要なアイテムの所持、クエストの`completed`、前提エンディングへの到達を順に調べる。クエストの記録が`nil`でも、`state == nil`の判定で未達成として扱う。
 - (現在のゲームでは、足りない内容を**プレイヤーに教えず**、ただヒント文だけを出す仕様。リストの長さだけを判定に使っている)
 
 ### 9-3-5 通知の補助
@@ -4433,8 +4455,13 @@ func (s *Server) writePlayers(players map[string]*Player) error {
 プレイヤーのセーブと同じ作りで、データが「アイテムID→部屋ID」の辞書です。
 
 ```go
-func (s *Server) loadItemLocations() (map[string]string, error)  // 読む(無ければ空)
-func (s *Server) writeItemLocations(locations map[string]string) error  // 一時ファイル→Renameで書く
+func (s *Server) loadItemLocations() (map[string]string, error) {
+	...
+}
+
+func (s *Server) writeItemLocations(locations map[string]string) error {
+	...
+}
 ```
 
 ### `restoreItemLocations`(起動時に呼ばれる)
@@ -4636,7 +4663,7 @@ func logOutbound(client *serverClient, data []byte) {
 			logger.Info("response", "remote", client.remote, "player", player, "command", command, "line", clip(line))
 		case strings.HasPrefix(line, "ERR "):
 			code, _, _ := strings.Cut(strings.TrimPrefix(line, "ERR "), " ")
-			logger.Warn("error_response", ..., "code", code, "line", clip(line))
+			logger.Warn("error_response", "remote", client.remote, "player", player, "command", command, "code", code, "line", clip(line))
 		case strings.HasPrefix(line, "EVT "):
 			logger.Debug("event", "remote", client.remote, "player", player, "line", clip(line))
 		}
@@ -5222,18 +5249,38 @@ func (client *protocolClient) readLoop() {
 - 分類した結果を `incoming` に送る。
 - ループが終わったら(サーバーが切れた)、理由を付けた**切断メッセージ**を送る。正常な切断はエラーが `nil` なので、 `io.EOF`(「終わり」を意味する標準のエラー)を入れる。
 
-## 15-2 `model.go`(116行)— 受け取るデータの型
+## 15-2 `model.go`(133行)— 受け取るデータの型
 
 ```go
-type roomView struct { ID, Name, Description string; Exits map[string]string }
-type lookView struct { Room roomView; Players, Items, NPCs []string }
-type statusView struct { HP, MaxHP int; Status string }
-type questView struct { QuestID, Status, Progress string }
+type roomView struct {
+	ID          string            `json:"id"`
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	Exits       map[string]string `json:"exits"`
+}
+
+type lookView struct {
+	Room    roomView `json:"room"`
+	Players []string `json:"players"`
+	Items   []string `json:"items"`
+	NPCs    []string `json:"npcs"`
+}
+
+type statusView struct {
+	HP     int    `json:"hp"`
+	MaxHP  int    `json:"max_hp"`
+	Status string `json:"status"`
+}
+
+type questView struct {
+	QuestID  string `json:"quest_id"`
+	Status   string `json:"status"`
+	Progress string `json:"progress"`
+}
 ```
 
-(実際は1フィールドずつ `json:` タグ付きで書かれている。)
-
 - サーバーが返す JSON を受け取るための型。 `LOOK`、 `STATUS`、 `QUESTS` の応答に対応する。サーバー側で定義した形(第4章の `roomView` など)と同じ。
+- `json:` タグが応答のキーとフィールドを対応させる。たとえば `max_hp` は `MaxHP`、`quest_id` は `QuestID` に入る。
 
 ```go
 type localizedName map[string]string
@@ -5246,18 +5293,25 @@ func (name localizedName) get(locale string) string {
 }
 
 type catalogEntry struct {
-	Name localizedName `json:"name"`
+	Name        localizedName `json:"name"`
+	Description localizedName `json:"description"`
+	Hazard      *struct {
+		Type string `json:"type"`
+	} `json:"hazard"`
 }
 
 type worldCatalog struct {
+	Rooms  map[string]catalogEntry `json:"rooms"`
 	Items  map[string]catalogEntry `json:"items"`
 	NPCs   map[string]catalogEntry `json:"npcs"`
 	Quests map[string]catalogEntry `json:"quests"`
 }
 ```
 
-- `world.json` から**表示名だけ**を読むための型。サーバーの `LocalizedText`(第4章)と同じ働き。**JSONにあるキーのうち、構造体にあるものだけ**が読まれ、他は無視されるので、名前だけを取り出せる。
+- `world.json` から**表示名・説明文・危険の種類**を読むための型。`Name` と `Description` は言語ごとの文章を持つ。`Hazard` は無名構造体へのポインタで、危険が設定されていない部屋では `nil` になる。
+- **JSONにあるキーのうち、構造体にあるものだけ**が読まれ、他は無視される。GUIは部屋・アイテム・NPC・クエストの辞書を使い、サーバーの戦闘処理などはここへ読み込まない。
 - GUIが表示名を取るのは、サーバーが返すのが**IDだけ**(`LOOK` の `items` は ID の配列)だから。
+- 部屋の情報は、出口の行き先を名前で表示する処理と、ゲームオーバー画面にも使う。
 
 ### `loadCatalog`
 
@@ -5285,7 +5339,7 @@ func loadCatalog() (*worldCatalog, error) {
 }
 ```
 
-- `data/world.json` の**場所を探す**。「今のフォルダ」と「実行ファイルのあるフォルダ」から出発し、 **4階層上まで**さかのぼりながら、候補のパスを作る。
+- `data/world.json` の**場所を探す**。「今のフォルダ」と「実行ファイルのあるフォルダ」それぞれについて、**出発点を含む4階層**を調べる。親へ3回さかのぼる範囲が候補になる。
 - `filepath.Dir(base)`:1つ上のフォルダ。
 - 候補を順に試して、最初に読めたファイルを使う。どこから起動しても動くようにするための工夫。
 - `workingDirectory()` / `executableDirectory()` は、それぞれ `os.Getwd()` と `os.Executable()` の薄いラッパー。
@@ -5299,6 +5353,8 @@ func (catalog *worldCatalog) label(kind, id, locale string) string {
 	}
 	var entry catalogEntry
 	switch kind {
+	case "room":
+		entry = catalog.Rooms[id]
 	case "item":
 		entry = catalog.Items[id]
 	case "npc":
@@ -5306,17 +5362,16 @@ func (catalog *worldCatalog) label(kind, id, locale string) string {
 	case "quest":
 		entry = catalog.Quests[id]
 	}
-	name := entry.Name.get(locale)
-	if name == "" || strings.EqualFold(name, id) {
-		return id
+	if name := entry.Name.get(locale); name != "" {
+		return name
 	}
-	return name + " [" + id + "]"
+	return id
 }
 ```
 
-- 画面に出す名前を作る。 `"黄金の羊毛皮 [item.golden_fleece]"` の形(名前とIDの両方)。
+- 画面に出す名前を選ぶ。名前が見つかれば `"黄金の羊毛皮"` のように表示する。部屋の名前も `kind == "room"` で取得できる。
 - `catalog == nil`(`world.json` が読めなかった)でも**ポインタが `nil` のままメソッドを呼べる**ので、 `nil` の場合は単にIDを返す。
-- 名前が見つからない/IDと同じならIDだけ。
+- 指定した言語の名前が無ければ英語を試し、名前自体が見つからなければIDを表示する。コマンドの送信や画像の選択には引き続きIDを使う。
 
 ```go
 func decodeOK(line string, target any) error {
@@ -5333,7 +5388,26 @@ func decodeOK(line string, target any) error {
 - `"OK {...json...}"` の形の応答から、 `OK ` を外して JSON を `target` にデコードする。
 - `target any`:**どんな型へのポインタでも受け取れる**(`&lookView` でも `&statusView` でも)。
 
-## 15-3 `retro.go`(85行)— 見た目
+### `gameOverRoom`— 即死部屋の判定
+
+```go
+func (catalog *worldCatalog) gameOverRoom(roomID string) (catalogEntry, bool) {
+	if catalog == nil {
+		return catalogEntry{}, false
+	}
+	entry, ok := catalog.Rooms[roomID]
+	if !ok || entry.Hazard == nil || entry.Hazard.Type != "lethal" {
+		return catalogEntry{}, false
+	}
+	return entry, true
+}
+```
+
+- ローカルのカタログから移動先の部屋を探す。`entry, ok` の `ok` は、そのIDが辞書に存在するかを表す。
+- `Hazard.Type == "lethal"` の部屋なら、表示に使う名前・説明文と `true` を返す。カタログが無い、部屋が無い、危険が無い、種類が違う場合は `false`。
+- 15-7-7のMOVE応答で呼ばれ、ゲームオーバー画面を開くか決める。判定に使う情報は、GUIが読み込んだ `data/world.json` にある。
+
+## 15-3 `retro.go`(87行)— 見た目
 
 ```go
 //go:embed assets/fonts/DroidSansFallbackFull.ttf
@@ -5399,7 +5473,7 @@ func sceneImage() *canvas.Image {
 
 - 部屋の絵を表示する画像部品。最初は「不明の部屋」の絵。 `FillMode = Contain`(枠に収まるように拡縮)。
 
-## 15-4 `ui_locale.go`(39行)— 言語切替
+## 15-4 `ui_locale.go`(62行)— 言語切替と表示文
 
 ```go
 func (ui *gui) tr(english, japanese string) string {
@@ -5440,6 +5514,44 @@ func (ui *gui) switchLocale(locale string) {
 
 - 言語を変えると、**画面全体を作り直す**(`ui.build()`)。作り直すと入力欄の内容が消えるので、 **先に退避しておき、作り直した後に戻す**。
 - 同じ言語ならすぐ終了。 `ja` 以外は `en` 扱い。
+
+### `exitLabel`— 方角と行き先の名前
+
+```go
+var directionNames = map[string]string{"north": "北", "south": "南", "east": "東", "west": "西"}
+
+func (ui *gui) exitLabel(direction, roomID string) string {
+	name := direction
+	if ui.locale == "ja" {
+		if japanese, ok := directionNames[direction]; ok {
+			name = japanese
+		}
+	}
+	return name + ": " + ui.catalog.label("room", roomID, ui.locale)
+}
+```
+
+- 日本語のときは、辞書にある方角を「北」「東」などへ変える。辞書に無い方角は受け取った文字列を使う。
+- `catalog.label("room", ...)` で行き先の表示名を取り、「東: トロイアの浜」のように組み立てる。名前が無ければ部屋IDを表示する。
+- MOVEの選択肢と、まわりの「出口」一覧の両方で使う。
+
+### `statusWord`— HPとクエストの状態
+
+```go
+var statusWords = map[string]string{"healthy": "健康", "combat": "戦闘中", "active": "進行中", "completed": "達成"}
+
+func (ui *gui) statusWord(status string) string {
+	if ui.locale == "ja" {
+		if japanese, ok := statusWords[status]; ok {
+			return japanese
+		}
+	}
+	return status
+}
+```
+
+- 日本語表示のときに、HPの状態とクエストの状態を辞書の文章へ変える。
+- 英語表示、または辞書に無い値なら元の文字列を返す。サーバーから受け取るJSONの値はそのまま使い、表示する段階で翻訳する。
 
 ## 15-5 `art_assets.go`(87行)— 画像
 
@@ -5574,7 +5686,7 @@ func itemPhotoCard(id string) fyne.CanvasObject {
 
 - アイテムのIDから、 **金の枠付きの画像カード**(104×104)を作る。画像が無いアイテムは `nil`(カードを出さない)。
 
-## 15-7 `main.go`(883行)— 画面と操作の本体
+## 15-7 `main.go`(908行)— 画面と操作の本体
 
 ### 15-7-1 型の定義
 
@@ -5654,7 +5766,7 @@ func (ui *gui) build() {
 	ui.hostEntry.SetPlaceHolder("host:port")
 	ui.hostEntry.OnSubmitted = func(string) { ui.window.Canvas().Focus(ui.nameEntry) }
 	ui.nameEntry = widget.NewEntry()
-	ui.nameEntry.SetPlaceHolder("player name")
+	ui.nameEntry.SetPlaceHolder(ui.tr("player name", "プレイヤー名"))
 	ui.nameEntry.OnSubmitted = func(string) { ui.connect() }
 ```
 
@@ -5729,33 +5841,51 @@ func (ui *gui) build() {
 - `LOOK` / `INVENTORY` / `STATUS` などは**その場でコマンドを送る**。 `MOVE` / `TAKE` / `TALK` などは、対象を選ぶ必要があるので `chooseAction`(15-7-4)で番号付きの選択肢を出す。
 
 ```go
-	commandPane := framed(ui.tr("Commands", "コマンド"), container.NewBorder(nil, ui.rawEntry, nil, nil, container.NewVScroll(commandContent)))
-	journal := container.NewAppTabs(...)
+	choiceArea := container.NewBorder(ui.choiceTitle, nil, nil, nil, container.NewVScroll(ui.choiceBox))
+	commandTop := container.NewVBox(
+		widget.NewLabel(ui.tr("Arrows: move / Numbers: select / [ ]: item art", "矢印: 移動  /  数字: 対象を選択  /  [ ]: イラスト")),
+		ui.commandButtons, widget.NewSeparator(),
+	)
+	commandPane := framed(ui.tr("Commands", "コマンド"), container.NewBorder(commandTop, ui.rawEntry, nil, nil, choiceArea))
+	journal := container.NewAppTabs(
+		container.NewTabItem(ui.tr("Around", "まわり"), surroundings),
+		container.NewTabItem(ui.tr("Inventory", "もちもの"), container.NewVScroll(ui.inventoryBox)),
+		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(ui.questBox)),
+	)
 	right := container.NewVSplit(commandPane, framed(ui.tr("Journal", "記録"), journal))
-	right.Offset = 0.71
-	worldSplit := container.NewHSplit(scene, right)
+	right.Offset = 0.62
+	roomColumn := container.NewVSplit(scene, container.NewVScroll(ui.roomDesc))
+	roomColumn.Offset = 0.8
+	worldSplit := container.NewHSplit(roomColumn, right)
 	worldSplit.Offset = 0.61
 ```
 
-- 画面の右側(コマンド+記録)を**上下に分割**(`NewVSplit`)。
-- 全体を **左(部屋の絵)と右に分割**(`NewHSplit`)。 `Offset` は分割線の位置(0〜1)。
+- `choiceArea`に選択肢、`commandTop`に操作案内とコマンドボタンを置く。`commandPane`は、上に`commandTop`、下に生コマンド入力欄、中央に選択肢を配置する。
+- 画面の右側(コマンド+記録)を**上下に分割**(`NewVSplit`)。記録のタブには、まわり・持ち物・クエストがある。
+- 左側の`roomColumn`は、**部屋の絵と、その下の説明文**を上下に並べる。説明文は`NewVScroll`でスクロールできる。
+- 全体を左側の`roomColumn`と右側の`right`へ分割する(`NewHSplit`)。`Offset`は分割線の位置(0〜1)。右側は0.62、左側の絵は0.8、全体の左右は0.61を初期値にする。
 
 ```go
+	ui.storyLabel = widget.NewLabel(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
+	ui.storyLabel.Wrapping = fyne.TextWrapWord
+	ui.storyScroll = container.NewVScroll(ui.storyLabel)
+	adventure := ui.storyScroll
 	ui.messages = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Adventure", "ぼうけん"), adventure),
 		container.NewTabItem(ui.tr("Chat", "チャット"), chatPane),
 		container.NewTabItem(ui.tr("Log", "ログ"), ui.logScroll),
 	)
 	mainSplit := container.NewVSplit(worldSplit, framed(ui.tr("Messages", "ことば"), ui.messages))
-	mainSplit.Offset = 0.78
+	mainSplit.Offset = 0.58
 ```
 
-- 下部のメッセージ欄:「ぼうけん」(物語)、「チャット」、「ログ」の3つのタブ。上の部分と下の部分を上下に分割。
+- 下部のメッセージ欄:「ぼうけん」(物語)、「チャット」、「ログ」の3つのタブ。「ぼうけん」は`storyScroll`を使い、部屋の説明文は絵の下に置く。
+- 上の部分とメッセージ欄を上下に分割する。`mainSplit.Offset = 0.58`で、下部の物語を読む領域を確保する。
 
 ```go
 	header := container.NewVBox(
 		connectionRow, nameRow,
-		container.NewHBox(ui.statusLabel, widget.NewLabel(" | "), ui.roomCount, ... ),
+		container.NewGridWithColumns(5, ui.statusLabel, ui.roomCount, ui.totalCount, ui.hpLabel, ui.groupLabel),
 	)
 	ui.window.SetContent(container.NewBorder(framed("THE ANSWER PROTOCOL", header), nil, nil, nil, mainSplit))
 	ui.bindKeyboard()
@@ -5828,11 +5958,11 @@ func (ui *gui) chooseAction(action string) {
 		}
 		sort.Strings(directions)
 		for _, direction := range directions {
-			choices = append(choices, menuChoice{label: direction + " -> " + ui.room.Room.Exits[direction], command: "MOVE " + direction})
+			choices = append(choices, menuChoice{label: ui.exitLabel(direction, ui.room.Room.Exits[direction]), command: "MOVE " + direction})
 		}
 ```
 
-- 「MOVE」を押したときの処理。**今の部屋の出口を、方角の順に並べ**、 `"north -> loc.xxx"` の選択肢にする。選ぶとコマンド `"MOVE north"` を送る。
+- 「MOVE」を押したときの処理。**今の部屋の出口を、方角の順に並べ**、`exitLabel`で方角と行き先の名前を表示する。日本語なら「東: トロイアの浜」のようになる。選ぶとコマンド `"MOVE east"` を送る。
 
 ```go
 	case "TAKE":
@@ -5875,14 +6005,14 @@ func (ui *gui) chooseAction(action string) {
 		rows = append(rows, ui.commandButton(fmt.Sprintf("%d  %s", index+1, choice.label), func() { ui.runChoice(index) }))
 	}
 	if len(choices) > 9 {
-		rows = append(rows, widget.NewLabel(ui.tr("For targets 10+, enter the ID with /", "10件目以降は / でIDを直接入力")))
+		rows = append(rows, widget.NewLabel(ui.tr("For targets 10+, type the command after /", "10件目以降は / でコマンドを直接入力")))
 	}
 	setRows(ui.choiceBox, rows)
 }
 ```
 
 - 選択肢がなければ「対象なし」と表示。
-- あれば、 **最大9個まで番号付きのボタン**にする(キーボードの1〜9で選べる)。10個以上のときは「`/` でIDを直接入力」と案内。
+- あれば、 **最大9個まで番号付きのボタン**にする(キーボードの1〜9で選べる)。10個以上のときは、`/`で入力欄へ移り、`TAKE item.xxx`のようにコマンド全体を入力する。
 - **`index := index`**:ループ変数を、ボタンの関数(クロージャ)の中で**そのときの値のまま使う**ための書き方。(古いGoでは必須。Go 1.22以降は不要だが、害は無い。)
 
 ```go
@@ -6297,7 +6427,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 	case "STATUS":
 		var status statusView
 		if err := decodeOK(line, &status); err != nil { ... return }
-		ui.hpLabel.SetText(fmt.Sprintf("HP: %d/%d (%s)", status.HP, status.MaxHP, status.Status))
+		ui.hpLabel.SetText(fmt.Sprintf("HP: %d/%d (%s)", status.HP, status.MaxHP, ui.statusWord(status.Status)))
 	case "WHO":
 		if strings.HasPrefix(line, "OK players=") {
 			ui.setTotal(strings.TrimPrefix(line, "OK players="))
@@ -6308,8 +6438,12 @@ func (ui *gui) handleResponse(command, request, line string) {
 
 ```go
 	case "MOVE":
-		ui.addStory(ui.tr("Moved to: ", "移動: ") + strings.TrimPrefix(line, "OK room="))
+		destination := strings.TrimPrefix(line, "OK room=")
+		ui.addStory(ui.tr("Moved to: ", "移動: ") + destination)
 		ui.refresh("LOOK", "STATUS", "QUESTS")
+		if room, ok := ui.catalog.gameOverRoom(destination); ok {
+			ui.showGameOver(destination, room)
+		}
 	case "TAKE", "DROP":
 		id := strings.TrimPrefix(strings.TrimPrefix(line, "OK taken="), "OK dropped=")
 		if command == "TAKE" {
@@ -6331,7 +6465,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 ```
 
 - 行動した結果を物語欄に出し、 **変わった可能性のある情報を取り直す**(`refresh`):
-  - 移動 → 部屋・HP・依頼。
+  - 移動 → 部屋・HP・依頼。移動先がカタログ上の即死部屋なら、`showGameOver`(15-7-8)でその部屋の絵と説明を表示する。
   - 拾う/置く → 部屋・持ち物・HP・依頼。
   - 攻撃/逃げる → 部屋・HP・依頼。
   - 会話 → 台詞をポップアップ。 `OK dead`(会話で死んだ)なら部屋とHPを更新。
@@ -6427,7 +6561,7 @@ func (ui *gui) showRoom(view lookView) {
 	sort.Strings(directions)
 	for _, direction := range directions {
 		destination := view.Room.Exits[direction]
-		exits = append(exits, widget.NewLabel(direction+" -> "+destination))
+		exits = append(exits, widget.NewLabel(ui.exitLabel(direction, destination)))
 	}
 	setRows(ui.exitBox, exits)
 	var players []fyne.CanvasObject
@@ -6438,7 +6572,8 @@ func (ui *gui) showRoom(view lookView) {
 	...
 ```
 
-- 出口・人・アイテム・NPCを、それぞれラベルにして一覧の入れ物に入れ替える。出口は方角順に並べる。アイテムとNPCの名前は `catalog.label` で、表示名+IDにする。
+- 出口・人・アイテム・NPCを、それぞれラベルにして一覧の入れ物に入れ替える。出口は方角順に並べ、`exitLabel`で方角と行き先の名前を出す。アイテムとNPCは`catalog.label`で表示名を選ぶ。
+- 部屋IDは`ui.room`に保持し、`roomID`ラベルにも設定する。`build`では部屋の見出しに`roomTitle`を配置している。
 
 ```go
 func (ui *gui) showItemPhotos(ids []string) {
@@ -6479,7 +6614,7 @@ func (ui *gui) showInventory(ids []string) {
 
 func (ui *gui) showQuests(quests []questView) {
 	...
-		label := widget.NewLabel(ui.catalog.label("quest", quest.QuestID, ui.locale) + " - " + quest.Status + " " + quest.Progress)
+		label := widget.NewLabel(ui.catalog.label("quest", quest.QuestID, ui.locale) + " - " + ui.statusWord(quest.Status) + " " + quest.Progress)
 	...
 }
 
@@ -6493,7 +6628,7 @@ func setRows(box *fyne.Container, rows []fyne.CanvasObject) {
 ```
 
 - 持ち物は、 `DROP` の選択肢で使うために **コピーを `ui.inventory` に保存**する。
-- クエストは `名前 - active 2/3` の形で並べる。
+- クエストは`名前 - active 2/3`の形で並べる。日本語では`statusWord`により`active`は「進行中」、`completed`は「達成」と表示する。
 - **`setRows`**:入れ物の中身を丸ごと差し替える共通部品。空なら `- ` を1つ入れて、空欄にならないようにする。 `box.Refresh()` で再描画。
 
 ```go
@@ -6516,14 +6651,47 @@ func (ui *gui) showMessage(title, message string) {
 - `var popup *widget.PopUp` を**先に宣言**してから、ボタンの関数の中で `popup.Hide()` を使う。(ボタンを作る時点では、まだポップアップ本体が無いが、押される時にはすでに代入済みなので動く。)
 - `NewModalPopUp`:他の操作を受け付けない(モーダル)ポップアップ。
 
+#### `showGameOver`— 即死部屋の絵と説明文
+
+```go
+func (ui *gui) showGameOver(roomID string, room catalogEntry) {
+	scene := canvas.NewImageFromImage(loadArt("rooms", roomID))
+	scene.FillMode = canvas.ImageFillContain
+	scene.ScaleMode = canvas.ImageScaleSmooth
+	scene.SetMinSize(fyne.NewSize(480, 288))
+	title := widget.NewLabelWithStyle(ui.tr("GAME OVER", "ゲームオーバー")+"  -  "+room.Name.get(ui.locale), fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	story := widget.NewLabel(room.Description.get(ui.locale))
+	story.Wrapping = fyne.TextWrapWord
+	var popup *widget.PopUp
+	closeButton := widget.NewButton(ui.tr("Return to the Hall of the Fates", "運命の間へ戻る"), func() {
+		popup.Hide()
+		ui.window.Canvas().Unfocus()
+	})
+	content := framed("", container.NewBorder(title, closeButton, nil, nil, container.NewVBox(scene, story)))
+	popup = widget.NewModalPopUp(container.NewGridWrap(fyne.NewSize(540, 520), content), ui.window.Canvas())
+	popup.Show()
+	ui.window.Canvas().Focus(closeButton)
+}
+```
+
+- `loadArt("rooms", roomID)`で死亡した部屋のPNGを選ぶ。`art_assets.go`の埋め込み画像を使い、見つからなければ`unknown.png`を使う。
+- `ImageFillContain`で絵の縦横比を保ち、最小サイズを480×288にする。部屋の元画像は960×576なので、同じ縦横比になる。
+- 見出しは「ゲームオーバー」と部屋の名前。説明文はローカルの`catalogEntry.Description`から、その言語の文章を選び、折り返して表示する。
+- 絵と説明文を縦に並べ、上に見出し、下に「運命の間へ戻る」ボタンを置く。540×520のモーダルとして表示し、ボタンにフォーカスを移す。
+- サーバーの`respawnPlayerLocked`は既に復活処理を済ませている。ボタンを押すと画面を閉じてフォーカスを外し、MOVE応答で送ったLOOKなどの結果を使って冒険を続ける。
+- この画面を開く条件は、`gameOverRoom`が移動先を`lethal`と判定すること。死亡通知の文章を表示する`handleEvent`とは別の処理として、MOVE応答から呼ぶ。
+
 ```go
 func (ui *gui) addChat(line string) {
 	ui.chatLines = appendLine(ui.chatLines, line)
 	ui.chatLabel.SetText(strings.Join(ui.chatLines, "\n"))
 	ui.chatScroll.ScrollToBottom()
 }
-// addStory, addLog も同じ形
+```
 
+- `addStory`と`addLog`も、それぞれの行の記録・ラベル・スクロール部品に対して同じ流れで更新する。
+
+```go
 func appendLine(lines []string, line string) []string {
 	lines = append(lines, time.Now().Format("15:04:05")+"  "+line)
 	if len(lines) > 300 {
@@ -6549,8 +6717,8 @@ func appendLine(lines []string, line string) []string {
 
 1. **接続が来てからコマンドが処理されるまでの流れ**を説明できる?
    → `Accept` → `go handleClient` → `Scan` で1行読む → `commandHandlers` から担当関数 → 応答を返す(第1章、7-21)
-2. **なぜロックが1つなのに、他の人が固まらないのか**?
-   → 遅い書き込みは送信キュー+専用goroutineに任せ、ロック中は「積む」だけにしている(第6章、7-10)
+2. **遅いクライアントへの送信中に、共通ロックを保持し続けない理由**は?
+   → 送信キューへ積み、共通ロックを外してから`waitResponse`で書き込み完了を待つ。実際のネットワーク書き込みは専用goroutineが行う(第6章、7-10)
 3. **セーブが途中で壊れない理由**は?
    → 一時ファイルに書いて `Rename` で入れ替える(12-1)
 4. **世界のデータを変えるときは、どこを触るか**?
