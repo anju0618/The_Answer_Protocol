@@ -143,6 +143,7 @@ func (ui *gui) showInventory(ids []string) {
 		rows = append(rows, ui.itemRow(id, "DROP", ui.tr("Drop", "置く")))
 	}
 	ui.setJournalRows(ui.inventoryBox, rows, ui.tr("Your bag is empty. Pick up items in Around.", "持ち物はありません。「まわり」から道具を拾えます。"))
+	ui.showEndings()
 }
 
 func (ui *gui) showQuests(quests []questView) {

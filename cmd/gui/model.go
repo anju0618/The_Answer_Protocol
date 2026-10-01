@@ -58,7 +58,12 @@ type catalogEntry struct {
 	GiverNPCID  string            `json:"giver_npc_id"`
 	HP          int               `json:"hp"`
 	Exits       map[string]string `json:"exits"`
-	Hazard      *struct {
+	Ending      *struct {
+		ID         string        `json:"id"`
+		Name       localizedName `json:"name"`
+		RewardItem string        `json:"reward_item"`
+	} `json:"ending"`
+	Hazard *struct {
 		Type string `json:"type"`
 	} `json:"hazard"`
 }
