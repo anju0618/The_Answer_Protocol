@@ -89,7 +89,6 @@ go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
 
 ## チーム分担
 
-git履歴から確認できる大まかな分担(詳しくは英語セクションの[Group Contributions](#group-contributions)):
 - **takawaka**: サーバーの土台(TCP受付・行単位ディスパッチ、CONNECT/LOOK/MOVE、CHAT、GROUP、アイテムの永続化)とCLIクライアント
 - **amakino**: ワールド・ストーリー設計、RFC/課題分析(`TASKS.md`/`memo.md`)、戦闘・クエスト・ハザード・クルーシステムの設計と実装、神話ゲートのデータ設計、多言語対応
 
