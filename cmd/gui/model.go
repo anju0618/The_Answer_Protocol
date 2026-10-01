@@ -52,11 +52,23 @@ func (name localizedName) get(locale string) string {
 }
 
 type catalogEntry struct {
-	Name        localizedName `json:"name"`
-	Description localizedName `json:"description"`
-	Role        string        `json:"role"`
-	GiverNPCID  string        `json:"giver_npc_id"`
-	Hazard      *struct {
+	Name        localizedName     `json:"name"`
+	Description localizedName     `json:"description"`
+	Role        string            `json:"role"`
+	GiverNPCID  string            `json:"giver_npc_id"`
+	HP          int               `json:"hp"`
+	Exits       map[string]string `json:"exits"`
+	Ending      *struct {
+		ID         string        `json:"id"`
+		Name       localizedName `json:"name"`
+		RewardItem string        `json:"reward_item"`
+		Blessing   *struct {
+			God         localizedName `json:"god"`
+			Name        localizedName `json:"name"`
+			Description localizedName `json:"description"`
+		} `json:"blessing"`
+	} `json:"ending"`
+	Hazard *struct {
 		Type string `json:"type"`
 	} `json:"hazard"`
 }

@@ -59,6 +59,8 @@ type World struct {
 	Items       map[string]*Item  `json:"items"`
 	NPCs        map[string]*NPC   `json:"npcs"`
 	Quests      map[string]*Quest `json:"quests"`
+	// Hints maps what killed a player (an NPC, room or item ID) to the Moirai's hint about it.
+	Hints map[string]LocalizedText `json:"hints,omitempty"`
 }
 
 func loadWorld(path string) (*World, error) {
@@ -122,6 +124,11 @@ func (w *World) validate() error {
 			default:
 				return fmt.Errorf("room %q has unknown hazard type %q", id, h.Type)
 			}
+		}
+	}
+	for subject := range w.Hints {
+		if w.Rooms[subject] == nil && w.Items[subject] == nil && w.NPCs[subject] == nil {
+			return fmt.Errorf("hint is about unknown room, item or NPC %q", subject)
 		}
 	}
 	for id, item := range w.Items {

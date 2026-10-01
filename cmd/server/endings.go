@@ -6,6 +6,23 @@ import (
 	"strings"
 )
 
+// Blessing is a permanent boon from the god of an arc, earned by reaching that arc's ending.
+// It is derived from the endings a player has reached, so nothing extra is stored on the player.
+type Blessing struct {
+	God         LocalizedText `json:"god"`
+	Name        LocalizedText `json:"name"`
+	Description LocalizedText `json:"description"`
+	Effect      string        `json:"effect"`
+	Value       int           `json:"value"`
+}
+
+const (
+	blessingCounterReduction = "counter_reduction" // enemy counter-attacks hurt Value% less
+	blessingRegenBonus       = "regen_bonus"       // Value extra HP every regen tick
+	blessingDamageBonus      = "damage_bonus"      // Value extra damage on every hit
+	maxCounterReduction      = 80                  // allies (3 x 20%) plus a blessing never reach 100%
+)
+
 type Ending struct {
 	ID              string          `json:"id"`
 	Name            LocalizedText   `json:"name"`
@@ -13,6 +30,7 @@ type Ending struct {
 	RequiresQuests  []string        `json:"requires_quests,omitempty"`
 	RequiresEndings []string        `json:"requires_endings,omitempty"`
 	RewardItem      string          `json:"reward_item,omitempty"`
+	Blessing        *Blessing       `json:"blessing,omitempty"`
 	Hint            LocalizedText   `json:"hint"`
 	Text            []LocalizedText `json:"text"`
 }
@@ -42,6 +60,16 @@ func (w *World) validateEndings() error {
 		for _, questID := range e.RequiresQuests {
 			if w.Quests[questID] == nil {
 				return fmt.Errorf("ending %q requires unknown quest %q", e.ID, questID)
+			}
+		}
+		if b := e.Blessing; b != nil {
+			switch b.Effect {
+			case blessingCounterReduction, blessingRegenBonus, blessingDamageBonus:
+			default:
+				return fmt.Errorf("ending %q blessing has unknown effect %q", e.ID, b.Effect)
+			}
+			if b.Value < 1 || b.God["en"] == "" || b.Name["en"] == "" || b.Name["ja"] == "" || b.God["ja"] == "" {
+				return fmt.Errorf("ending %q blessing needs a positive value and en/ja god and name", e.ID)
 			}
 		}
 		if e.RewardItem != "" {
@@ -108,6 +136,23 @@ func (s *Server) missingForEndingLocked(player *Player, e *Ending, locale string
 		}
 	}
 	return missing
+}
+
+// blessingTotalLocked adds up one effect over every blessing the player has earned.
+func (s *Server) blessingTotalLocked(player *Player, effect string) int {
+	if s.world == nil {
+		return 0
+	}
+	total := 0
+	for _, npc := range s.world.NPCs {
+		if npc == nil || npc.Ending == nil || npc.Ending.Blessing == nil {
+			continue
+		}
+		if b := npc.Ending.Blessing; b.Effect == effect && player.Endings[npc.Ending.ID] {
+			total += b.Value
+		}
+	}
+	return total
 }
 
 func (s *Server) sendEndingLocked(name, text string) {
@@ -185,6 +230,12 @@ func (s *Server) talkEndingLocked(player *Player, npc *NPC) {
 			"en": "You received: %s (see INVENTORY).",
 			"ja": "報酬を受け取った: %s(INVENTORYで確認できる)。",
 		}.Format(locale, reward.Name.Get(locale)))
+	}
+	if b := e.Blessing; b != nil {
+		s.sendEndingLocked(player.Name, LocalizedText{
+			"en": "%s grants you her blessing, for good: %s. %s",
+			"ja": "%sの祝福を受けた(永続): %s。%s",
+		}.Format(locale, b.God.Get(locale), b.Name.Get(locale), b.Description.Get(locale)))
 	}
 	s.sendEndingProgressLocked(player)
 }

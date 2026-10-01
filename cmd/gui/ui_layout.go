@@ -34,6 +34,7 @@ func (ui *gui) build() {
 	ui.totalCount = compactLabel(ui.tr("Online: -", "全体: - 人"))
 	ui.hpLabel = compactLabel("HP: -")
 	ui.crewLabel = compactLabel(ui.tr("Crew: -", "仲間: - 人"))
+	ui.hpBar, ui.crewBar = newStatBar(), newStatBar()
 	ui.groupLabel = compactLabel(ui.tr("Group: -", "グループ: -"))
 
 	ui.roomTitle = widget.NewLabelWithStyle(ui.tr("Your journey", "冒険の旅"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
@@ -46,6 +47,7 @@ func (ui *gui) build() {
 	ui.npcBox = container.NewVBox()
 	ui.inventoryBox = container.NewVBox()
 	ui.questBox = container.NewVBox()
+	ui.endingBox = newEndingBox()
 	ui.choiceTitle = widget.NewLabel("")
 	ui.choiceBox = container.NewVBox()
 	ui.itemPhotoBox = container.NewHBox()
@@ -60,7 +62,8 @@ func (ui *gui) build() {
 	ui.photoStrip = container.NewGridWrap(fyne.NewSize(290, 112), photos)
 	ui.photoStrip.Hide()
 	photoOverlay := container.NewHBox(layout.NewSpacer(), ui.photoStrip)
-	sceneVisual := container.NewStack(ui.scene, container.NewBorder(nil, photoOverlay, nil, nil))
+	ui.flash = newFlashLayer()
+	sceneVisual := container.NewStack(ui.scene, ui.flash, container.NewBorder(nil, photoOverlay, nil, nil))
 	sceneFrame := canvas.NewRectangle(ink)
 	sceneFrame.StrokeColor = gold
 	sceneFrame.StrokeWidth = 1
@@ -77,7 +80,8 @@ func (ui *gui) build() {
 	ui.journal = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Around", "まわり"), container.NewVScroll(surroundings)),
 		container.NewTabItem(ui.tr("Inventory", "持ち物"), container.NewVScroll(ui.inventoryBox)),
-		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(ui.questBox)),
+		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(container.NewVBox(ui.questBox, ui.endingBox))),
+		container.NewTabItem(ui.tr("Map", "地図"), ui.buildMapTab()),
 	)
 	ui.journal.OnSelected = func(item *container.TabItem) {
 		if !ui.connected {
@@ -96,7 +100,8 @@ func (ui *gui) build() {
 		ui.commandButton(ui.tr("Flee", "逃げる"), func() { ui.send("FLEE") }),
 		ui.commandButton(ui.tr("Chat", "チャット"), ui.focusChat),
 	)
-	ui.detailPanel = container.NewBorder(nil, ui.commandButtons, nil, nil, ui.journal)
+	ui.buildCombatPanel()
+	ui.detailPanel = container.NewBorder(ui.combatPanel, ui.commandButtons, nil, nil, ui.journal)
 	ui.playArea = container.New(&adventureLayout{}, ui.scenePanel, ui.detailPanel)
 
 	ui.chatScope = widget.NewSelect([]string{"GLOBAL", "ROOM", "GROUP"}, nil)
@@ -112,9 +117,8 @@ func (ui *gui) build() {
 	ui.logLabel = widget.NewLabel("")
 	ui.logLabel.Wrapping = fyne.TextWrapWord
 	ui.logScroll = container.NewVScroll(ui.logLabel)
-	ui.storyLabel = widget.NewLabel(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
-	ui.storyLabel.Wrapping = fyne.TextWrapWord
-	ui.storyScroll = container.NewVScroll(ui.storyLabel)
+	ui.storyText = newStoryText()
+	ui.storyScroll = container.NewVScroll(ui.storyText)
 	ui.messages = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Adventure", "ぼうけん"), ui.storyScroll),
 		container.NewTabItem(ui.tr("Chat", "チャット"), chatPane),
@@ -125,7 +129,7 @@ func (ui *gui) build() {
 	brand.TextStyle.Bold = true
 	header := container.NewBorder(nil, nil, brand,
 		container.NewHBox(ui.languageSelect, ui.settingsButton, ui.connectButton, ui.quitButton))
-	stats := container.New(&statsLayout{}, ui.hpLabel, ui.crewLabel, ui.groupLabel, ui.roomCount, ui.totalCount, ui.statusLabel)
+	stats := container.New(&statsLayout{}, container.NewStack(ui.hpBar.box, ui.hpLabel), container.NewStack(ui.crewBar.box, ui.crewLabel), ui.groupLabel, ui.roomCount, ui.totalCount, ui.statusLabel)
 	ui.window.SetContent(container.NewPadded(container.New(&screenLayout{}, header, stats, ui.playArea, ui.messages)))
 	ui.languageSelect.OnChanged = func(selection string) {
 		if ui.client != nil || ui.connected || ui.dialing {
@@ -140,15 +144,22 @@ func (ui *gui) build() {
 	ui.showRoom(lookView{})
 	ui.showInventory(nil)
 	ui.showQuests(nil)
+	ui.showEndings()
 	for _, saved := range []struct {
 		lines []string
 		label *widget.Label
 	}{
-		{ui.chatLines, ui.chatLabel}, {ui.storyLines, ui.storyLabel}, {ui.logLines, ui.logLabel},
+		{ui.chatLines, ui.chatLabel}, {ui.logLines, ui.logLabel},
 	} {
 		if len(saved.lines) > 0 {
 			saved.label.SetText(strings.Join(saved.lines, "\n"))
 		}
+	}
+	if len(ui.storyLines) > 0 {
+		ui.storyText.Segments = storySegments(ui.storyLines)
+		ui.storyText.Refresh()
+	} else {
+		ui.addStory(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
 	}
 }
 
@@ -190,9 +201,9 @@ func (*screenLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	if size.Width < 1000 {
 		statsHeight = 60 + gap
 	}
-	messagesHeight := min(float32(150), size.Height*0.18)
+	messagesHeight := min(float32(230), size.Height*0.26)
 	if size.Width < 960 {
-		messagesHeight = min(float32(120), size.Height*0.16)
+		messagesHeight = min(float32(170), size.Height*0.22)
 	}
 	playHeight := max(float32(0), size.Height-headerHeight-statsHeight-messagesHeight-3*gap)
 	y := float32(0)

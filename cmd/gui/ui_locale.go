@@ -36,6 +36,7 @@ func (ui *gui) switchLocale(locale string) {
 	ui.showInventory(inventory)
 	ui.showQuests(quests)
 	ui.showState(state)
+	ui.showFight(ui.fight)
 	if ui.client != nil {
 		ui.connectButton.Disable()
 		ui.settingsButton.Disable()

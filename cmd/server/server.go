@@ -191,7 +191,7 @@ func (s *Server) playerForUpdateLocked(name string) *Player {
 	if player == nil || player.exiting {
 		return nil
 	}
-	player.regenLocked(time.Now())
+	player.regenLocked(time.Now(), s.blessingTotalLocked(player, blessingRegenBonus))
 	return player
 }
 
@@ -228,6 +228,7 @@ var commandHandlers = map[string]commandHandler{
 	"TALK":      handleTalk,
 	"ATTACK":    handleAttack,
 	"FLEE":      handleFlee,
+	"DEFEND":    handleDefend,
 	"STATUS":    handleStatus,
 	"STATE":     handleState,
 	"QUEST":     handleQuest,
@@ -386,13 +387,13 @@ func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	if _, blocker := s.blockingEnemyLocked(player, player.RoomID); blocker != nil {
+	if blockerID, blocker := s.blockingEnemyLocked(player, player.RoomID); blocker != nil {
 		encounterRoomID := player.RoomID
 		locale := clientLocale(conn)
 		client := conn.(*serverClient)
 		response, err := client.enqueueResponse("OK room=" + destination)
 		if err == nil {
-			s.respawnPlayerLocked(player, *name, "slip_past", blocker.Name.Get(locale))
+			s.respawnPlayerLocked(player, *name, "slip_past", blockerID, blocker.Name.Get(locale))
 			s.broadcastFlavorLocked(encounterRoomID, flavor{key: "slip_past", player: *name, npc: blocker})
 		}
 		s.mu.Unlock()
@@ -699,7 +700,7 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 		client := conn.(*serverClient)
 		response, err := client.enqueueResponse("OK dead")
 		if err == nil {
-			s.respawnPlayerLocked(player, *name, "talk_unprepared", npc.Name.Get(locale))
+			s.respawnPlayerLocked(player, *name, "talk_unprepared", npcID, npc.Name.Get(locale))
 			s.broadcastFlavorLocked(encounterRoomID, flavor{key: "talk_unprepared", player: *name, npc: npc})
 		}
 		s.mu.Unlock()
@@ -726,6 +727,7 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 		if npc.Guide {
 
 			s.sendGuideLocked(*name, 1)
+			s.sendDeathHintLocked(player, *name)
 		}
 		s.sendQuestHintLocked(player, npcID)
 		s.talkEndingLocked(player, npc)
@@ -753,7 +755,7 @@ func handleStatus(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	player.regenLocked(time.Now())
+	player.regenLocked(time.Now(), s.blessingTotalLocked(player, blessingRegenBonus))
 	status := "healthy"
 	if player.CombatTargetID != "" {
 		status = "combat"

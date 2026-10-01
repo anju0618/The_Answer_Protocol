@@ -8,20 +8,22 @@ type PlayerQuest struct {
 }
 
 type Player struct {
-	Name            string                  `json:"name"`
-	HP              int                     `json:"hp"`
-	RoomID          string                  `json:"room_id"`
-	Inventory       []string                `json:"inventory"`
-	Crew            int                     `json:"crew,omitempty"`
-	CrewInitialized bool                    `json:"crew_initialized,omitempty"`
-	IntroSeen       bool                    `json:"intro_seen,omitempty"`
-	CombatTargetID  string                  `json:"combat_target_id,omitempty"`
-	FledFrom        map[string]bool         `json:"fled_from,omitempty"`
-	Quests          map[string]*PlayerQuest `json:"quests,omitempty"`
-	Endings         map[string]bool         `json:"endings,omitempty"`
-	EnemyHP         map[string]int          `json:"enemy_hp,omitempty"`
-	lastRegen       time.Time
-	exiting         bool
+	Name             string                  `json:"name"`
+	HP               int                     `json:"hp"`
+	RoomID           string                  `json:"room_id"`
+	Inventory        []string                `json:"inventory"`
+	Crew             int                     `json:"crew,omitempty"`
+	CrewInitialized  bool                    `json:"crew_initialized,omitempty"`
+	IntroSeen        bool                    `json:"intro_seen,omitempty"`
+	LastDeathSubject string                  `json:"last_death_subject,omitempty"`
+	CombatTargetID   string                  `json:"combat_target_id,omitempty"`
+	FledFrom         map[string]bool         `json:"fled_from,omitempty"`
+	Quests           map[string]*PlayerQuest `json:"quests,omitempty"`
+	Endings          map[string]bool         `json:"endings,omitempty"`
+	EnemyHP          map[string]int          `json:"enemy_hp,omitempty"`
+	lastRegen        time.Time
+	guarding         bool // braced with DEFEND: the next counter-attack is halved (not saved)
+	exiting          bool
 }
 
 func (p *Player) hasItem(itemID string) bool {
@@ -69,7 +71,8 @@ const (
 	regenAmount   = 1
 )
 
-func (p *Player) regenLocked(now time.Time) {
+// regenLocked heals over time; bonus is extra HP per tick (Hera's blessing).
+func (p *Player) regenLocked(now time.Time, bonus int) {
 	if p.HP >= maxPlayerHP || p.lastRegen.IsZero() {
 		p.lastRegen = now
 		return
@@ -78,7 +81,7 @@ func (p *Player) regenLocked(now time.Time) {
 	if ticks <= 0 {
 		return
 	}
-	p.HP += ticks * regenAmount
+	p.HP += ticks * (regenAmount + bonus)
 	if p.HP >= maxPlayerHP {
 		p.HP = maxPlayerHP
 		p.lastRegen = now
