@@ -22,6 +22,7 @@ type Player struct {
 	Endings          map[string]bool         `json:"endings,omitempty"`
 	EnemyHP          map[string]int          `json:"enemy_hp,omitempty"`
 	lastRegen        time.Time
+	guarding         bool // braced with DEFEND: the next counter-attack is halved (not saved)
 	exiting          bool
 }
 

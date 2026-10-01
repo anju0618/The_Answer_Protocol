@@ -61,3 +61,12 @@ func TestUnparsableAttackFallsBackToRawText(t *testing.T) {
 		t.Fatalf("fallback story = %q, fight = %+v", last.text, ui.fight)
 	}
 }
+
+func TestDefendResponseIsExplainedAndRefreshesStatus(t *testing.T) {
+	ui := newCombatTestUI(t)
+	ui.handleResponse("DEFEND", "DEFEND", `OK {"hp":80,"result":"braced"}`)
+	last := ui.storyLines[len(ui.storyLines)-1]
+	if last.kind != storyCombat || last.text != "You brace yourself. The next counter-attack will hurt half as much." {
+		t.Fatalf("story = %+v", last)
+	}
+}
