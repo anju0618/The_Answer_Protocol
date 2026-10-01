@@ -34,6 +34,7 @@ func (ui *gui) build() {
 	ui.totalCount = compactLabel(ui.tr("Online: -", "全体: - 人"))
 	ui.hpLabel = compactLabel("HP: -")
 	ui.crewLabel = compactLabel(ui.tr("Crew: -", "仲間: - 人"))
+	ui.hpBar, ui.crewBar = newStatBar(), newStatBar()
 	ui.groupLabel = compactLabel(ui.tr("Group: -", "グループ: -"))
 
 	ui.roomTitle = widget.NewLabelWithStyle(ui.tr("Your journey", "冒険の旅"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
@@ -125,7 +126,7 @@ func (ui *gui) build() {
 	brand.TextStyle.Bold = true
 	header := container.NewBorder(nil, nil, brand,
 		container.NewHBox(ui.languageSelect, ui.settingsButton, ui.connectButton, ui.quitButton))
-	stats := container.New(&statsLayout{}, ui.hpLabel, ui.crewLabel, ui.groupLabel, ui.roomCount, ui.totalCount, ui.statusLabel)
+	stats := container.New(&statsLayout{}, container.NewStack(ui.hpBar.box, ui.hpLabel), container.NewStack(ui.crewBar.box, ui.crewLabel), ui.groupLabel, ui.roomCount, ui.totalCount, ui.statusLabel)
 	ui.window.SetContent(container.NewPadded(container.New(&screenLayout{}, header, stats, ui.playArea, ui.messages)))
 	ui.languageSelect.OnChanged = func(selection string) {
 		if ui.client != nil || ui.connected || ui.dialing {
