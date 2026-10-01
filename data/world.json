@@ -2310,5 +2310,95 @@
         "hp": 10
       }
     }
+  },
+  "hints": {
+    "npc.polyphemus": {
+      "en": "Odysseus did not fight the Cyclops with bare hands. A stake of olive wood, hardened in fire, did the work.",
+      "ja": "オデュッセウスは素手で一つ目の巨人に挑んだのではない。火で固めたオリーブの杭が、その役目を果たした。"
+    },
+    "npc.laestrygonian": {
+      "en": "Only one ship escaped the Laestrygonians: the one that never entered their harbor, and fled.",
+      "ja": "ライストリュゴネス人から逃れた船は一隻だけ。港に入らず、ただ逃げた船だ。"
+    },
+    "npc.circe": {
+      "en": "Hermes gave Odysseus a plant with a black root and a milk-white flower before he met Circe.",
+      "ja": "ヘルメスは、キルケに会う前のオデュッセウスに、黒い根と乳白色の花をもつ草を授けた。"
+    },
+    "npc.scylla": {
+      "en": "No one fights Scylla. The strait takes its toll, and the ship passes.",
+      "ja": "スキュラと戦う者はいない。海峡は代償を取り、船は通り抜ける。"
+    },
+    "npc.antinous": {
+      "en": "Only one man in the hall could string that great bow, and the suitors knew it was not them.",
+      "ja": "広間であの大弓に弦を張れる者は一人だけ。求婚者たちにそれができないことは、彼ら自身が知っていた。"
+    },
+    "npc.amycus": {
+      "en": "Even a boxing king falls to those who come prepared; ask who among the Argonauts was known for his fists.",
+      "ja": "拳闘の王とて、備えた者には倒れる。アルゴ号の乗員で、拳で名高かったのは誰か。"
+    },
+    "npc.harpy": {
+      "en": "Strike the Harpy and ask who is fast enough to chase it: the winged sons of the North Wind.",
+      "ja": "ハルピュイアに挑むなら、追いつける速さの者は誰か。北風の翼ある息子たちを思い出せ。"
+    },
+    "npc.khalkotauroi": {
+      "en": "Medea's ointment kept Jason from the bulls' fire.",
+      "ja": "メディアの塗り薬が、イアソンを雄牛の炎から守った。"
+    },
+    "npc.colchis_dragon": {
+      "en": "The sleepless dragon was put to sleep by Medea's draught, not by a sword.",
+      "ja": "眠らぬ竜を眠らせたのは剣ではなく、メディアの薬だった。"
+    },
+    "npc.talos": {
+      "en": "Talos had a single vein sealed at the ankle. Who among the Argonauts knew how to unmake him?",
+      "ja": "タロスの命は足首の一本の血管に封じられていた。それを解く術を知っていたのは誰か。"
+    },
+    "npc.hector": {
+      "en": "Hector wore Achilles' old armor once, and only Achilles' armor was worth fighting him in.",
+      "ja": "ヘクトルが戦ったのは、アキレウスの武具をまとった者だった。"
+    },
+    "loc.ody_sirens": {
+      "en": "Odysseus plugged his crew's ears with wax and had himself bound to the mast.",
+      "ja": "オデュッセウスは仲間の耳を蜜蝋でふさぎ、自分は帆柱に縛りつけた。"
+    },
+    "loc.ody_scylla": {
+      "en": "Scylla takes six men, but not a ship. Know how many are aboard before you sail in.",
+      "ja": "スキュラは六人を奪うが、船までは奪わない。入る前に、何人乗っているか数えておけ。"
+    },
+    "loc.ody_charybdis": {
+      "en": "When Odysseus sailed between the two, he kept close to the cliff and away from the whirlpool.",
+      "ja": "両者の間を進んだとき、オデュッセウスは渦を避けて断崖に寄せて舵を取った。"
+    },
+    "loc.ody_ismarus_feast": {
+      "en": "Odysseus's men wanted to stay and feast on the shore of Ismarus. It cost them dearly.",
+      "ja": "仲間たちはイスマロスの浜に留まって宴を望んだ。その代償は大きかった。"
+    },
+    "loc.ody_lotus_garden": {
+      "en": "Whoever tastes what the Lotus-Eaters offer forgets the way home.",
+      "ja": "ロトパゴス人の差し出すものを口にした者は、故郷への道を忘れる。"
+    },
+    "loc.ody_sealed_cave": {
+      "en": "Odysseus did not slay the sleeping Cyclops: who else could move the boulder at the cave mouth?",
+      "ja": "眠る巨人を討たなかったのは、洞窟の入口の岩を動かせるのが彼だけだからだ。"
+    },
+    "loc.ody_laestrygonian_depths": {
+      "en": "The captain who moored inside the inner harbor never sailed out again.",
+      "ja": "奥の港に船をつないだ船長は、二度と出てこなかった。"
+    },
+    "loc.ody_pigsty": {
+      "en": "Circe's cup turns men into swine, unless you carry what Hermes gave.",
+      "ja": "キルケの杯は人を豚に変える。ヘルメスの贈り物を持たない者は。"
+    },
+    "loc.ody_eternal_ogygia": {
+      "en": "Calypso offered immortality; Odysseus asked only to go home.",
+      "ja": "カリュプソは不死を差し出した。オデュッセウスが望んだのは故郷だけだった。"
+    },
+    "item.lotus_fruit": {
+      "en": "A sweet fruit, and a sweeter forgetting. Leave it be.",
+      "ja": "甘い実、さらに甘い忘却。手を出さないことだ。"
+    },
+    "item.sacred_cattle": {
+      "en": "The cattle of the Sun are not food, and the Sun sees everything.",
+      "ja": "太陽神の牛は食べ物ではない。太陽はすべてを見ている。"
+    }
   }
 }

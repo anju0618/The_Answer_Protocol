@@ -34,7 +34,7 @@ func TestStoryEventsAreColouredByKind(t *testing.T) {
 
 func TestStoryColourNamesResolveInTheme(t *testing.T) {
 	th := retroTheme{base: nil}
-	for _, kind := range []storyKind{storyDeath, storyQuest, storyCombat, storyEnding, storyTeam, storyError} {
+	for _, kind := range []storyKind{storyDeath, storyQuest, storyCombat, storyEnding, storyTeam, storyError, storyHint} {
 		name := storyColorName(kind)
 		if _, ok := storyColor(name); !ok {
 			t.Errorf("kind %v: colour name %q has no colour", kind, name)

@@ -12,7 +12,10 @@ var randDamage = func(min, max int) int {
 	return min + rand.IntN(max-min+1)
 }
 
-func (s *Server) respawnPlayerLocked(player *Player, name, cause string, args ...any) {
+// respawnPlayerLocked kills the player and sends them back to the hub.
+// subject is the ID of the NPC, room or item that caused the death; the Moirai can later turn it into a hint.
+func (s *Server) respawnPlayerLocked(player *Player, name, cause, subject string, args ...any) {
+	player.LastDeathSubject = subject
 	outcome := s.applyDeathPenaltyLocked(player, name)
 	s.notifyDeathLocked(name, cause, outcome, args...)
 	oldRoomID := player.RoomID
@@ -92,7 +95,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		result = combatResult{player.HP, enemyHP, 0, "overwhelmed"}
 
 	case npc.hasMythRequirement() && !player.meetsMythRequirement(npc):
-		s.respawnPlayerLocked(player, *name, "attack_unprepared", npc.Name.Get(locale))
+		s.respawnPlayerLocked(player, *name, "attack_unprepared", npcID, npc.Name.Get(locale))
 		event = flavor{key: "attack_unprepared", player: *name, npc: npc}
 		result = combatResult{0, enemyHP, 0, "dead"}
 
@@ -118,7 +121,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 			counter = max(1, counter*(100-bonus*allyCounterReductionPercent)/100)
 			player.HP -= counter
 			if player.HP <= 0 {
-				s.respawnPlayerLocked(player, *name, "attack_counter", npc.Name.Get(locale))
+				s.respawnPlayerLocked(player, *name, "attack_counter", npcID, npc.Name.Get(locale))
 				event = flavor{key: "attack_struck_down", player: *name, npc: npc}
 				result = combatResult{0, enemyHP, damage, "dead"}
 			} else {
@@ -195,7 +198,7 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 		counter := randDamage(counterMinDamage, counterMaxDamage)
 		player.HP -= counter
 		if player.HP <= 0 {
-			s.respawnPlayerLocked(player, *name, "flee_failed", npc.Name.Get(locale))
+			s.respawnPlayerLocked(player, *name, "flee_failed", targetID, npc.Name.Get(locale))
 			result = "failure_dead"
 			event = flavor{key: "flee_dead", player: *name, npc: npc}
 		} else {
