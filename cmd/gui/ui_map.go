@@ -134,7 +134,7 @@ func (ui *gui) roomMapColor(roomID string) color.Color {
 // refreshMap redraws the whole minimap: visited rooms are coloured, rooms next to
 // a visited room are shown as dim "unknown" cells, everything else stays hidden.
 func (ui *gui) refreshMap() {
-	if ui.mapBox == nil || ui.catalog == nil {
+	if ui.catalog == nil {
 		return
 	}
 	arc := arcOf(ui.room.Room.ID)
@@ -146,6 +146,14 @@ func (ui *gui) refreshMap() {
 	}
 	ui.lastArc = arc
 	positions := computeMapLayout(ui.catalog, arc)
+	for _, box := range []*fyne.Container{ui.mapBox, ui.sceneMapBox} {
+		if box != nil {
+			ui.redrawMap(box, positions)
+		}
+	}
+}
+
+func (ui *gui) redrawMap(box *fyne.Container, positions map[string]gridPos) {
 	layout := &mapLayout{}
 	first := true
 	for _, pos := range positions {
@@ -199,23 +207,27 @@ func (ui *gui) refreshMap() {
 		cells = append(cells, mapCell{obj: rect, pos: pos})
 	}
 	layout.cells = append(lines, cells...)
-	ui.mapBox.Layout = layout
-	ui.mapBox.Objects = nil
+	box.Layout = layout
+	box.Objects = nil
 	for _, item := range layout.cells {
-		ui.mapBox.Objects = append(ui.mapBox.Objects, item.obj)
+		box.Objects = append(box.Objects, item.obj)
 	}
-	ui.mapBox.Refresh()
+	box.Refresh()
 }
 
 func (ui *gui) buildMapTab() fyne.CanvasObject {
 	ui.mapBox = container.NewWithoutLayout()
+	return container.NewVScroll(ui.mapView(ui.mapBox))
+}
+
+func (ui *gui) mapView(box *fyne.Container) fyne.CanvasObject {
 	legend := container.NewGridWithColumns(2,
 		legendEntry(mapHub, ui.tr("Hub", "ハブ")),
 		legendEntry(mapVisited, ui.tr("Visited", "訪れた")),
 		legendEntry(mapHazard, ui.tr("Hazard", "危険")),
 		legendEntry(mapLethal, ui.tr("Fatal", "即死")),
 	)
-	return container.NewVScroll(container.NewBorder(nil, legend, nil, nil, ui.mapBox))
+	return container.NewBorder(nil, legend, nil, nil, box)
 }
 
 func legendEntry(c color.Color, text string) fyne.CanvasObject {
