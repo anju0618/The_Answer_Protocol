@@ -2,212 +2,11 @@
 
 # The Answer Protocol (TAP)
 
-[日本語版はこちら](#日本語版) ・ [English version below](#english-original-submission)
+[English](#english) ・ [日本語版は下にあります (Japanese version below)](#日本語版)
 
 ---
 
-# 日本語版
-
-
-## 動かし方
-
-```sh
-# サーバー起動(ポート4242で待ち受け、Ctrl-Cで終了)
-go run ./cmd/server
-
-# 別ターミナルでCLIクライアント接続(デフォルトは127.0.0.1:4242)
-go run ./cmd/cli
-go run ./cmd/cli 127.0.0.1:4242   # ホスト:ポートを指定する場合
-
-# バイナリとしてビルドする場合
-go build -o server ./cmd/server && ./server
-go build -o cli ./cmd/cli && ./cli
-```
-
-CLIは「生プロトコルをそのまま中継する」方針(打った行がそのままサーバーに送られ、サーバーの応答行がそのまま表示される)。最初のコマンドは必ず`CONNECT <name>`。日本語版で遊びたい場合は、`CONNECT`より前に`LANG ja`を送る(8章参照)。
-
-```
-$ go run ./cmd/cli
-Connected to 127.0.0.1:4242
-OK hello proto=1
-LANG ja
-OK lang=ja
-CONNECT alice
-OK connected
-LOOK
-OK {"room":{...,"name":"運命の間",...}, ...}
-```
-
-## コマンド一覧
-
-RFC 15コマンド + 独自拡張2つ(`FLEE`・`LANG`、下表に明記)。正式な仕様は`protocol-rfc.html` 5章、英語セクションの[Command list](#command-list)も参照。
-
-| コマンド | 構文 | 内容 |
-|---|---|---|
-| `CONNECT` | `CONNECT <name>` | `<name>`で認証。`LANG`を送る場合を除き最初に送るコマンド。 |
-| `LANG`(独自) | `LANG <en\|ja>` | このコネクションのストーリー言語を選択。**`CONNECT`より前**に送ること。 |
-| `LOOK` | `LOOK` | 現在の部屋(名前・説明・プレイヤー・アイテムID・NPC ID・出口)を取得。 |
-| `MOVE` | `MOVE <方向>` | 出口を通って移動(例: `MOVE east`)。 |
-| `TAKE` | `TAKE <アイテムIDまたは名前>` | 部屋にあるアイテムを取得。 |
-| `DROP` | `DROP <アイテムIDまたは名前>` | 所持品を部屋に置く。 |
-| `INVENTORY` | `INVENTORY` | 所持品一覧。 |
-| `TALK` | `TALK <NPC IDまたは名前>` | 部屋にいるNPCと話す。 |
-| `ATTACK` | `ATTACK <NPC IDまたは名前>` | 敵NPCを攻撃。 |
-| `FLEE`(独自) | `FLEE` | 現在の戦闘から離脱。戦闘中のみ有効。 |
-| `STATUS` | `STATUS` | 自分のHP・戦闘状態を確認。 |
-| `QUEST` | `QUEST <NPC IDまたは名前>` | そのNPCが持つクエストを受注。 |
-| `QUESTS` | `QUESTS` | これまで受注した全クエストと進行状況を一覧表示。 |
-| `CHAT` | `CHAT <GLOBAL\|ROOM\|GROUP> <メッセージ>` | 指定した範囲にチャット送信。 |
-| `WHO` | `WHO` | 現在の接続プレイヤー数。 |
-| `GROUP` | `GROUP CREATE` / `GROUP INVITE <name>` / `GROUP JOIN <leader>` / `GROUP LEAVE` | `CHAT GROUP`用のグループ管理。 |
-| `QUIT` | `QUIT` | 正常に切断する。 |
-
-## テストの実行
-
-```sh
-go vet ./...
-gofmt -l .            # 何も出なければOK
-go test ./...
-go test -race ./cmd/server/...
-```
-
-特定のテストだけ実行したいとき:
-```sh
-go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
-```
-
-## 各システムの概要
-
-英語セクションの各見出し([Architecture](#architecture)、[Protocol Implementation](#protocol-implementation)、[Combat System](#combat-system)、[Quest System](#quest-system)、[World Design](#world-design)、[Server Logging](#server-logging))に詳しく書いてあるので、ここでは要点だけ:
-
-- **並行モデル**: 接続ごとに1 goroutine + サーバー状態全体を単一の`sync.Mutex`で保護、という単純な方式。実装の正しさを優先した(`memo.md` 2章)。
-- **戦闘**: ATTACKは基本8〜14ダメージ・反撃6〜12ダメージのランダム。一部の敵は「正しいアイテム/達成済みクエスト」を持っていないとATTACKで即死する「神話ゲート」付き。HP0で運命の間にHP20でリスポーン。**生きている敵がいる部屋はMOVEで出ようとすると即死**(倒すかFLEEで振り切るまで封鎖)。
-- **クエスト**: `QUEST <npc>`で受注、TAKE/ATTACKの成否をサーバー側が自動で判定して進行・達成・報酬付与まで行う(完了報告コマンドは無し)。
-- **ワールド**: 46部屋・アイテム21種(取得できるもの17種+記念品4種)・NPC 43・クエスト16種。ハブ(運命の間)からは東のオデュッセイア編(22部屋)にだけ行ける。アルゴナウタイ編(12部屋)とトロイア編(11部屋)のデータは残してあるが、そこへ続く出口は消してあり、今は行けない(到達できるのは23部屋)。オデュッセイア編は単独で輪になっていて(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)、冥界と求婚者たちの広間はそこから分かれる行き止まりの枝なので、「ループ+分岐、一直線不可」の要件を満たす。さらに、史実に反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入るゲームオーバー部屋が6つある。
-- **多言語対応**: `LANG ja`をCONNECT前に送るとLOOK/TALK/QUESTのテキストが日本語になる。RFC規定のJSON構造・コマンド名は一切変更していないので、他チームのサーバー/クライアントとの相互接続には影響しない。詳細は`memo.md` 8章。
-
-### ワールドの地図
-
-全40部屋とその出口を `data/world.json` から生成した図。アルゴナウタイ編とトロイア編も描いてあるが、ハブからそこへ入る出口は消してあり、入れない。そちらからハブへ戻る出口は残してあるので(ハブへ向かう一方通行の矢印)、すでに中にいた人が閉じ込められることはない。矢印の文字は、上の部屋から下の部屋へ進むときの方角(戻るときは逆方向)。`<-->` は往復できる道、`-->` は一方通行(クレタ→イオルコス、城壁の下の野→ギリシア軍の陣営、イタケの岸辺→運命の間)。緑がハブ、橙は仲間を失う/適切なアイテムが無いと死ぬ危険のある部屋、赤は入ると必ず死ぬ部屋。
-
-```mermaid
-flowchart TB
-  hall_of_fates["運命の間"]
-  subgraph argo_arc["アルゴ船の航海"]
-    argo_iolcus["イオルコスの港"]
-    argo_lemnos["レムノス島"]
-    argo_bebrycia["ベブリュケス人の岸辺"]
-    argo_salmydessus["サルミュデッソス、トラキアの海岸"]
-    argo_symplegades["衝突する岩(シュンプレガデス)"]
-    argo_colchis_shore["パシス川の河口"]
-    argo_court_aeetes["アイエテス王の宮廷"]
-    argo_bull_field["青銅の雄牛の野"]
-    argo_grove["アレスの聖なる森"]
-    argo_flight["コルキスからの逃走"]
-    argo_return_sea["遠い帰り道"]
-    argo_crete["クレタの岸辺"]
-  end
-  subgraph troy_arc["イーリアス(トロイア)"]
-    troy_ida["イダ山の斜面"]
-    troy_sparta["スパルタの宮殿"]
-    troy_aulis["アウリスの港"]
-    troy_camp["トロイア前のギリシア陣営"]
-    troy_achilles_tent["アキレウスの天幕"]
-    troy_plain["スカマンドロスの平野"]
-    troy_gate["スカイアの門"]
-    troy_countryside["城壁の下の野"]
-    troy_city["プリアモスの宮殿"]
-    troy_horse["木馬の岸辺"]
-    troy_fall["トロイア炎上"]
-  end
-  subgraph ody_arc["オデュッセイア"]
-    ody_troy_shore["トロイアからの出発"]
-    ody_cicones["イスマロス、キコネス人の地"]
-    ody_lotus["ロトパゴイ(蓮を食う者たち)の地"]
-    ody_cyclops["ポリュペモスの洞窟"]
-    ody_aeolus["アイオロスの浮島"]
-    ody_laestrygonians["ライストリュゴネス族の港"]
-    ody_circe["アイアイエ、キルケーの島"]
-    ody_underworld["死者の館"]
-    ody_sirens["セイレーンの岩礁"]
-    ody_scylla["スキュラとカリュブディスの海峡"]
-    ody_charybdis["カリュブディスの大渦"]
-    ody_thrinacia["トリナキエ、太陽の島"]
-    ody_calypso["オギュギエ、カリュプソの島"]
-    ody_phaeacia["スケリエ、パイアケス人の地"]
-    ody_ithaca_shore["イタケの岸辺"]
-    ody_palace["求婚者たちの広間"]
-    ody_ismarus_feast["イスマロスの宴"]
-    ody_lotus_garden["蓮の園"]
-    ody_sealed_cave["ふさがれた洞窟"]
-    ody_laestrygonian_depths["港の奥"]
-    ody_pigsty["キルケーの豚小屋"]
-    ody_eternal_ogygia["果てしなきオギュギア"]
-  end
-  hall_of_fates <-->|東| ody_troy_shore
-  argo_iolcus -->|東| hall_of_fates
-  troy_ida -->|南| hall_of_fates
-  argo_iolcus <-->|南| argo_bebrycia
-  argo_iolcus <-->|北| argo_lemnos
-  ody_troy_shore <-->|東| ody_cicones
-  troy_ida <-->|東| troy_sparta
-  argo_bebrycia <-->|東| argo_salmydessus
-  ody_cicones -->|北| ody_ismarus_feast
-  ody_cicones <-->|東| ody_lotus
-  troy_sparta <-->|東| troy_aulis
-  argo_salmydessus <-->|東| argo_symplegades
-  ody_lotus <-->|東| ody_cyclops
-  ody_lotus -->|北| ody_lotus_garden
-  troy_aulis <-->|東| troy_camp
-  argo_symplegades <-->|東| argo_colchis_shore
-  ody_cyclops <-->|東| ody_aeolus
-  ody_cyclops -->|南| ody_sealed_cave
-  troy_camp <-->|北| troy_achilles_tent
-  troy_camp <-->|東| troy_plain
-  argo_colchis_shore <-->|北| argo_court_aeetes
-  ody_aeolus <-->|東| ody_laestrygonians
-  troy_plain <-->|東| troy_gate
-  argo_court_aeetes <-->|東| argo_bull_field
-  ody_laestrygonians <-->|東| ody_circe
-  ody_laestrygonians -->|北| ody_laestrygonian_depths
-  troy_gate <-->|北| troy_city
-  troy_gate <-->|南| troy_countryside
-  troy_countryside -->|西| troy_camp
-  argo_bull_field <-->|北| argo_grove
-  ody_circe -->|北| ody_pigsty
-  ody_circe <-->|南| ody_sirens
-  ody_circe <-->|東| ody_underworld
-  troy_city <-->|東| troy_horse
-  argo_grove <-->|東| argo_flight
-  ody_sirens -->|南| ody_charybdis
-  ody_sirens <-->|東| ody_scylla
-  troy_horse <-->|北| troy_fall
-  argo_flight <-->|北| argo_return_sea
-  ody_scylla <-->|東| ody_thrinacia
-  argo_return_sea <-->|東| argo_crete
-  ody_thrinacia <-->|東| ody_calypso
-  argo_crete -->|北| argo_iolcus
-  ody_calypso -->|南| ody_eternal_ogygia
-  ody_calypso <-->|東| ody_phaeacia
-  ody_phaeacia <-->|東| ody_ithaca_shore
-  ody_ithaca_shore -->|東| hall_of_fates
-  ody_ithaca_shore <-->|北| ody_palace
-  classDef hub fill:#2e7d32,color:#fff,stroke:#1b5e20
-  classDef hazard fill:#ef6c00,color:#fff,stroke:#bf360c
-  classDef lethal fill:#c62828,color:#fff,stroke:#7f0000
-  class hall_of_fates hub
-  class ody_cicones,ody_cyclops,ody_sirens,ody_scylla hazard
-  class ody_charybdis,ody_ismarus_feast,ody_lotus_garden,ody_sealed_cave,ody_laestrygonian_depths,ody_pigsty,ody_eternal_ogygia lethal
-```
-
-## チーム分担
-
-- **takawaka**: サーバーの土台(TCP受付・行単位ディスパッチ、CONNECT/LOOK/MOVE、CHAT、GROUP、アイテムの永続化)とCLIクライアント
-- **amakino**: ワールド・ストーリー設計、RFC/課題分析(`TASKS.md`/`memo.md`)、戦闘・クエスト・ハザード・クルーシステムの設計と実装、神話ゲートのデータ設計、多言語対応
-
----
-
-# English (Original Submission)
+# English
 
 ## Description
 
@@ -537,3 +336,204 @@ go test ./cmd/server/... -run TestName -v   # a single test, verbose
 ```
 
 The server package's test suite covers, among other things: the full connection/auth lifecycle and disconnect/reconnect persistence; every RFC command's success and error paths; TCP message splitting/coalescing; concurrent multi-client scenarios (room presence, chat scopes, groups); world-data validation (`TestLoadWorldData` loads the real `data/world.json`); and, specific to this project's combat/quest/localization design, integration tests that exercise every myth-gate NPC and room hazard **against the real `data/world.json`** (not just a synthetic test world) in both English and Japanese — `TestOdysseyArcAgainstRealWorldData`, `TestArgonautsAndTroyMythGatesAgainstRealWorldData`, and `TestJapaneseTranslationsAgainstRealWorldData`.
+
+---
+
+# 日本語版
+
+
+## 動かし方
+
+```sh
+# サーバー起動(ポート4242で待ち受け、Ctrl-Cで終了)
+go run ./cmd/server
+
+# 別ターミナルでCLIクライアント接続(デフォルトは127.0.0.1:4242)
+go run ./cmd/cli
+go run ./cmd/cli 127.0.0.1:4242   # ホスト:ポートを指定する場合
+
+# バイナリとしてビルドする場合
+go build -o server ./cmd/server && ./server
+go build -o cli ./cmd/cli && ./cli
+```
+
+CLIは「生プロトコルをそのまま中継する」方針(打った行がそのままサーバーに送られ、サーバーの応答行がそのまま表示される)。最初のコマンドは必ず`CONNECT <name>`。日本語版で遊びたい場合は、`CONNECT`より前に`LANG ja`を送る(8章参照)。
+
+```
+$ go run ./cmd/cli
+Connected to 127.0.0.1:4242
+OK hello proto=1
+LANG ja
+OK lang=ja
+CONNECT alice
+OK connected
+LOOK
+OK {"room":{...,"name":"運命の間",...}, ...}
+```
+
+## コマンド一覧
+
+RFC 15コマンド + 独自拡張2つ(`FLEE`・`LANG`、下表に明記)。正式な仕様は`protocol-rfc.html` 5章、英語セクションの[Command list](#command-list)も参照。
+
+| コマンド | 構文 | 内容 |
+|---|---|---|
+| `CONNECT` | `CONNECT <name>` | `<name>`で認証。`LANG`を送る場合を除き最初に送るコマンド。 |
+| `LANG`(独自) | `LANG <en\|ja>` | このコネクションのストーリー言語を選択。**`CONNECT`より前**に送ること。 |
+| `LOOK` | `LOOK` | 現在の部屋(名前・説明・プレイヤー・アイテムID・NPC ID・出口)を取得。 |
+| `MOVE` | `MOVE <方向>` | 出口を通って移動(例: `MOVE east`)。 |
+| `TAKE` | `TAKE <アイテムIDまたは名前>` | 部屋にあるアイテムを取得。 |
+| `DROP` | `DROP <アイテムIDまたは名前>` | 所持品を部屋に置く。 |
+| `INVENTORY` | `INVENTORY` | 所持品一覧。 |
+| `TALK` | `TALK <NPC IDまたは名前>` | 部屋にいるNPCと話す。 |
+| `ATTACK` | `ATTACK <NPC IDまたは名前>` | 敵NPCを攻撃。 |
+| `FLEE`(独自) | `FLEE` | 現在の戦闘から離脱。戦闘中のみ有効。 |
+| `STATUS` | `STATUS` | 自分のHP・戦闘状態を確認。 |
+| `QUEST` | `QUEST <NPC IDまたは名前>` | そのNPCが持つクエストを受注。 |
+| `QUESTS` | `QUESTS` | これまで受注した全クエストと進行状況を一覧表示。 |
+| `CHAT` | `CHAT <GLOBAL\|ROOM\|GROUP> <メッセージ>` | 指定した範囲にチャット送信。 |
+| `WHO` | `WHO` | 現在の接続プレイヤー数。 |
+| `GROUP` | `GROUP CREATE` / `GROUP INVITE <name>` / `GROUP JOIN <leader>` / `GROUP LEAVE` | `CHAT GROUP`用のグループ管理。 |
+| `QUIT` | `QUIT` | 正常に切断する。 |
+
+## テストの実行
+
+```sh
+go vet ./...
+gofmt -l .            # 何も出なければOK
+go test ./...
+go test -race ./cmd/server/...
+```
+
+特定のテストだけ実行したいとき:
+```sh
+go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
+```
+
+## 各システムの概要
+
+英語セクションの各見出し([Architecture](#architecture)、[Protocol Implementation](#protocol-implementation)、[Combat System](#combat-system)、[Quest System](#quest-system)、[World Design](#world-design)、[Server Logging](#server-logging))に詳しく書いてあるので、ここでは要点だけ:
+
+- **並行モデル**: 接続ごとに1 goroutine + サーバー状態全体を単一の`sync.Mutex`で保護、という単純な方式。実装の正しさを優先した(`memo.md` 2章)。
+- **戦闘**: ATTACKは基本8〜14ダメージ・反撃6〜12ダメージのランダム。一部の敵は「正しいアイテム/達成済みクエスト」を持っていないとATTACKで即死する「神話ゲート」付き。HP0で運命の間にHP20でリスポーン。**生きている敵がいる部屋はMOVEで出ようとすると即死**(倒すかFLEEで振り切るまで封鎖)。
+- **クエスト**: `QUEST <npc>`で受注、TAKE/ATTACKの成否をサーバー側が自動で判定して進行・達成・報酬付与まで行う(完了報告コマンドは無し)。
+- **ワールド**: 46部屋・アイテム21種(取得できるもの17種+記念品4種)・NPC 43・クエスト16種。ハブ(運命の間)からは東のオデュッセイア編(22部屋)にだけ行ける。アルゴナウタイ編(12部屋)とトロイア編(11部屋)のデータは残してあるが、そこへ続く出口は消してあり、今は行けない(到達できるのは23部屋)。オデュッセイア編は単独で輪になっていて(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)、冥界と求婚者たちの広間はそこから分かれる行き止まりの枝なので、「ループ+分岐、一直線不可」の要件を満たす。さらに、史実に反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入るゲームオーバー部屋が6つある。
+- **多言語対応**: `LANG ja`をCONNECT前に送るとLOOK/TALK/QUESTのテキストが日本語になる。RFC規定のJSON構造・コマンド名は一切変更していないので、他チームのサーバー/クライアントとの相互接続には影響しない。詳細は`memo.md` 8章。
+
+### ワールドの地図
+
+全40部屋とその出口を `data/world.json` から生成した図。アルゴナウタイ編とトロイア編も描いてあるが、ハブからそこへ入る出口は消してあり、入れない。そちらからハブへ戻る出口は残してあるので(ハブへ向かう一方通行の矢印)、すでに中にいた人が閉じ込められることはない。矢印の文字は、上の部屋から下の部屋へ進むときの方角(戻るときは逆方向)。`<-->` は往復できる道、`-->` は一方通行(クレタ→イオルコス、城壁の下の野→ギリシア軍の陣営、イタケの岸辺→運命の間)。緑がハブ、橙は仲間を失う/適切なアイテムが無いと死ぬ危険のある部屋、赤は入ると必ず死ぬ部屋。
+
+```mermaid
+flowchart TB
+  hall_of_fates["運命の間"]
+  subgraph argo_arc["アルゴ船の航海"]
+    argo_iolcus["イオルコスの港"]
+    argo_lemnos["レムノス島"]
+    argo_bebrycia["ベブリュケス人の岸辺"]
+    argo_salmydessus["サルミュデッソス、トラキアの海岸"]
+    argo_symplegades["衝突する岩(シュンプレガデス)"]
+    argo_colchis_shore["パシス川の河口"]
+    argo_court_aeetes["アイエテス王の宮廷"]
+    argo_bull_field["青銅の雄牛の野"]
+    argo_grove["アレスの聖なる森"]
+    argo_flight["コルキスからの逃走"]
+    argo_return_sea["遠い帰り道"]
+    argo_crete["クレタの岸辺"]
+  end
+  subgraph troy_arc["イーリアス(トロイア)"]
+    troy_ida["イダ山の斜面"]
+    troy_sparta["スパルタの宮殿"]
+    troy_aulis["アウリスの港"]
+    troy_camp["トロイア前のギリシア陣営"]
+    troy_achilles_tent["アキレウスの天幕"]
+    troy_plain["スカマンドロスの平野"]
+    troy_gate["スカイアの門"]
+    troy_countryside["城壁の下の野"]
+    troy_city["プリアモスの宮殿"]
+    troy_horse["木馬の岸辺"]
+    troy_fall["トロイア炎上"]
+  end
+  subgraph ody_arc["オデュッセイア"]
+    ody_troy_shore["トロイアからの出発"]
+    ody_cicones["イスマロス、キコネス人の地"]
+    ody_lotus["ロトパゴイ(蓮を食う者たち)の地"]
+    ody_cyclops["ポリュペモスの洞窟"]
+    ody_aeolus["アイオロスの浮島"]
+    ody_laestrygonians["ライストリュゴネス族の港"]
+    ody_circe["アイアイエ、キルケーの島"]
+    ody_underworld["死者の館"]
+    ody_sirens["セイレーンの岩礁"]
+    ody_scylla["スキュラとカリュブディスの海峡"]
+    ody_charybdis["カリュブディスの大渦"]
+    ody_thrinacia["トリナキエ、太陽の島"]
+    ody_calypso["オギュギエ、カリュプソの島"]
+    ody_phaeacia["スケリエ、パイアケス人の地"]
+    ody_ithaca_shore["イタケの岸辺"]
+    ody_palace["求婚者たちの広間"]
+    ody_ismarus_feast["イスマロスの宴"]
+    ody_lotus_garden["蓮の園"]
+    ody_sealed_cave["ふさがれた洞窟"]
+    ody_laestrygonian_depths["港の奥"]
+    ody_pigsty["キルケーの豚小屋"]
+    ody_eternal_ogygia["果てしなきオギュギア"]
+  end
+  hall_of_fates <-->|東| ody_troy_shore
+  argo_iolcus -->|東| hall_of_fates
+  troy_ida -->|南| hall_of_fates
+  argo_iolcus <-->|南| argo_bebrycia
+  argo_iolcus <-->|北| argo_lemnos
+  ody_troy_shore <-->|東| ody_cicones
+  troy_ida <-->|東| troy_sparta
+  argo_bebrycia <-->|東| argo_salmydessus
+  ody_cicones -->|北| ody_ismarus_feast
+  ody_cicones <-->|東| ody_lotus
+  troy_sparta <-->|東| troy_aulis
+  argo_salmydessus <-->|東| argo_symplegades
+  ody_lotus <-->|東| ody_cyclops
+  ody_lotus -->|北| ody_lotus_garden
+  troy_aulis <-->|東| troy_camp
+  argo_symplegades <-->|東| argo_colchis_shore
+  ody_cyclops <-->|東| ody_aeolus
+  ody_cyclops -->|南| ody_sealed_cave
+  troy_camp <-->|北| troy_achilles_tent
+  troy_camp <-->|東| troy_plain
+  argo_colchis_shore <-->|北| argo_court_aeetes
+  ody_aeolus <-->|東| ody_laestrygonians
+  troy_plain <-->|東| troy_gate
+  argo_court_aeetes <-->|東| argo_bull_field
+  ody_laestrygonians <-->|東| ody_circe
+  ody_laestrygonians -->|北| ody_laestrygonian_depths
+  troy_gate <-->|北| troy_city
+  troy_gate <-->|南| troy_countryside
+  troy_countryside -->|西| troy_camp
+  argo_bull_field <-->|北| argo_grove
+  ody_circe -->|北| ody_pigsty
+  ody_circe <-->|南| ody_sirens
+  ody_circe <-->|東| ody_underworld
+  troy_city <-->|東| troy_horse
+  argo_grove <-->|東| argo_flight
+  ody_sirens -->|南| ody_charybdis
+  ody_sirens <-->|東| ody_scylla
+  troy_horse <-->|北| troy_fall
+  argo_flight <-->|北| argo_return_sea
+  ody_scylla <-->|東| ody_thrinacia
+  argo_return_sea <-->|東| argo_crete
+  ody_thrinacia <-->|東| ody_calypso
+  argo_crete -->|北| argo_iolcus
+  ody_calypso -->|南| ody_eternal_ogygia
+  ody_calypso <-->|東| ody_phaeacia
+  ody_phaeacia <-->|東| ody_ithaca_shore
+  ody_ithaca_shore -->|東| hall_of_fates
+  ody_ithaca_shore <-->|北| ody_palace
+  classDef hub fill:#2e7d32,color:#fff,stroke:#1b5e20
+  classDef hazard fill:#ef6c00,color:#fff,stroke:#bf360c
+  classDef lethal fill:#c62828,color:#fff,stroke:#7f0000
+  class hall_of_fates hub
+  class ody_cicones,ody_cyclops,ody_sirens,ody_scylla hazard
+  class ody_charybdis,ody_ismarus_feast,ody_lotus_garden,ody_sealed_cave,ody_laestrygonian_depths,ody_pigsty,ody_eternal_ogygia lethal
+```
+
+## チーム分担
+
+- **takawaka**: サーバーの土台(TCP受付・行単位ディスパッチ、CONNECT/LOOK/MOVE、CHAT、GROUP、アイテムの永続化)とCLIクライアント
+- **amakino**: ワールド・ストーリー設計、RFC/課題分析(`TASKS.md`/`memo.md`)、戦闘・クエスト・ハザード・クルーシステムの設計と実装、神話ゲートのデータ設計、多言語対応
