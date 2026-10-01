@@ -8,20 +8,21 @@ type PlayerQuest struct {
 }
 
 type Player struct {
-	Name            string                  `json:"name"`
-	HP              int                     `json:"hp"`
-	RoomID          string                  `json:"room_id"`
-	Inventory       []string                `json:"inventory"`
-	Crew            int                     `json:"crew,omitempty"`
-	CrewInitialized bool                    `json:"crew_initialized,omitempty"`
-	IntroSeen       bool                    `json:"intro_seen,omitempty"`
-	CombatTargetID  string                  `json:"combat_target_id,omitempty"`
-	FledFrom        map[string]bool         `json:"fled_from,omitempty"`
-	Quests          map[string]*PlayerQuest `json:"quests,omitempty"`
-	Endings         map[string]bool         `json:"endings,omitempty"`
-	EnemyHP         map[string]int          `json:"enemy_hp,omitempty"`
-	lastRegen       time.Time
-	exiting         bool
+	Name             string                  `json:"name"`
+	HP               int                     `json:"hp"`
+	RoomID           string                  `json:"room_id"`
+	Inventory        []string                `json:"inventory"`
+	Crew             int                     `json:"crew,omitempty"`
+	CrewInitialized  bool                    `json:"crew_initialized,omitempty"`
+	IntroSeen        bool                    `json:"intro_seen,omitempty"`
+	LastDeathSubject string                  `json:"last_death_subject,omitempty"`
+	CombatTargetID   string                  `json:"combat_target_id,omitempty"`
+	FledFrom         map[string]bool         `json:"fled_from,omitempty"`
+	Quests           map[string]*PlayerQuest `json:"quests,omitempty"`
+	Endings          map[string]bool         `json:"endings,omitempty"`
+	EnemyHP          map[string]int          `json:"enemy_hp,omitempty"`
+	lastRegen        time.Time
+	exiting          bool
 }
 
 func (p *Player) hasItem(itemID string) bool {

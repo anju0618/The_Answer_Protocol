@@ -20,6 +20,7 @@ const (
 	storyEnding
 	storyTeam
 	storyError
+	storyHint
 )
 
 type storyEntry struct {
@@ -36,6 +37,7 @@ const (
 	colorStoryCombat fyne.ThemeColorName = "storyCombat"
 	colorStoryEnding fyne.ThemeColorName = "storyEnding"
 	colorStoryTeam   fyne.ThemeColorName = "storyTeam"
+	colorStoryHint   fyne.ThemeColorName = "storyHint"
 )
 
 func storyColorName(kind storyKind) fyne.ThemeColorName {
@@ -50,6 +52,8 @@ func storyColorName(kind storyKind) fyne.ThemeColorName {
 		return colorStoryEnding
 	case storyTeam:
 		return colorStoryTeam
+	case storyHint:
+		return colorStoryHint
 	}
 	return "foreground"
 }
@@ -67,6 +71,8 @@ func storyColor(name fyne.ThemeColorName) (color.Color, bool) {
 		return color.NRGBA{R: 190, G: 140, B: 240, A: 255}, true
 	case colorStoryTeam:
 		return color.NRGBA{R: 110, G: 200, B: 140, A: 255}, true
+	case colorStoryHint:
+		return color.NRGBA{R: 120, G: 190, B: 235, A: 255}, true
 	}
 	return nil, false
 }
@@ -82,6 +88,8 @@ func storyKindOf(word string) storyKind {
 		return storyEnding
 	case "TEAM":
 		return storyTeam
+	case "HINT":
+		return storyHint
 	}
 	return storyPlain
 }
