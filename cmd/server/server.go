@@ -109,6 +109,7 @@ func (s *Server) connectPlayer(name string) error {
 	if _, exists := s.players[name]; exists {
 		return errNameInUse
 	}
+	player.lastRegen = time.Now()
 	s.players[name] = player
 	return nil
 }
@@ -409,6 +410,8 @@ func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 		player.RoomID = destination
 		logger.Info("player_moved", "player", *name, "from", oldRoomID, "to", destination)
 		if oldRoomID != destination {
+			player.CombatTargetID = ""
+			player.guarding = false
 			for playerName, current := range s.players {
 				recipient := s.clients[playerName]
 				if recipient == nil {

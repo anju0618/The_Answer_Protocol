@@ -3,6 +3,7 @@ package main
 import (
 	"strconv"
 	"strings"
+	"unicode/utf8"
 )
 
 type flavor struct {
@@ -112,7 +113,15 @@ func (s *Server) broadcastFlavorLocked(roomID string, f flavor) {
 			continue
 		}
 		if recipient := s.clients[playerName]; recipient != nil {
-			recipient.enqueueEvent("EVT ROOM COMBAT " + f.text(s.localeOfLocked(playerName)))
+			event := "EVT ROOM COMBAT " + f.text(s.localeOfLocked(playerName))
+			if len(event) > maxProtocolLineBytes {
+				event = event[:maxProtocolLineBytes-len("...")]
+				for !utf8.ValidString(event) {
+					event = event[:len(event)-1]
+				}
+				event += "..."
+			}
+			recipient.enqueueEvent(event)
 		}
 	}
 }
