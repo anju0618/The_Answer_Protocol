@@ -12,9 +12,9 @@
 
 **The Answer Protocol (TAP)** is a shared-world, multiplayer, text-based adventure (MUD): a single TCP server (`cmd/server`) plus a CLI client (`cmd/cli`), built strictly against the attached RFC (`rfc.tar.gz` / `protocol-rfc.html`) so that our server and client can interoperate with any other team's implementation of the same protocol.
 
-The world is built from three Greek myths — the Voyage of the Argonauts, the Iliad, and the Odyssey — as three story arcs that share a single hub room (`loc.hall_of_fates`, the Hall of the Fates). Right now only the Odyssey is open to players; the other two arcs are kept in the world data but no road leads to them (see "World Design"). On top of that world, we designed an original combat and quest system around one idea, left deliberately undefined by the RFC (see "Combat System" below): **acting against the myth gets you killed.** For example, attacking Polyphemus without first taking the sharpened olive stake is an instant kill, not a normal fight.
+The world is built from three Greek myths — the Voyage of the Argonauts, the Iliad, and the Odyssey — as three story arcs that share a single hub room (`loc.hall_of_fates`, the Hall of the Fates). All three arcs are open from the hub (see "World Design"). On top of that world, we designed an original combat and quest system around one idea, left deliberately undefined by the RFC (see "Combat System" below): **acting against the myth gets you killed.** For example, attacking Polyphemus without first taking the sharpened olive stake is an instant kill, not a normal fight.
 
-The mandatory part is implemented: the server (all RFC commands and events, plus our two documented extensions), a CLI client (`cmd/cli`), a GUI client (`cmd/gui`, built with the Fyne toolkit) and structured JSON logging (see "Server Logging"). Known limitations: the Argonauts and Iliad arcs cannot currently be reached, and a few GUI illustrations are still placeholders.
+The mandatory part is implemented: the server (all RFC commands and events, plus our two documented extensions), a CLI client (`cmd/cli`), a GUI client (`cmd/gui`, built with the Fyne toolkit) and structured JSON logging (see "Server Logging"). Known limitations: a few GUI illustrations are still placeholders (for example the portrait of Athena).
 
 ## Instructions
 
@@ -24,7 +24,7 @@ Our CLI client is a **raw protocol relay**: every line you type is sent to the s
 
 ### Command list
 
-All 15 RFC commands, plus our two additive extensions (`FLEE`, `LANG`, both marked below). Full request/response/error shapes are in `protocol-rfc.html` §5; this is a quick reference.
+All 15 RFC commands, plus our three additive extensions (`FLEE`, `DEFEND`, `LANG`, all marked below). Full request/response/error shapes are in `protocol-rfc.html` §5; this is a quick reference.
 
 | Command | Syntax | What it does |
 |---|---|---|
@@ -38,6 +38,7 @@ All 15 RFC commands, plus our two additive extensions (`FLEE`, `LANG`, both mark
 | `TALK` | `TALK <npc id or name>` | Talk to an NPC in the room. |
 | `ATTACK` | `ATTACK <npc id or name>` | Attack an enemy NPC. |
 | `FLEE` *(custom)* | `FLEE` | Retreat from your current fight. Only valid while in combat. |
+| `DEFEND` *(custom)* | `DEFEND` | Brace instead of attacking: you deal no damage, but the next counter-attack is halved. Only valid while in combat. |
 | `STATUS` | `STATUS` | Your current HP and combat status. |
 | `QUEST` | `QUEST <npc id or name>` | Request the quest offered by that NPC. |
 | `QUESTS` | `QUESTS` | List every quest you've started, with progress. |
@@ -81,6 +82,10 @@ All 15 RFC commands work identically regardless of language; only story text (ro
 - Go standard library only — `net`, `encoding/json`, `bufio`, `log`, `sync`, `math/rand/v2`, etc. `go.mod` declares no third-party dependencies.
 - **AI assistance**: Claude (Anthropic) was used throughout this project as a coding/design assistant, with all output reviewed, built, and tested by the team before committing. Specifically, AI assistance was used for: reading and summarizing the subject PDF and RFC into `TASKS.md` and `memo.md` at the start of the project; collaboratively designing the combat/quest/crew/myth-gate game systems described below; implementing the corresponding Go code (`combat.go`, `quest.go`, `hazard.go`, `odyssey.go`, `locale.go`) and its automated tests; authoring the Japanese localization text in `data/world.json`; and writing this README.
 
+## GUI client
+
+The GUI (`cmd/gui`, Fyne) is a window onto the same protocol; it sends exactly the commands a CLI player would. Features: coloured HP and crew bars; a colour-coded Adventure log (deaths red, quests gold, combat orange, endings purple, hints blue); a combat panel with the enemy's HP bar and Attack / Brace / Flee buttons; a minimap tab that draws the rooms you have visited and the unexplored exits next to them (hub in green, hazards orange, fatal rooms red); an endings gallery with the blessing each ending gives, plus how many fatal choices you have found (stored per player name on this computer); short screen flashes on damage, travel and death; mouse controls and a responsive layout.
+
 ## Architecture
 
 - **Dispatch**: `cmd/server/server.go` maps each command name to a handler function (`commandHandlers map[string]commandHandler`). `main.go` calls `net.Listen("tcp", ":4242")` and spawns one goroutine per accepted connection (`go server.handleClient(conn)`); each connection's goroutine reads newline-delimited commands with `bufio.Scanner` and dispatches them in a loop, one at a time.
@@ -108,9 +113,10 @@ All 15 RFC commands are implemented: `CONNECT, LOOK, MOVE, CHAT, TAKE, DROP, INV
 We added a small number of **additive** extensions. None of them change the shape or meaning of any RFC-defined command, response, or event, so an RFC-only client from another team continues to interoperate with our server without modification, and our client works against a plain RFC-only server (it simply never sends the extra commands):
 
 - **`FLEE`** — a combat command with no arguments, retreating from the player's current fight. The RFC explicitly names `FLEE` as an example of a team-defined combat extension (§6.1.1).
+- **`DEFEND`** — a second combat command with no arguments: you brace instead of attacking. It answers `OK {"hp":<n>,"result":"braced"}`, deals no damage, and halves the next counter-attack (once; it also ends if you flee or die). It returns `ERR 407 NOT_IN_COMBAT` outside a fight. Like `FLEE`, it is additive: a client that never sends it is unaffected.
 - **`LANG <code>`** — must be sent before `CONNECT`; selects the language (`en`, the default, or `ja`) that this connection's story text (room/NPC/quest text) is returned in for the rest of the session. Sending it after `CONNECT` returns `ERR 400 BAD_REQUEST`, since language is a start-of-session choice, not a runtime setting. See "World Design" / `memo.md` §8 for the full localization design.
 - **`EVT ROOM COMBAT <text>`** — a new event *type*, not a new event *format*: the RFC's event grammar (`event-line = "EVT" SP event-type SP event-data LF`) does not close off the set of valid event-type tokens, so a well-behaved client that only recognizes the RFC's own event types (`ROOM PRESENCE ...`, `ROOM CHAT ...`, etc.) can safely ignore an unrecognized `COMBAT` type rather than fail to parse it. We use it to broadcast combat/hazard flavor text to everyone in the room.
-- **`EVT PLAYER <kind> <text>`** — a second new event type, sent to **one player only** (unlike `EVT ROOM COMBAT`, which goes to everyone in a room). It exists because a dying player is teleported back to the Hall of the Fates *before* the room broadcast is sent, so they never saw why they died. `<kind>` is `DEATH` (what killed you, what you lost, where you woke up and with how much HP), `ENDING` (the story endings and what is still missing for them), `TEAM` (an ally shared a kill with you), `GUIDE` (the Hall of the Fates tutorial, see "World Design") or `QUEST` (a quest-giver is in the room / progress / completion, see "Quest System"). Text is in the language chosen with `LANG`. As with `COMBAT`, an RFC-only client can safely ignore the unknown `PLAYER` type.
+- **`EVT PLAYER <kind> <text>`** — a second new event type, sent to **one player only** (unlike `EVT ROOM COMBAT`, which goes to everyone in a room). It exists because a dying player is teleported back to the Hall of the Fates *before* the room broadcast is sent, so they never saw why they died. `<kind>` is `DEATH` (what killed you, what you lost, where you woke up and with how much HP), `ENDING` (the story endings and what is still missing for them), `TEAM` (an ally shared a kill with you), `GUIDE` (the Hall of the Fates tutorial, see "World Design"), `HINT` (the Moirai's hint about what last killed you, see "Endings, Difficulty and Co-op") or `QUEST` (a quest-giver is in the room / progress / completion, see "Quest System"). Text is in the language chosen with `LANG`. As with `COMBAT`, an RFC-only client can safely ignore the unknown `PLAYER` type.
 - **`ERR 407 NOT_IN_COMBAT`** — a new error code (the RFC defines up to `406`), returned by `FLEE` when the player isn't currently fighting anything.
 - **No new fields on any RFC-defined JSON response.** In particular, our internal `Crew` resource (see "World Design") is deliberately kept out of `STATUS`/`ATTACK`'s JSON bodies, even though the RFC does not explicitly forbid extra JSON keys — we didn't want to gamble on how strictly another team's JSON parser is written. It is only ever revealed as plain narrative text over `EVT ROOM COMBAT`.
 
@@ -126,7 +132,7 @@ RFC §6.1.1 leaves damage calculation, turn/initiative handling, combat state tr
 - **Logging/broadcast.** Every `ATTACK`/`FLEE` resolution is broadcast to the room via `EVT ROOM COMBAT <flavor text>`, in addition to the structured response sent to the acting player.
 - **A live threat blocks the room, not just the fight.** Several room descriptions state outright that the enemy blocks passage — Amycus "blocks every crew that lands," Polyphemus's cave mouth is sealed by a boulder — but originally nothing stopped a player from just walking past a hostile NPC via `MOVE` without ever engaging it. We closed that: `MOVE` out of a room containing any live (`hp > 0`) `enemy`-role NPC the player hasn't yet defeated or successfully fled from is an instant kill (`blockingEnemyLocked` in `hazard.go`), consistent with every other myth gate in this design. A successful `FLEE` against a given NPC is remembered permanently per player (`Player.FledFrom`, keyed by NPC ID — not reset by leaving and re-entering), so once you've talked your way or run your way past something, it stays resolved. Because `Unwinnable` NPCs (the Laestrygonians) never reach 0 HP, `FLEE` is their *only* way out of the room; `TestNoEnemyIsBothUnwinnableAndUnfleeable` checks the whole roster so we can't accidentally ship an NPC that's both unwinnable and unfleeable (an unconditional softlock). Scylla was exactly this case during development — she had no `flee_accurate` set, which would have forced a fight the myth never asks for — so we gave her `flee_accurate: true`, matching how she's actually survived (you don't kill Scylla, you just get past her, at a cost already charged by the room's `crew_gate` hazard on the way in).
 
-We did not add a `DEFEND` command: none of the myth gates we designed call for a "reduce incoming damage" mechanic, so we judged it unnecessary complexity rather than adding it just because the RFC mentions it as an example.
+- **DEFEND.** Plain `ATTACK` spam was the only choice in a fight, so we added a stance (see "Protocol Implementation"). It is a real trade-off, not a free heal: a round spent bracing deals no damage, and in exchange the next counter-attack costs half. It stacks with the ally and blessing reductions (the total is capped at 80%).
 
 ## Quest System
 
@@ -146,12 +152,13 @@ RFC §6.1.2 fixes only the `QUEST`/`QUESTS` request/response shapes and leaves o
 - **Why "not enough items" happened, and the fix.** Items were unique world instances and inventories are saved, so one player picking up and abandoning the key items (a real saved account held ten of them) made every other player's route unwinnable. Items needed by a quest, a myth gate or an ending are now `renewable`: they stay in their room and each player gets their own copy (players who already hold one don't see it in `LOOK`). A few decorative items (`item.hospitality_gift`, `item.dragons_teeth`, `item.strong_wine`, `item.lotus_fruit`) stay unique, so the subject's "TAKE removes the item from the room, DROP makes it available" behaviour is still there and tested.
 - **Enemies are per player.** Enemy HP lives in `Player.EnemyHP`, not in the shared NPC, so one player killing the Harpy no longer stops everybody else from fighting it or finishing a `defeat_npc` quest. Accepting a quest also counts progress you had already made (an item already in your inventory, an enemy already beaten), which used to be impossible to finish.
 - **Two more softlocks fixed.** HP never regenerated (after one death you were at 20 HP forever, and the Argonauts' mandatory fights alone cost more than 100 HP), so HP now regenerates slowly (1 HP per 2 s). The Odyssey crew (needed at Scylla) was granted only once, so it is now refilled every time you enter the Odyssey from the Hall.
-- **Brutal difficulty.** Death costs you every belonging except trophies: unique items go back to their home room, key-item copies vanish (fetch them again), and every enemy you wounded or escaped is reset. Enemy counter-attacks are 7-14 damage. The death message says only what killed you and what you lost: never what you were missing. Quest texts and death messages deliberately contain no hints, so what a myth gate wants has to be worked out from the myths.
+- **Brutal difficulty.** Death costs you every belonging except trophies: unique items go back to their home room, key-item copies vanish (fetch them again), and every enemy you wounded or escaped is reset. Enemy counter-attacks are 7-14 damage. The death message says only what killed you and what you lost: never what you were missing. Quest texts and death messages deliberately contain no hints, so what a myth gate wants has to be worked out from the myths. The one softening is opt-in: after a death, `TALK` to the Moirai once and she answers with a single vague line from the myth about what killed you (`EVT PLAYER HINT`, data in the `hints` object of `data/world.json`). It never names the item or the command, it is spent after one use, and a player who never asks never sees one.
 - **Co-op.** In the same `GROUP`, allies standing in the same room add +5 damage each (up to 3) and reduce each counter-attack by 20% each; a kill counts for every ally in the room (including `defeat_npc` quest progress); and if you die while an ally is in the room, they protect your belongings so you lose nothing. Combat narration is localized for each recipient.
+- **Blessings.** Each arc has a patron god, and clearing the arc earns that god's blessing for good (it is never lost on death). It is computed from the endings you have reached, so nothing extra is stored: **Athena** (Odyssey, `ending.odyssey`) cuts enemy counter-attacks by 20%, **Hera** (Argonauts, `ending.argo`) doubles your HP regeneration, **Apollo** (Iliad, `ending.troy`) adds 3 damage to every hit. Athena also stands on the Shore of Ithaca as a young shepherd and talks to you. The blessing is announced as an `EVT PLAYER ENDING` line when you first reach the ending. Blessings are defined in the `blessing` object of each ending in `data/world.json`.
 
 ## World Design
 
-- **Structure.** One shared hub room, the Hall of the Fates (`loc.hall_of_fates`), with a single exit east into the Odyssey (22 rooms, six of them game-over rooms). The Voyage of the Argonauts (12 rooms) and the Iliad (11 rooms) are still in `data/world.json` with their NPCs, quests and endings, but no exit leads to them any more, so they are currently unreachable (46 rooms in the data, 23 reachable). The Odyssey is a loop on its own: heading east from the hub through every stop to the Shore of Ithaca, whose east exit leads back to the hub, makes a 14-room ring (hub included), with the Underworld and the Hall of the Suitors as dead-end branches off it. That ring plus those branches satisfies the "rooms form a loop and at least one branch, not a straight line" requirement.
+- **Structure.** One shared hub room, the Hall of the Fates (`loc.hall_of_fates`), with three exits: west into the Voyage of the Argonauts (12 rooms), north into the Iliad (11 rooms) and east into the Odyssey (22 rooms, six of them game-over rooms). All 46 rooms are reachable. The Odyssey is a loop on its own: heading east from the hub through every stop to the Shore of Ithaca, whose east exit leads back to the hub, makes a 14-room ring (hub included), with the Underworld and the Hall of the Suitors as dead-end branches off it. That ring plus those branches satisfies the "rooms form a loop and at least one branch, not a straight line" requirement.
 - **NPCs.** All three required roles are represented throughout: `dialogue` (lore/flavor), `quest_giver`, and `enemy`. Well over 30 NPCs total.
 - **Items.** 17 obtainable items (plus 4 reward-only trophies), nearly all of them load-bearing for either a myth gate or a quest objective (e.g. the beeswax that protects against the Sirens, the moly root that protects against Circe).
 - **Quests.** 16 quests across the three arcs, every one a `collect_item` or `defeat_npc` objective (see "Quest System" for how progress/reward is handled).
@@ -168,7 +175,7 @@ RFC §6.1.2 fixes only the `QUEST`/`QUESTS` request/response shapes and leaves o
 
 ### Room map
 
-All 40 rooms and their exits, generated from `data/world.json`. The Argonauts and Iliad groups are drawn too, but nothing leads into them: the hub's exits to them were removed for now. Their own exits back to the hub were kept (the one-way arrows into the hub), so a player who was already inside is not trapped. Each edge is labelled with the direction you take when moving from the upper room to the lower one (the way back is the opposite direction). `<-->` is a two-way connection; `-->` is one-way (Crete → Iolcus, Fields Beneath the Walls → Greek Camp, Shore of Ithaca → Hall of the Fates). Green is the hub, orange rooms have a hazard that costs crew or kills without the right item, and red rooms are always fatal.
+All 40 rooms and their exits, generated from `data/world.json`. The Argonauts and Iliad groups are connected to the hub by two-way roads (west and north). Each edge is labelled with the direction you take when moving from the upper room to the lower one (the way back is the opposite direction). `<-->` is a two-way connection; `-->` is one-way (Crete → Iolcus, Fields Beneath the Walls → Greek Camp, Shore of Ithaca → Hall of the Fates). Green is the hub, orange rooms have a hazard that costs crew or kills without the right item, and red rooms are always fatal.
 
 ```mermaid
 flowchart TB
@@ -225,8 +232,8 @@ flowchart TB
     ody_eternal_ogygia["Eternal Ogygia"]
   end
   hall_of_fates <-->|E| ody_troy_shore
-  argo_iolcus -->|E| hall_of_fates
-  troy_ida -->|S| hall_of_fates
+  hall_of_fates <-->|W| argo_iolcus
+  hall_of_fates <-->|N| troy_ida
   argo_iolcus <-->|S| argo_bebrycia
   argo_iolcus <-->|N| argo_lemnos
   ody_troy_shore <-->|E| ody_cicones
@@ -373,7 +380,7 @@ OK {"room":{...,"name":"運命の間",...}, ...}
 
 ## コマンド一覧
 
-RFC 15コマンド + 独自拡張2つ(`FLEE`・`LANG`、下表に明記)。正式な仕様は`protocol-rfc.html` 5章、英語セクションの[Command list](#command-list)も参照。
+RFC 15コマンド + 独自拡張3つ(`FLEE`・`DEFEND`・`LANG`、下表に明記)。正式な仕様は`protocol-rfc.html` 5章、英語セクションの[Command list](#command-list)も参照。
 
 | コマンド | 構文 | 内容 |
 |---|---|---|
@@ -387,6 +394,7 @@ RFC 15コマンド + 独自拡張2つ(`FLEE`・`LANG`、下表に明記)。正�
 | `TALK` | `TALK <NPC IDまたは名前>` | 部屋にいるNPCと話す。 |
 | `ATTACK` | `ATTACK <NPC IDまたは名前>` | 敵NPCを攻撃。 |
 | `FLEE`(独自) | `FLEE` | 現在の戦闘から離脱。戦闘中のみ有効。 |
+| `DEFEND`(独自) | `DEFEND` | 攻撃せずに身構える。ダメージは与えないが、次の反撃が半分になる。戦闘中のみ有効。 |
 | `STATUS` | `STATUS` | 自分のHP・戦闘状態を確認。 |
 | `QUEST` | `QUEST <NPC IDまたは名前>` | そのNPCが持つクエストを受注。 |
 | `QUESTS` | `QUESTS` | これまで受注した全クエストと進行状況を一覧表示。 |
@@ -414,14 +422,14 @@ go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
 英語セクションの各見出し([Architecture](#architecture)、[Protocol Implementation](#protocol-implementation)、[Combat System](#combat-system)、[Quest System](#quest-system)、[World Design](#world-design)、[Server Logging](#server-logging))に詳しく書いてあるので、ここでは要点だけ:
 
 - **並行モデル**: 接続ごとに1 goroutine + サーバー状態全体を単一の`sync.Mutex`で保護、という単純な方式。実装の正しさを優先した(`memo.md` 2章)。
-- **戦闘**: ATTACKは基本8〜14ダメージ・反撃6〜12ダメージのランダム。一部の敵は「正しいアイテム/達成済みクエスト」を持っていないとATTACKで即死する「神話ゲート」付き。HP0で運命の間にHP20でリスポーン。**生きている敵がいる部屋はMOVEで出ようとすると即死**(倒すかFLEEで振り切るまで封鎖)。
+- **戦闘**: ATTACKは基本8〜14ダメージ・反撃6〜12ダメージのランダム。一部の敵は「正しいアイテム/達成済みクエスト」を持っていないとATTACKで即死する「神話ゲート」付き。HP0で運命の間にHP20でリスポーン。**生きている敵がいる部屋はMOVEで出ようとすると即死**(倒すかFLEEで振り切るまで封鎖)。**DEFEND**で身構えると次の反撃が半分になる(1回限り)。死んだあとモイライに`TALK`すると、死因について神話にちなんだ控えめなヒントを1回だけくれる(`EVT PLAYER HINT`)。**祝福**: 各編をクリア(エンディング)すると、その編の神の祝福が永続で手に入る(死んでも消えない)。アテナ(オデュッセイア編)=敵の反撃-20%、ヘラ(アルゴ船編)=HP回復2倍、アポロン(トロイア編)=与ダメージ+3。
 - **クエスト**: `QUEST <npc>`で受注、TAKE/ATTACKの成否をサーバー側が自動で判定して進行・達成・報酬付与まで行う(完了報告コマンドは無し)。
-- **ワールド**: 46部屋・アイテム21種(取得できるもの17種+記念品4種)・NPC 43・クエスト16種。ハブ(運命の間)からは東のオデュッセイア編(22部屋)にだけ行ける。アルゴナウタイ編(12部屋)とトロイア編(11部屋)のデータは残してあるが、そこへ続く出口は消してあり、今は行けない(到達できるのは23部屋)。オデュッセイア編は単独で輪になっていて(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)、冥界と求婚者たちの広間はそこから分かれる行き止まりの枝なので、「ループ+分岐、一直線不可」の要件を満たす。さらに、史実に反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入るゲームオーバー部屋が6つある。
+- **ワールド**: 46部屋・アイテム21種(取得できるもの17種+記念品4種)・NPC 43・クエスト16種。ハブ(運命の間)からは西のアルゴナウタイ編(12部屋)・北のトロイア編(11部屋)・東のオデュッセイア編(22部屋)の3編に行ける(全46部屋に到達できる)。オデュッセイア編は単独で輪になっていて(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)、冥界と求婚者たちの広間はそこから分かれる行き止まりの枝なので、「ループ+分岐、一直線不可」の要件を満たす。さらに、史実に反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入るゲームオーバー部屋が6つある。
 - **多言語対応**: `LANG ja`をCONNECT前に送るとLOOK/TALK/QUESTのテキストが日本語になる。RFC規定のJSON構造・コマンド名は一切変更していないので、他チームのサーバー/クライアントとの相互接続には影響しない。詳細は`memo.md` 8章。
 
 ### ワールドの地図
 
-全40部屋とその出口を `data/world.json` から生成した図。アルゴナウタイ編とトロイア編も描いてあるが、ハブからそこへ入る出口は消してあり、入れない。そちらからハブへ戻る出口は残してあるので(ハブへ向かう一方通行の矢印)、すでに中にいた人が閉じ込められることはない。矢印の文字は、上の部屋から下の部屋へ進むときの方角(戻るときは逆方向)。`<-->` は往復できる道、`-->` は一方通行(クレタ→イオルコス、城壁の下の野→ギリシア軍の陣営、イタケの岸辺→運命の間)。緑がハブ、橙は仲間を失う/適切なアイテムが無いと死ぬ危険のある部屋、赤は入ると必ず死ぬ部屋。
+全40部屋とその出口を `data/world.json` から生成した図。アルゴナウタイ編とトロイア編も、ハブとの間を往復できる道でつながっている。矢印の文字は、上の部屋から下の部屋へ進むときの方角(戻るときは逆方向)。`<-->` は往復できる道、`-->` は一方通行(クレタ→イオルコス、城壁の下の野→ギリシア軍の陣営、イタケの岸辺→運命の間)。緑がハブ、橙は仲間を失う/適切なアイテムが無いと死ぬ危険のある部屋、赤は入ると必ず死ぬ部屋。
 
 ```mermaid
 flowchart TB
