@@ -1446,6 +1446,22 @@
           "quest.trojan_horse"
         ],
         "reward_item": "item.ember_of_troy",
+        "blessing": {
+          "god": {
+            "en": "Apollo",
+            "ja": "アポロン"
+          },
+          "name": {
+            "en": "Apollo's Arrow",
+            "ja": "アポロンの矢"
+          },
+          "description": {
+            "en": "Every hit you land deals 3 extra damage.",
+            "ja": "与えるダメージが常に3増える。"
+          },
+          "effect": "damage_bonus",
+          "value": 3
+        },
         "hint": {
           "en": "Aeneas watches the flames: the war is not yet won. Only one who has armed Achilles, faced Hector, ransomed him, and built the horse may see its end.",
           "ja": "アイネイアスは炎を見つめる。戦はまだ終わっていない。アキレウスに武具を与え、ヘクトールと戦い、彼を弔い、木馬を作った者だけが、その終わりを見届けられる。"
@@ -1739,6 +1755,29 @@
         }
       ]
     },
+    "npc.athena": {
+      "name": {
+        "en": "Athena",
+        "ja": "アテナ"
+      },
+      "description": {
+        "en": "The grey-eyed goddess of wisdom, patron of Odysseus, walking Ithaca's shore as a young shepherd.",
+        "ja": "オデュッセウスの守護女神、知恵の灰色の瞳の女神。若い羊飼いの姿でイタケの浜を歩く。"
+      },
+      "role": "dialogue",
+      "room_id": "loc.ody_ithaca_shore",
+      "hp": 100,
+      "dialogue": [
+        {
+          "en": "'Twenty years away, and you still talk your way out of everything. I have always liked that about you.'",
+          "ja": "「二十年も留守にして、まだ口先で切り抜けるのね。そこが昔から気に入っているわ」"
+        },
+        {
+          "en": "'I was beside you at Troy, and on every sea since. Finish what you started, and my gift is yours for good.'",
+          "ja": "「トロイアでも、その後のどの海でも、私はあなたのそばにいた。やり遂げなさい。そうすれば私の贈り物は永遠にあなたのもの」"
+        }
+      ]
+    },
     "npc.eumaeus": {
       "name": {
         "en": "Eumaeus",
@@ -1830,6 +1869,22 @@
           "quest.suitors_end"
         ],
         "reward_item": "item.olive_branch_of_ithaca",
+        "blessing": {
+          "god": {
+            "en": "Athena",
+            "ja": "アテナ"
+          },
+          "name": {
+            "en": "Athena's Grey-Eyed Wit",
+            "ja": "アテナの灰色の知恵"
+          },
+          "description": {
+            "en": "Enemy counter-attacks hurt 20% less.",
+            "ja": "敵の反撃で受けるダメージが2割減る。"
+          },
+          "effect": "counter_reduction",
+          "value": 20
+        },
         "hint": {
           "en": "Penelope studies you carefully. Only one who can string the bow and drive out the suitors is the man she has waited twenty years for.",
           "ja": "ペネロペイアはあなたをじっと見つめる。弓に弦を張り、求婚者を追い払える者だけが、二十年待ち続けた人だ。"
@@ -1984,6 +2039,22 @@
           "quest.golden_fleece"
         ],
         "reward_item": "item.laurel_of_the_argo",
+        "blessing": {
+          "god": {
+            "en": "Hera",
+            "ja": "ヘラ"
+          },
+          "name": {
+            "en": "Hera's Favor",
+            "ja": "ヘラの寵愛"
+          },
+          "description": {
+            "en": "You heal twice as fast.",
+            "ja": "HPの回復が2倍の速さになる。"
+          },
+          "effect": "regen_bonus",
+          "value": 1
+        },
         "hint": {
           "en": "Pelias sneers: the fleece, hero. Not stories of it.",
           "ja": "ペリアスは鼻で笑う。「羊毛皮だ、英雄よ。話ではなく、本物を持ってこい」"

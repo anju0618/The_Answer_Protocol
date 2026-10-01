@@ -62,6 +62,11 @@ type catalogEntry struct {
 		ID         string        `json:"id"`
 		Name       localizedName `json:"name"`
 		RewardItem string        `json:"reward_item"`
+		Blessing   *struct {
+			God         localizedName `json:"god"`
+			Name        localizedName `json:"name"`
+			Description localizedName `json:"description"`
+		} `json:"blessing"`
 	} `json:"ending"`
 	Hazard *struct {
 		Type string `json:"type"`

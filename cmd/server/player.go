@@ -70,7 +70,8 @@ const (
 	regenAmount   = 1
 )
 
-func (p *Player) regenLocked(now time.Time) {
+// regenLocked heals over time; bonus is extra HP per tick (Hera's blessing).
+func (p *Player) regenLocked(now time.Time, bonus int) {
 	if p.HP >= maxPlayerHP || p.lastRegen.IsZero() {
 		p.lastRegen = now
 		return
@@ -79,7 +80,7 @@ func (p *Player) regenLocked(now time.Time) {
 	if ticks <= 0 {
 		return
 	}
-	p.HP += ticks * regenAmount
+	p.HP += ticks * (regenAmount + bonus)
 	if p.HP >= maxPlayerHP {
 		p.HP = maxPlayerHP
 		p.lastRegen = now

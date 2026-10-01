@@ -16,17 +16,22 @@ var endingOrder = []string{"ending.argo", "ending.troy", "ending.odyssey", "endi
 type endingSlot struct {
 	id, rewardItem string
 	name           localizedName
+	blessing       string // "God: Name. Description" in the current locale, or "" if the ending has none
 }
 
 // endingSlots lists every ending of the world, ordered by endingOrder.
-func (catalog *worldCatalog) endingSlots() []endingSlot {
+func (catalog *worldCatalog) endingSlots(locale string) []endingSlot {
 	var slots []endingSlot
 	if catalog == nil {
 		return slots
 	}
 	for _, npc := range catalog.NPCs {
 		if npc.Ending != nil {
-			slots = append(slots, endingSlot{id: npc.Ending.ID, rewardItem: npc.Ending.RewardItem, name: npc.Ending.Name})
+			slot := endingSlot{id: npc.Ending.ID, rewardItem: npc.Ending.RewardItem, name: npc.Ending.Name}
+			if b := npc.Ending.Blessing; b != nil {
+				slot.blessing = b.God.get(locale) + ": " + b.Name.get(locale) + " — " + b.Description.get(locale)
+			}
+			slots = append(slots, slot)
 		}
 	}
 	rank := func(id string) int {
@@ -79,14 +84,19 @@ func (ui *gui) showEndings() {
 	}
 	var rows []fyne.CanvasObject
 	reached := 0
-	slots := ui.catalog.endingSlots()
+	slots := ui.catalog.endingSlots(ui.locale)
 	for _, slot := range slots {
-		text := "？？？"
+		card := container.NewVBox(journalName("？？？"))
 		if slices.Contains(ui.inventory, slot.rewardItem) {
-			text = "★ " + slot.name.get(ui.locale)
+			card = container.NewVBox(journalName("★ " + slot.name.get(ui.locale)))
+			if slot.blessing != "" {
+				blessing := widget.NewLabel(slot.blessing)
+				blessing.Wrapping = fyne.TextWrapWord
+				card.Add(blessing)
+			}
 			reached++
 		}
-		rows = append(rows, journalCard(journalName(text)))
+		rows = append(rows, journalCard(card))
 	}
 	if len(slots) == 0 {
 		ui.endingBox.Objects = nil

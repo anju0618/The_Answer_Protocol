@@ -12,6 +12,15 @@ var randDamage = func(min, max int) int {
 	return min + rand.IntN(max-min+1)
 }
 
+// reduceCounter lowers a counter-attack by percent (capped), never below 1 damage.
+func reduceCounter(counter, percent int) int {
+	percent = min(percent, maxCounterReduction)
+	if percent <= 0 {
+		return counter
+	}
+	return max(1, counter*(100-percent)/100)
+}
+
 // respawnPlayerLocked kills the player and sends them back to the hub.
 // subject is the ID of the NPC, room or item that caused the death; the Moirai can later turn it into a hint.
 func (s *Server) respawnPlayerLocked(player *Player, name, cause, subject string, args ...any) {
@@ -103,7 +112,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 
 		allies := s.alliesInRoomLocked(*name)
 		bonus := allyBonusCount(allies)
-		damage := randDamage(combatMinDamage, combatMaxDamage) + bonus*allyDamageBonus
+		damage := randDamage(combatMinDamage, combatMaxDamage) + bonus*allyDamageBonus + s.blessingTotalLocked(player, blessingDamageBonus)
 		enemyHP -= damage
 		if enemyHP < 0 {
 			enemyHP = 0
@@ -118,7 +127,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		} else {
 			player.CombatTargetID = npcID
 			counter := randDamage(counterMinDamage, counterMaxDamage)
-			counter = max(1, counter*(100-bonus*allyCounterReductionPercent)/100)
+			counter = reduceCounter(counter, bonus*allyCounterReductionPercent+s.blessingTotalLocked(player, blessingCounterReduction))
 			player.HP -= counter
 			if player.HP <= 0 {
 				s.respawnPlayerLocked(player, *name, "attack_counter", npcID, npc.Name.Get(locale))
@@ -195,7 +204,7 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 		}
 		player.FledFrom[targetID] = true
 	} else {
-		counter := randDamage(counterMinDamage, counterMaxDamage)
+		counter := reduceCounter(randDamage(counterMinDamage, counterMaxDamage), s.blessingTotalLocked(player, blessingCounterReduction))
 		player.HP -= counter
 		if player.HP <= 0 {
 			s.respawnPlayerLocked(player, *name, "flee_failed", targetID, npc.Name.Get(locale))

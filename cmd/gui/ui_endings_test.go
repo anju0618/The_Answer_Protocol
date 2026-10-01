@@ -11,9 +11,12 @@ func TestEndingSlotsFollowStoryOrderWithFinalLast(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	slots := catalog.endingSlots()
+	slots := catalog.endingSlots("en")
 	if len(slots) != 4 || slots[0].id != "ending.argo" || slots[3].id != "ending.final" {
 		t.Fatalf("ending slots = %+v", slots)
+	}
+	if slots[2].id != "ending.odyssey" || slots[2].blessing == "" || slots[3].blessing != "" {
+		t.Fatalf("blessings: Odyssey = %q, final = %q", slots[2].blessing, slots[3].blessing)
 	}
 	if catalog.lethalRoomCount() == 0 {
 		t.Fatal("the Odyssey has game-over rooms")

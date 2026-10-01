@@ -191,7 +191,7 @@ func (s *Server) playerForUpdateLocked(name string) *Player {
 	if player == nil || player.exiting {
 		return nil
 	}
-	player.regenLocked(time.Now())
+	player.regenLocked(time.Now(), s.blessingTotalLocked(player, blessingRegenBonus))
 	return player
 }
 
@@ -754,7 +754,7 @@ func handleStatus(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	player.regenLocked(time.Now())
+	player.regenLocked(time.Now(), s.blessingTotalLocked(player, blessingRegenBonus))
 	status := "healthy"
 	if player.CombatTargetID != "" {
 		status = "combat"
