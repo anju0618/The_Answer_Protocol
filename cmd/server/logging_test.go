@@ -229,3 +229,37 @@ func TestClipAndLogFile(t *testing.T) {
 		t.Errorf("log file = %q, want only the WARN record", data)
 	}
 }
+
+func TestAbuseMonitorRemovesExpiredIPsAndWarnings(t *testing.T) {
+	monitor := newAbuseMonitor()
+	now := time.Now()
+	for i := 0; i <= maxConnectsPerWindow; i++ {
+		monitor.noteConnection("203.0.113.9", now)
+	}
+	if _, exists := monitor.lastWarn["203.0.113.9"]; !exists {
+		t.Fatal("rapid connection warning was not tracked")
+	}
+	monitor.noteConnection("198.51.100.1", now.Add(time.Second))
+	monitor.noteConnection("198.51.100.2", now.Add(connectWindow))
+	if _, exists := monitor.connects["203.0.113.9"]; exists {
+		t.Fatal("expired connection history was retained")
+	}
+	if _, exists := monitor.lastWarn["203.0.113.9"]; exists {
+		t.Fatal("expired IP warning was retained")
+	}
+	if len(monitor.connects["198.51.100.1"]) != 1 || len(monitor.connects["198.51.100.2"]) != 1 {
+		t.Fatalf("live connections were not retained: %v", monitor.connects)
+	}
+}
+
+func TestAbuseMonitorHistoryDoesNotAccumulateAcrossIPs(t *testing.T) {
+	monitor := newAbuseMonitor()
+	now := time.Now()
+	for i := 0; i < 1000; i++ {
+		ip := fmt.Sprintf("192.0.%d.%d", i/256, i%256)
+		monitor.noteConnection(ip, now.Add(time.Duration(i)*(connectWindow+time.Second)))
+	}
+	if len(monitor.connects) != 1 || len(monitor.lastWarn) != 0 {
+		t.Fatalf("expired IPs accumulated: histories=%d, warnings=%d", len(monitor.connects), len(monitor.lastWarn))
+	}
+}

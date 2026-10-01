@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/sha256"
+	"fmt"
 	"image"
 	"image/png"
 	"net"
@@ -227,4 +228,109 @@ func TestQuitErrorKeepsGUIConnected(t *testing.T) {
 		t.Fatal("QUIT error left the GUI in a disconnected state")
 	}
 	ui.stopPolling()
+}
+
+func TestIdlePollUpdatesHP(t *testing.T) {
+	application := test.NewApp()
+	defer application.Quit()
+	window := application.NewWindow("test")
+	defer window.Close()
+	ui := &gui{window: window, locale: "en"}
+	ui.build()
+	clientConn, serverConn := net.Pipe()
+	defer serverConn.Close()
+	ui.client = newProtocolClient(clientConn)
+	defer ui.client.Close()
+	ui.connected = true
+	ui.handleResponse("STATUS", "STATUS", `OK {"hp":20,"max_hp":100,"status":"healthy"}`)
+
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	go func() {
+		ui.poll(ui.client, stop)
+		close(done)
+	}()
+	defer func() {
+		close(stop)
+		<-done
+	}()
+	if err := serverConn.SetDeadline(time.Now().Add(7 * time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	reader := bufio.NewScanner(serverConn)
+	for _, exchange := range []struct {
+		command  string
+		response string
+	}{
+		{"LOOK", `OK {"room":{"id":"loc.hall_of_fates"},"players":[],"items":[],"npcs":[]}`},
+		{"WHO", "OK players=1"},
+		{"STATUS", `OK {"hp":22,"max_hp":100,"status":"healthy"}`},
+	} {
+		if !reader.Scan() || reader.Text() != exchange.command {
+			t.Fatalf("poll command = %q, want %q: %v", reader.Text(), exchange.command, reader.Err())
+		}
+		if _, err := fmt.Fprintln(serverConn, exchange.response); err != nil {
+			t.Fatal(err)
+		}
+		message := nextMessage(t, ui.client)
+		if message.command != exchange.command {
+			t.Fatalf("response matched %q, want %q", message.command, exchange.command)
+		}
+		ui.handleMessage(message)
+	}
+	if ui.hpLabel.Text != "HP: 22/100 (healthy)" {
+		t.Fatalf("idle HP display = %q", ui.hpLabel.Text)
+	}
+}
+
+func TestEscapeCancelsGroupInput(t *testing.T) {
+	for _, action := range []struct {
+		name  string
+		index int
+	}{
+		{"INVITE", 1},
+		{"JOIN", 2},
+	} {
+		t.Run(action.name, func(t *testing.T) {
+			application := test.NewApp()
+			defer application.Quit()
+			window := application.NewWindow("test")
+			defer window.Close()
+			ui := &gui{window: window, locale: "en", connected: true}
+			ui.build()
+			ui.chooseAction("GROUP")
+			ui.runChoice(action.index)
+			focused := window.Canvas().Focused()
+			if focused != ui.rawEntry {
+				t.Fatal("group input was not focused")
+			}
+			test.Type(focused, "bob")
+			focused.TypedKey(&fyne.KeyEvent{Name: fyne.KeyEscape})
+			if window.Canvas().Focused() != nil || len(ui.choices) != 0 || ui.rawEntry.Text != "" {
+				t.Fatalf("Esc left focus=%T, choices=%d, input=%q", window.Canvas().Focused(), len(ui.choices), ui.rawEntry.Text)
+			}
+			if ui.choiceTitle.Text != "Choose a target by number" {
+				t.Fatalf("prompt after cancel = %q", ui.choiceTitle.Text)
+			}
+		})
+	}
+}
+
+func TestCommandEntryKeepsEditingAndUnsentDraft(t *testing.T) {
+	application := test.NewApp()
+	defer application.Quit()
+	window := application.NewWindow("test")
+	defer window.Close()
+	ui := &gui{window: window, locale: "en"}
+	ui.build()
+	window.Canvas().Focus(ui.rawEntry)
+	test.Type(ui.rawEntry, "LOOKx")
+	ui.rawEntry.TypedKey(&fyne.KeyEvent{Name: fyne.KeyBackspace})
+	if ui.rawEntry.Text != "LOOK" {
+		t.Fatalf("Backspace did not edit the command: %q", ui.rawEntry.Text)
+	}
+	ui.rawEntry.TypedKey(&fyne.KeyEvent{Name: fyne.KeyEscape})
+	if window.Canvas().Focused() != nil || ui.rawEntry.Text != "LOOK" {
+		t.Fatalf("Esc did not preserve the unsent command: focus=%T, input=%q", window.Canvas().Focused(), ui.rawEntry.Text)
+	}
 }

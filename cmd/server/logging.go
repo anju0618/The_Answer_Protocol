@@ -101,13 +101,21 @@ func newAbuseMonitor() *abuseMonitor {
 
 func (m *abuseMonitor) noteConnection(ip string, now time.Time) {
 	m.mu.Lock()
-	recent := m.connects[ip][:0]
-	for _, t := range m.connects[ip] {
-		if now.Sub(t) < connectWindow {
-			recent = append(recent, t)
+	for knownIP, times := range m.connects {
+		recent := times[:0]
+		for _, t := range times {
+			if now.Sub(t) < connectWindow {
+				recent = append(recent, t)
+			}
+		}
+		if len(recent) == 0 {
+			delete(m.connects, knownIP)
+			delete(m.lastWarn, knownIP)
+		} else {
+			m.connects[knownIP] = recent
 		}
 	}
-	recent = append(recent, now)
+	recent := append(m.connects[ip], now)
 	m.connects[ip] = recent
 	count := len(recent)
 	warn := count > maxConnectsPerWindow && now.Sub(m.lastWarn[ip]) >= abuseWarnInterval

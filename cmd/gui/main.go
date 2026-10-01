@@ -62,7 +62,7 @@ type gui struct {
 	commandButtons  *fyne.Container
 	chatScope       *widget.Select
 	chatEntry       *widget.Entry
-	rawEntry        *widget.Entry
+	rawEntry        *commandEntry
 	chatLabel       *widget.Label
 	storyLabel      *widget.Label
 	logLabel        *widget.Label
@@ -131,7 +131,7 @@ func (ui *gui) build() {
 	ui.questBox = container.NewVBox(widget.NewLabel("-"))
 	ui.choiceTitle = widget.NewLabel(ui.tr("Choose a target by number", "番号で対象を選ぶ"))
 	ui.choiceBox = container.NewVBox(widget.NewLabel("-"))
-	ui.rawEntry = widget.NewEntry()
+	ui.rawEntry = newCommandEntry(ui.cancelChoices)
 	ui.rawEntry.SetPlaceHolder(ui.tr("/ : RFC command", "/ : RFCコマンド"))
 	ui.rawEntry.OnSubmitted = func(line string) {
 		ui.send(strings.TrimSpace(line))
@@ -351,9 +351,7 @@ func (ui *gui) bindKeyboard() {
 			return
 		}
 		if event.Name == fyne.KeyEscape {
-			ui.choices = nil
-			ui.choiceTitle.SetText(ui.tr("Choose a target by number", "番号で対象を選ぶ"))
-			setRows(ui.choiceBox, nil)
+			ui.cancelChoices()
 			return
 		}
 		directions := map[fyne.KeyName]string{fyne.KeyUp: "north", fyne.KeyDown: "south", fyne.KeyLeft: "west", fyne.KeyRight: "east"}
@@ -410,6 +408,16 @@ func (ui *gui) bindKeyboard() {
 			ui.send("QUIT")
 		}
 	})
+}
+
+func (ui *gui) cancelChoices() {
+	if ui.window.Canvas().Focused() == ui.rawEntry && len(ui.choices) > 0 {
+		ui.rawEntry.SetText("")
+	}
+	ui.window.Canvas().Unfocus()
+	ui.choices = nil
+	ui.choiceTitle.SetText(ui.tr("Choose a target by number", "番号で対象を選ぶ"))
+	setRows(ui.choiceBox, nil)
 }
 
 func (ui *gui) sendChat() {
@@ -494,6 +502,7 @@ func (ui *gui) poll(client *protocolClient, stop <-chan struct{}) {
 			if client.canPoll() {
 				client.Send("LOOK")
 				client.Send("WHO")
+				client.Send("STATUS")
 			}
 		case <-stop:
 			return

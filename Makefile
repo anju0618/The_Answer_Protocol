@@ -27,7 +27,7 @@ build: ## Compile the server, CLI client and GUI client into bin/
 	$(GO) build -o $(GUI_BIN) ./cmd/gui
 
 run-server: ## Run the server on :4242 (JSON logs on stderr)
-	$(GO) run ./cmd/server
+	@$(GO) run ./cmd/server
 
 run-client: ## Run the CLI client (ADDR=host:port to change the server)
 	$(GO) run ./cmd/cli $(ADDR)
