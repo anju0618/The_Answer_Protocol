@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -86,9 +85,9 @@ func (ui *gui) showEndings() {
 	reached := 0
 	slots := ui.catalog.endingSlots(ui.locale)
 	for _, slot := range slots {
-		card := container.NewVBox(journalName("？？？"))
+		card := textVBox(journalName("？？？"))
 		if slices.Contains(ui.inventory, slot.rewardItem) {
-			card = container.NewVBox(journalName("★ " + slot.name.get(ui.locale)))
+			card = textVBox(journalName("★ " + slot.name.get(ui.locale)))
 			if slot.blessing != "" {
 				blessing := widget.NewLabel(slot.blessing)
 				blessing.Wrapping = fyne.TextWrapWord
@@ -103,10 +102,11 @@ func (ui *gui) showEndings() {
 		ui.endingBox.Refresh()
 		return
 	}
-	header := widget.NewLabelWithStyle(fmt.Sprintf(ui.tr("Endings %d/%d", "エンディング %d/%d"), reached, len(slots)), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	header := journalName(fmt.Sprintf(ui.tr("Endings %d/%d", "エンディング %d/%d"), reached, len(slots)))
 	fatal := widget.NewLabel(fmt.Sprintf(ui.tr("Fatal choices found: %d/%d", "見つけた即死の選択: %d/%d"), len(ui.fatalRooms()), ui.catalog.lethalRoomCount()))
+	fatal.Wrapping = fyne.TextWrapWord
 	ui.endingBox.Objects = append(append([]fyne.CanvasObject{header}, rows...), fatal)
 	ui.endingBox.Refresh()
 }
 
-func newEndingBox() *fyne.Container { return container.NewVBox() }
+func newEndingBox() *fyne.Container { return textVBox() }

@@ -530,7 +530,8 @@ func (ui *gui) showGameOver(roomID string, room catalogEntry) {
 	scene.FillMode = canvas.ImageFillContain
 	scene.ScaleMode = canvas.ImageScaleSmooth
 	scene.SetMinSize(fyne.NewSize(480, 288))
-	title := widget.NewLabelWithStyle(ui.tr("GAME OVER", "ゲームオーバー")+"  -  "+room.Name.get(ui.locale), fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	title := widget.NewLabelWithStyle(room.Name.get(ui.locale), fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	title.Wrapping = fyne.TextWrapWord
 	story := widget.NewLabel(room.Description.get(ui.locale))
 	story.Wrapping = fyne.TextWrapWord
 	var popup *widget.PopUp
@@ -538,7 +539,8 @@ func (ui *gui) showGameOver(roomID string, room catalogEntry) {
 		popup.Hide()
 		ui.window.Canvas().Unfocus()
 	})
-	content := framed("", container.NewBorder(title, closeButton, nil, nil, container.NewVBox(scene, story)))
+	content := framed(ui.tr("GAME OVER", "ゲームオーバー"),
+		container.NewBorder(nil, closeButton, nil, nil, container.NewVScroll(textVBox(title, scene, story))))
 	popup = widget.NewModalPopUp(container.NewGridWrap(fyne.NewSize(540, 520), content), ui.window.Canvas())
 	popup.Show()
 	ui.window.Canvas().Focus(closeButton)
