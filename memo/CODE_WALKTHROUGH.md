@@ -6451,7 +6451,7 @@ func appendLine(lines []string, line string) []string {
 
 - 現在時刻と文章を追加し、300行を超えたら古い行を取り除きます。
 
-## 15-8 `ui_layout.go`(379行)— 画面とウインドウサイズ
+## 15-8 `ui_layout.go`(398行)— 画面とウインドウサイズ
 
 ### `build`
 
@@ -6510,7 +6510,8 @@ func (ui *gui) build() {
 	ui.sceneMapBox = container.New(&mapLayout{})
 	ui.sceneMapPanel = framed(ui.tr("Map", "地図"), ui.mapView(ui.sceneMapBox))
 	ui.sceneMapPanel.Hide()
-	sceneVisual := container.NewScroll(container.New(&sceneVisualLayout{photos: ui.itemPhotoBox}, ui.scene, ui.flash, ui.photoStrip, ui.sceneMapPanel))
+	visualLayout := &sceneVisualLayout{photos: ui.itemPhotoBox}
+	sceneVisual := container.NewScroll(container.New(visualLayout, ui.scene, ui.flash, ui.photoStrip, ui.sceneMapPanel))
 	sceneVisual.Direction = container.ScrollNone
 	sceneFrame := canvas.NewRectangle(ink)
 	sceneFrame.StrokeColor = gold
@@ -6525,12 +6526,24 @@ func (ui *gui) build() {
 		journalSection(ui.tr("Items here", "落ちている道具"), ui.itemBox),
 		journalSection(ui.tr("Players here", "この部屋のプレイヤー"), ui.playerBox),
 	)
+	mapTab := container.NewTabItem(ui.tr("Map", "地図"), ui.buildMapTab())
 	ui.journal = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Around", "まわり"), container.NewVScroll(surroundings)),
 		container.NewTabItem(ui.tr("Inventory", "持ち物"), container.NewVScroll(ui.inventoryBox)),
 		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(textVBox(ui.questBox, ui.endingBox))),
-		container.NewTabItem(ui.tr("Map", "地図"), ui.buildMapTab()),
+		mapTab,
 	)
+	journal := ui.journal
+	visualLayout.onMapVisibility = func(visible bool) {
+		if visible && len(journal.Items) == 4 {
+			if journal.Selected() == mapTab {
+				journal.SelectIndex(0)
+			}
+			journal.Remove(mapTab)
+		} else if !visible && len(journal.Items) == 3 {
+			journal.Append(mapTab)
+		}
+	}
 	ui.journal.OnSelected = func(item *container.TabItem) {
 		if !ui.connected {
 			return
@@ -6929,7 +6942,10 @@ func textLineHeight() float32 {
 ### `sceneVisualLayout`
 
 ```go
-type sceneVisualLayout struct{ photos *fyne.Container }
+type sceneVisualLayout struct {
+	photos          *fyne.Container
+	onMapVisibility func(bool)
+}
 ```
 
 - 背景・フラッシュ・アイテムの絵を、部屋の絵の枠内へ配置します。
@@ -6963,6 +6979,9 @@ func (l *sceneVisualLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) 
 	} else {
 		mapPanel.Hide()
 	}
+	if l.onMapVisibility != nil {
+		l.onMapVisibility(mapPanel.Visible())
+	}
 	if objects[2].Visible() {
 		thumbnail := fyne.NewSquareSize(min(104, max(48, inside.Height*0.3)))
 		for _, photo := range l.photos.Objects {
@@ -6983,6 +7002,8 @@ func (l *sceneVisualLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) 
 - 背景とフラッシュを枠から余白分だけ離します。アイテムは右下に置き、絵の高さに応じて48～104の正方形へ縮小・拡大します。アイテム欄の幅と高さも枠の内側へ収めます。
 
 - 横に広い画面では、縦横比を保って表示した絵の左に余白が生まれます。その余白に地図と余白分の幅・高さが収まる場合だけ、地図を常時表示します。絵の表示範囲を狭めたり、絵の上に地図を重ねたりはしません。
+
+- 左の地図を表示するときは右の地図タブを取り除き、表示できない幅に戻すと同じタブを追加します。地図タブを選択中なら「まわり」へ戻し、持ち物・クエストを選択中ならそのまま保ちます。
 
 ## 15-9 `ui_actions.go`(94行)— マウス操作とグループ
 
@@ -7489,7 +7510,7 @@ func handleState(s *Server, conn net.Conn, name *string, parts []string) bool {
 | `ui_combat.go` | 戦闘中の敵名・HP・「戦う／構える／逃げる」を表示し、ATTACK・DEFEND・FLEEの応答を反映する |
 | `ui_story.go` | 冒険の履歴を種類付きで保存し、種類別の色を使ったRichTextへ変換する |
 | `ui_effects.go` | 移動・被害・死亡時のフラッシュを作り、時間経過で透明にする |
-| `ui_map.go` | 訪れた部屋と接続関係、危険・即死等の凡例を表示する。タブと絵の左の余白の2か所を、それぞれ独立した描画部品で更新する。狭い画面の地図タブは地図と凡例全体をスクロールできる |
+| `ui_map.go` | 訪れた部屋と接続関係、危険・即死等の凡例を表示する。タブと絵の左の余白の描画部品を別々に更新し、左へ表示できる場合は地図タブを取り除く。狭い画面の地図タブは地図と凡例全体をスクロールできる |
 | `ui_endings.go` | 持ち物の記念品から取得したエンディングと祝福を表示し、設定へ記録した即死部屋の数も表示する |
 
 長い敵名、エンディングの祝福文にも`textVBox`を使います。地図の凡例は色見本以外へ残りの幅を割り当て、言語による文字幅の違いに対応します。
@@ -7498,7 +7519,7 @@ func handleState(s *Server, conn net.Conn, name *string, parts []string) bool {
 
 `ui_initial_room_test.go`では、未接続の画面を表示し、英語から日本語へ切り替えた後に、最初の部屋を読み込みます。タブ切替・サイズ変更をしない状態の「まわり」の配置を検証し、その後タブを切り替えても一覧の高さが変わらないことを確認します。文字サイズ15・22、1280×900・640×900で確認します。
 
-`ui_map_test.go`では、1920×1080の広い画面の地図が絵の左の余白に収まること、画面を狭めると隠れること、2か所の地図が描画部品を共有せずに訪問済みの部屋を更新することを確認します。
+`ui_map_test.go`では、日本語・英語、文字サイズ15・22で、広い画面の地図が左の余白に収まり、右の地図タブを取り除くことを確認します。幅を狭めると同じ地図タブを戻すこと、持ち物・クエストの選択とチャットの下書きを保つこと、言語切替後も広い画面では地図タブを出さないことも確認します。2か所の地図は描画部品を共有せずに訪問済みの部屋を更新します。
 
 Fyneのテスト用ウインドウは実ウインドウの最小サイズ制約を自動では適用しないため、テスト側で現在の最小サイズ以上へ調整します。`TAP_GUI_PREVIEW_DIR`に既存の出力ディレクトリを指定すると、同じ検証画面をPNGへ保存できます。通常のテストではPNGをファイルへ書きません。これはFyneのテスト用Canvasでの確認であり、OSの実ウインドウの起動確認とは別です。
 

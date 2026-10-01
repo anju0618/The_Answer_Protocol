@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"testing"
 
 	"fyne.io/fyne/v2"
@@ -34,8 +35,17 @@ func TestMapLayoutPlacesEveryOdysseyRoomOnItsOwnCell(t *testing.T) {
 }
 
 func TestWideSceneShowsMapInLeftMargin(t *testing.T) {
+	for _, locale := range []string{"en", "ja"} {
+		for _, textSize := range []float32{15, 22} {
+			t.Run(fmt.Sprintf("%s-text-%g", locale, textSize), func(t *testing.T) { checkWideSceneMap(t, locale, textSize) })
+		}
+	}
+}
+
+func checkWideSceneMap(t *testing.T, locale string, textSize float32) {
+	t.Helper()
 	application := test.NewApp()
-	application.Settings().SetTheme(retroTheme{base: theme.DarkTheme()})
+	application.Settings().SetTheme(layoutTestTheme{Theme: retroTheme{base: theme.DarkTheme()}, textSize: textSize})
 	defer application.Quit()
 	window := application.NewWindow("left map layout")
 	defer window.Close()
@@ -43,11 +53,13 @@ func TestWideSceneShowsMapInLeftMargin(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ui := &gui{window: window, locale: "ja", catalog: catalog}
+	ui := &gui{window: window, locale: locale, catalog: catalog}
 	ui.build()
-	ui.showRoom(lookView{Room: roomView{ID: hubRoomID, Name: catalog.label("room", hubRoomID, "ja")}, NPCs: []string{"npc.moirai"}})
+	mapTab := ui.journal.Items[3]
+	ui.chatEntry.SetText("unsent message")
+	ui.showRoom(lookView{Room: roomView{ID: hubRoomID, Name: catalog.label("room", hubRoomID, locale)}, NPCs: []string{"npc.moirai"}})
 	window.Show()
-	for _, size := range []fyne.Size{fyne.NewSize(1280, 900), fyne.NewSize(1920, 1080), fyne.NewSize(640, 900), fyne.NewSize(1920, 1080)} {
+	for step, size := range []fyne.Size{fyne.NewSize(1280, 900), fyne.NewSize(1920, 1080), fyne.NewSize(640, 900), fyne.NewSize(1920, 1080), fyne.NewSize(1280, 900), fyne.NewSize(1920, 1080)} {
 		window.SetFullScreen(size.Width == 1920)
 		window.Resize(size)
 		capture := window.Canvas().Capture()
@@ -55,16 +67,55 @@ func TestWideSceneShowsMapInLeftMargin(t *testing.T) {
 			if !ui.sceneMapPanel.Visible() {
 				t.Fatal("wide scene did not show the map")
 			}
+			if len(ui.journal.Items) != 3 {
+				t.Fatal("wide scene still has a duplicate map tab")
+			}
+			if step == 1 && ui.journal.SelectedIndex() != 0 {
+				t.Fatal("removing the selected map tab should return to Around")
+			}
 			checkJournalBounds(t, ui.sceneMapPanel)
 			renderedWidth := ui.scene.Size().Height * float32(artWidth) / float32(artHeight)
 			leftSpace := (ui.scene.Size().Width - renderedWidth) / 2
 			if ui.sceneMapPanel.Position().X+ui.sceneMapPanel.Size().Width > ui.scene.Position().X+leftSpace {
 				t.Fatal("map covers the room artwork")
 			}
-			saveOverlapPreview(t, "ja-wide-left-map", capture)
-		} else if ui.sceneMapPanel.Visible() {
-			t.Fatal("map should hide when the artwork has no large left margin")
+		} else {
+			if ui.sceneMapPanel.Visible() {
+				t.Fatal("map should hide when the artwork has no large left margin")
+			}
+			if len(ui.journal.Items) != 4 || ui.journal.Items[3] != mapTab {
+				t.Fatal("narrow scene should restore the same map tab once")
+			}
 		}
+		if step >= 2 {
+			wantTab := 1
+			if step >= 4 {
+				wantTab = 2
+			}
+			if ui.journal.SelectedIndex() != wantTab {
+				t.Fatal("resizing should keep the inventory or quests tab selected")
+			}
+		}
+		if ui.chatEntry.Text != "unsent message" {
+			t.Fatal("resizing should preserve the chat draft")
+		}
+		saveOverlapPreview(t, fmt.Sprintf("%s-map-text-%g-%gx%g-step%d", locale, textSize, size.Width, size.Height, step), capture)
+		if step == 0 {
+			ui.journal.Select(mapTab)
+		} else if step == 1 {
+			ui.journal.SelectIndex(1)
+		} else if step == 3 {
+			ui.journal.SelectIndex(2)
+		}
+	}
+	otherLocale := "ja"
+	if locale == "ja" {
+		otherLocale = "en"
+	}
+	ui.switchLocale(otherLocale)
+	window.Canvas().Capture()
+	if len(ui.journal.Items) != 3 || ui.journal.SelectedIndex() != 2 || ui.chatEntry.Text != "unsent message" {
+		t.Fatal("switching language in a wide scene should keep tabs and the chat draft without restoring the map tab")
 	}
 	if ui.sceneMapBox == ui.mapBox || len(ui.sceneMapBox.Objects) != len(ui.mapBox.Objects) {
 		t.Fatal("left map must render independently from the map tab")
