@@ -110,3 +110,10 @@ the cliffs, a rotten fig tree overhead. Terrifying and hopeless.
 1. ファイルを `cmd/gui/assets/rooms/` に置く
 2. `go test ./cmd/gui/` を実行する(サイズ・重複・読み込みを確認します)
 3. `cmd/gui/art_test.go` の「即死の部屋は絵がなくてもよい」という緩めた条件を、「全部の部屋に絵が必要」に戻してもらう
+
+## アテナの立ち絵(仮絵の差し替え用)
+
+`cmd/gui/assets/npcs/npc.athena.png` は今、プログラムで作った仮の絵です。本絵に差し替えるときは次を守ってください。
+
+- 形式: **PNG(透過あり)、192 × 312 ピクセル**ちょうど。他のNPCの立ち絵と同じ形式。
+- 内容: 灰色の瞳の女神アテナ。若い羊飼いに化けた姿で、兜・槍・盾を持つ。文字や枠は入れない。

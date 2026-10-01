@@ -12,7 +12,31 @@ var randDamage = func(min, max int) int {
 	return min + rand.IntN(max-min+1)
 }
 
-func (s *Server) respawnPlayerLocked(player *Player, name, cause string, args ...any) {
+// guardReductionPercent is how much a DEFEND stance cuts the next counter-attack.
+const guardReductionPercent = 50
+
+// takeGuard returns the extra reduction from a DEFEND stance and ends the stance: it covers one counter only.
+func takeGuard(player *Player) int {
+	if !player.guarding {
+		return 0
+	}
+	player.guarding = false
+	return guardReductionPercent
+}
+
+// reduceCounter lowers a counter-attack by percent (capped), never below 1 damage.
+func reduceCounter(counter, percent int) int {
+	percent = min(percent, maxCounterReduction)
+	if percent <= 0 {
+		return counter
+	}
+	return max(1, counter*(100-percent)/100)
+}
+
+// respawnPlayerLocked kills the player and sends them back to the hub.
+// subject is the ID of the NPC, room or item that caused the death; the Moirai can later turn it into a hint.
+func (s *Server) respawnPlayerLocked(player *Player, name, cause, subject string, args ...any) {
+	player.LastDeathSubject = subject
 	outcome := s.applyDeathPenaltyLocked(player, name)
 	s.notifyDeathLocked(name, cause, outcome, args...)
 	oldRoomID := player.RoomID
@@ -22,6 +46,7 @@ func (s *Server) respawnPlayerLocked(player *Player, name, cause string, args ..
 		destination = s.world.StartRoomID
 	}
 	player.HP = respawnHP
+	player.guarding = false
 	player.CombatTargetID = ""
 	player.RoomID = destination
 	if oldRoomID == destination {
@@ -92,7 +117,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		result = combatResult{player.HP, enemyHP, 0, "overwhelmed"}
 
 	case npc.hasMythRequirement() && !player.meetsMythRequirement(npc):
-		s.respawnPlayerLocked(player, *name, "attack_unprepared", npc.Name.Get(locale))
+		s.respawnPlayerLocked(player, *name, "attack_unprepared", npcID, npc.Name.Get(locale))
 		event = flavor{key: "attack_unprepared", player: *name, npc: npc}
 		result = combatResult{0, enemyHP, 0, "dead"}
 
@@ -100,7 +125,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 
 		allies := s.alliesInRoomLocked(*name)
 		bonus := allyBonusCount(allies)
-		damage := randDamage(combatMinDamage, combatMaxDamage) + bonus*allyDamageBonus
+		damage := randDamage(combatMinDamage, combatMaxDamage) + bonus*allyDamageBonus + s.blessingTotalLocked(player, blessingDamageBonus)
 		enemyHP -= damage
 		if enemyHP < 0 {
 			enemyHP = 0
@@ -115,10 +140,10 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		} else {
 			player.CombatTargetID = npcID
 			counter := randDamage(counterMinDamage, counterMaxDamage)
-			counter = max(1, counter*(100-bonus*allyCounterReductionPercent)/100)
+			counter = reduceCounter(counter, bonus*allyCounterReductionPercent+s.blessingTotalLocked(player, blessingCounterReduction)+takeGuard(player))
 			player.HP -= counter
 			if player.HP <= 0 {
-				s.respawnPlayerLocked(player, *name, "attack_counter", npc.Name.Get(locale))
+				s.respawnPlayerLocked(player, *name, "attack_counter", npcID, npc.Name.Get(locale))
 				event = flavor{key: "attack_struck_down", player: *name, npc: npc}
 				result = combatResult{0, enemyHP, damage, "dead"}
 			} else {
@@ -187,15 +212,16 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 		result = "success"
 		event = flavor{key: "flee_success", player: *name, npc: npc}
 		player.CombatTargetID = ""
+		player.guarding = false
 		if player.FledFrom == nil {
 			player.FledFrom = make(map[string]bool)
 		}
 		player.FledFrom[targetID] = true
 	} else {
-		counter := randDamage(counterMinDamage, counterMaxDamage)
+		counter := reduceCounter(randDamage(counterMinDamage, counterMaxDamage), s.blessingTotalLocked(player, blessingCounterReduction)+takeGuard(player))
 		player.HP -= counter
 		if player.HP <= 0 {
-			s.respawnPlayerLocked(player, *name, "flee_failed", npc.Name.Get(locale))
+			s.respawnPlayerLocked(player, *name, "flee_failed", targetID, npc.Name.Get(locale))
 			result = "failure_dead"
 			event = flavor{key: "flee_dead", player: *name, npc: npc}
 		} else {
@@ -219,6 +245,55 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 	response, err := client.enqueueResponse("OK " + string(data))
 	if err == nil {
 		s.broadcastFlavorLocked(encounterRoomID, event)
+	}
+	s.mu.Unlock()
+	if err != nil {
+		return true
+	}
+	return client.waitResponse(response) != nil
+}
+
+// handleDefend is a custom, additive command (like FLEE): brace instead of attacking.
+// You deal no damage, but the next counter-attack against you is halved. Only valid during a fight.
+func handleDefend(s *Server, conn net.Conn, name *string, parts []string) bool {
+	if !requireExactArgs(conn, parts, 1) {
+		return false
+	}
+	if *name == "" {
+		fmt.Fprintln(conn, "ERR 400 BAD_REQUEST")
+		return false
+	}
+	s.mu.Lock()
+	player := s.playerForUpdateLocked(*name)
+	if player == nil || s.world == nil {
+		s.mu.Unlock()
+		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
+		return false
+	}
+	npc := s.world.NPCs[player.CombatTargetID]
+	if player.CombatTargetID == "" || npc == nil {
+		player.CombatTargetID = ""
+		s.mu.Unlock()
+		fmt.Fprintln(conn, "ERR 407 NOT_IN_COMBAT")
+		return false
+	}
+	player.guarding = true
+	encounterRoomID := player.RoomID
+	logger.Info("combat_defend", "player", *name, "npc", player.CombatTargetID, "hp", player.HP)
+	data, err := json.Marshal(struct {
+		HP     int    `json:"hp"`
+		Result string `json:"result"`
+	}{player.HP, "braced"})
+	if err != nil {
+		s.mu.Unlock()
+		logger.Error("encode_response_failed", "command", "DEFEND", "error", err.Error())
+		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
+		return false
+	}
+	client := conn.(*serverClient)
+	response, err := client.enqueueResponse("OK " + string(data))
+	if err == nil {
+		s.broadcastFlavorLocked(encounterRoomID, flavor{key: "defend", player: *name, npc: npc})
 	}
 	s.mu.Unlock()
 	if err != nil {

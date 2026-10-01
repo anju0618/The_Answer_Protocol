@@ -28,10 +28,10 @@ func spendCrewLocked(player *Player, amount int) int {
 func (s *Server) applyTakeConsequencesLocked(player *Player, name, itemID string) *flavor {
 	switch itemID {
 	case itemLotusFruit:
-		s.respawnPlayerLocked(player, name, "lotus")
+		s.respawnPlayerLocked(player, name, "lotus", itemLotusFruit)
 		return &flavor{key: "lotus", player: name}
 	case itemSacredCattle:
-		s.respawnPlayerLocked(player, name, "cattle")
+		s.respawnPlayerLocked(player, name, "cattle", itemSacredCattle)
 		return &flavor{key: "cattle", player: name}
 	}
 	return nil

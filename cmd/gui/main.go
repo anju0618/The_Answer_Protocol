@@ -50,6 +50,19 @@ type gui struct {
 	roomCount        *widget.Label
 	totalCount       *widget.Label
 	hpLabel          *widget.Label
+	hpBar            *statBar
+	combatPanel      *fyne.Container
+	combatName       *widget.Label
+	combatHP         *widget.Label
+	combatBar        *statBar
+	fight            *fightState
+	visited          map[string]bool
+	endingBox        *fyne.Container
+	flash            *canvas.Rectangle
+	flashAnim        *fyne.Animation
+	lastArc          string
+	mapBox           *fyne.Container
+	crewBar          *statBar
 	crewLabel        *widget.Label
 	groupLabel       *widget.Label
 	exitBox          *fyne.Container
@@ -72,14 +85,14 @@ type gui struct {
 	chatScope        *widget.Select
 	chatEntry        *widget.Entry
 	chatLabel        *widget.Label
-	storyLabel       *widget.Label
+	storyText        *widget.RichText
 	logLabel         *widget.Label
 	chatScroll       *container.Scroll
 	storyScroll      *container.Scroll
 	logScroll        *container.Scroll
 	messages         *container.AppTabs
 	chatLines        []string
-	storyLines       []string
+	storyLines       []storyEntry
 	logLines         []string
 }
 
@@ -252,6 +265,9 @@ func (ui *gui) disconnect() {
 	ui.roomCount.SetText(ui.tr("Here: -", "部屋: - 人"))
 	ui.totalCount.SetText(ui.tr("Online: -", "全体: - 人"))
 	ui.hpLabel.SetText("HP: -")
+	ui.hpBar.Set(0, 1)
+	ui.showFight(nil)
+	ui.visited, ui.lastArc = nil, ""
 	ui.showState(stateView{})
 	ui.scene.Resource = nil
 	ui.scene.Image = loadArt("rooms", "unknown")
@@ -287,9 +303,11 @@ func (ui *gui) handleEvent(line string) {
 	if strings.HasPrefix(line, "EVT PLAYER ") {
 
 		kind, text, _ := strings.Cut(strings.TrimPrefix(line, "EVT PLAYER "), " ")
-		ui.addStory(text)
+		ui.addStoryKind(storyKindOf(kind), text)
 		switch kind {
 		case "DEATH":
+			ui.flashScene(flashDeath, 900*time.Millisecond)
+			ui.showFight(nil)
 			ui.refresh("LOOK", "INVENTORY", "STATUS", "STATE")
 		case "QUEST":
 			ui.refresh("STATUS", "QUESTS")
@@ -307,7 +325,7 @@ func (ui *gui) handleEvent(line string) {
 		ui.send("LOOK")
 	}
 	if strings.HasPrefix(line, "EVT ROOM COMBAT ") {
-		ui.addStory(strings.TrimPrefix(line, "EVT ROOM COMBAT "))
+		ui.addStoryKind(storyCombat, strings.TrimPrefix(line, "EVT ROOM COMBAT "))
 		ui.send("LOOK")
 		ui.send("STATUS")
 		ui.refresh("STATE")
@@ -331,7 +349,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 			ui.addLog(ui.tr("Crew and online names are unavailable on this server.", "このサーバーでは仲間の人数と全体の名前一覧を取得できません。"))
 			return
 		}
-		ui.addStory(line)
+		ui.addStoryKind(storyError, line)
 		if command == "QUIT" {
 			ui.quitButton.Enable()
 			if ui.pollStop == nil && ui.client != nil {
@@ -379,6 +397,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 			return
 		}
 		ui.hpLabel.SetText(fmt.Sprintf("HP: %d/%d", status.HP, status.MaxHP))
+		ui.hpBar.Set(status.HP, status.MaxHP)
 		if status.Status != "healthy" {
 			ui.hpLabel.SetText(ui.hpLabel.Text + " (" + ui.statusWord(status.Status) + ")")
 		}
@@ -396,8 +415,12 @@ func (ui *gui) handleResponse(command, request, line string) {
 	case "MOVE":
 		destination := strings.TrimPrefix(line, "OK room=")
 		ui.addStory(ui.tr("Moved to: ", "移動: ") + destination)
+		ui.flashScene(flashTravel, 450*time.Millisecond)
+		ui.showFight(nil)
+		ui.markVisited(destination)
 		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")
 		if room, ok := ui.catalog.gameOverRoom(destination); ok {
+			ui.recordFatalRoom(destination)
 			ui.showGameOver(destination, room)
 		}
 	case "TAKE", "DROP":
@@ -408,8 +431,19 @@ func (ui *gui) handleResponse(command, request, line string) {
 			ui.addStory(ui.tr("Dropped: ", "置いた: ") + ui.catalog.label("item", id, ui.locale))
 		}
 		ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS", "STATE")
+	case "DEFEND":
+		if !ui.handleDefend(line) {
+			ui.addStory(strings.TrimPrefix(line, "OK "))
+		}
+		ui.refresh("STATUS")
 	case "ATTACK", "FLEE":
-		ui.addStory(strings.TrimPrefix(line, "OK "))
+		handled := ui.handleAttack(request, line)
+		if command == "FLEE" {
+			handled = ui.handleFlee(line)
+		}
+		if !handled {
+			ui.addStory(strings.TrimPrefix(line, "OK "))
+		}
 		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")
 	case "TALK":
 		words := strings.TrimPrefix(line, "OK ")
@@ -514,12 +548,6 @@ func (ui *gui) addChat(line string) {
 	ui.chatLines = appendLine(ui.chatLines, line)
 	ui.chatLabel.SetText(strings.Join(ui.chatLines, "\n"))
 	ui.chatScroll.ScrollToBottom()
-}
-
-func (ui *gui) addStory(line string) {
-	ui.storyLines = appendLine(ui.storyLines, line)
-	ui.storyLabel.SetText(strings.Join(ui.storyLines, "\n"))
-	ui.storyScroll.ScrollToBottom()
 }
 
 func (ui *gui) addLog(line string) {
