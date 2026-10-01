@@ -113,6 +113,7 @@ func (ui *gui) showRoom(view lookView) {
 	ui.setJournalRows(ui.npcBox, npcs, ui.tr("No one to talk to here.", "話しかける相手はいません。"))
 	ui.setJournalRows(ui.itemBox, items, ui.tr("No items here.", "道具は落ちていません。"))
 	ui.setJournalRows(ui.playerBox, players, ui.tr("No players here.", "プレイヤーはいません。"))
+	ui.journal.Items[0].Content.Refresh()
 }
 
 func (catalog *worldCatalog) hasQuest(npcID string) bool {
