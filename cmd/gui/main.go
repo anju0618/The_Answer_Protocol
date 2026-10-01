@@ -103,7 +103,7 @@ func (ui *gui) build() {
 	ui.hostEntry.SetPlaceHolder("host:port")
 	ui.hostEntry.OnSubmitted = func(string) { ui.window.Canvas().Focus(ui.nameEntry) }
 	ui.nameEntry = widget.NewEntry()
-	ui.nameEntry.SetPlaceHolder("player name")
+	ui.nameEntry.SetPlaceHolder(ui.tr("player name", "プレイヤー名"))
 	ui.nameEntry.OnSubmitted = func(string) { ui.connect() }
 	ui.languageSelect = widget.NewSelect([]string{"English", japaneseLanguageOption}, nil)
 	ui.languageSelect.SetSelected(ui.tr("English", japaneseLanguageOption))
@@ -184,18 +184,19 @@ func (ui *gui) build() {
 		ui.commandButton(ui.tr("/ Command", "/ 入力"), func() { ui.window.Canvas().Focus(ui.rawEntry) }),
 		ui.commandButton(ui.tr("X Quit", "X 終了"), func() { ui.send("QUIT") }),
 	)
-	commandContent := container.NewVBox(
+	choiceArea := container.NewBorder(ui.choiceTitle, nil, nil, nil, container.NewVScroll(ui.choiceBox))
+	commandTop := container.NewVBox(
 		widget.NewLabel(ui.tr("Arrows: move / Numbers: select / [ ]: item art", "矢印: 移動  /  数字: 対象を選択  /  [ ]: イラスト")),
-		ui.choiceTitle, ui.choiceBox, widget.NewSeparator(), ui.commandButtons,
+		ui.commandButtons, widget.NewSeparator(),
 	)
-	commandPane := framed(ui.tr("Commands", "コマンド"), container.NewBorder(nil, ui.rawEntry, nil, nil, container.NewVScroll(commandContent)))
+	commandPane := framed(ui.tr("Commands", "コマンド"), container.NewBorder(commandTop, ui.rawEntry, nil, nil, choiceArea))
 	journal := container.NewAppTabs(
 		container.NewTabItem(ui.tr("Around", "まわり"), surroundings),
 		container.NewTabItem(ui.tr("Inventory", "もちもの"), container.NewVScroll(ui.inventoryBox)),
 		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(ui.questBox)),
 	)
 	right := container.NewVSplit(commandPane, framed(ui.tr("Journal", "記録"), journal))
-	right.Offset = 0.71
+	right.Offset = 0.62
 	worldSplit := container.NewHSplit(scene, right)
 	worldSplit.Offset = 0.61
 
@@ -211,21 +212,20 @@ func (ui *gui) build() {
 	ui.storyLabel = widget.NewLabel(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
 	ui.storyLabel.Wrapping = fyne.TextWrapWord
 	ui.storyScroll = container.NewVScroll(ui.storyLabel)
-	adventure := container.NewBorder(container.NewVBox(ui.roomID, ui.roomDesc), nil, nil, nil, ui.storyScroll)
+	adventure := container.NewBorder(ui.roomDesc, nil, nil, nil, ui.storyScroll)
 	ui.messages = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Adventure", "ぼうけん"), adventure),
 		container.NewTabItem(ui.tr("Chat", "チャット"), chatPane),
 		container.NewTabItem(ui.tr("Log", "ログ"), ui.logScroll),
 	)
 	mainSplit := container.NewVSplit(worldSplit, framed(ui.tr("Messages", "ことば"), ui.messages))
-	mainSplit.Offset = 0.78
+	mainSplit.Offset = 0.64
 	connectionRow := container.NewBorder(nil, nil, widget.NewLabel(ui.tr("Server", "サーバー")), nil, ui.hostEntry)
 	nameRow := container.NewBorder(nil, nil, widget.NewLabel(ui.tr("Name", "名前")),
 		container.NewHBox(ui.languageSelect, ui.connectButton, ui.quitButton), ui.nameEntry)
 	header := container.NewVBox(
 		connectionRow, nameRow,
-		container.NewHBox(ui.statusLabel, widget.NewLabel(" | "), ui.roomCount, widget.NewLabel(" | "),
-			ui.totalCount, widget.NewLabel(" | "), ui.hpLabel, widget.NewLabel(" | "), ui.groupLabel),
+		container.NewGridWithColumns(5, ui.statusLabel, ui.roomCount, ui.totalCount, ui.hpLabel, ui.groupLabel),
 	)
 	ui.window.SetContent(container.NewBorder(framed("THE ANSWER PROTOCOL", header), nil, nil, nil, mainSplit))
 	ui.bindKeyboard()
@@ -278,7 +278,7 @@ func (ui *gui) chooseAction(action string) {
 		}
 		sort.Strings(directions)
 		for _, direction := range directions {
-			choices = append(choices, menuChoice{label: direction + " -> " + ui.room.Room.Exits[direction], command: "MOVE " + direction})
+			choices = append(choices, menuChoice{label: ui.exitLabel(direction, ui.room.Room.Exits[direction]), command: "MOVE " + direction})
 		}
 	case "TAKE":
 		for _, id := range ui.room.Items {
@@ -316,7 +316,7 @@ func (ui *gui) chooseAction(action string) {
 		rows = append(rows, ui.commandButton(fmt.Sprintf("%d  %s", index+1, choice.label), func() { ui.runChoice(index) }))
 	}
 	if len(choices) > 9 {
-		rows = append(rows, widget.NewLabel(ui.tr("For targets 10+, enter the ID with /", "10件目以降は / でIDを直接入力")))
+		rows = append(rows, widget.NewLabel(ui.tr("For targets 10+, type the command after /", "10件目以降は / でコマンドを直接入力")))
 	}
 	setRows(ui.choiceBox, rows)
 }
@@ -666,7 +666,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 			ui.addLog(ui.tr("Could not parse STATUS: ", "STATUSを解析できません: ") + err.Error())
 			return
 		}
-		ui.hpLabel.SetText(fmt.Sprintf("HP: %d/%d (%s)", status.HP, status.MaxHP, status.Status))
+		ui.hpLabel.SetText(fmt.Sprintf("HP: %d/%d (%s)", status.HP, status.MaxHP, ui.statusWord(status.Status)))
 	case "WHO":
 		if strings.HasPrefix(line, "OK players=") {
 			ui.setTotal(strings.TrimPrefix(line, "OK players="))
@@ -763,7 +763,7 @@ func (ui *gui) showRoom(view lookView) {
 	sort.Strings(directions)
 	for _, direction := range directions {
 		destination := view.Room.Exits[direction]
-		exits = append(exits, widget.NewLabel(direction+" -> "+destination))
+		exits = append(exits, widget.NewLabel(ui.exitLabel(direction, destination)))
 	}
 	setRows(ui.exitBox, exits)
 	var players []fyne.CanvasObject
@@ -827,7 +827,7 @@ func (ui *gui) showInventory(ids []string) {
 func (ui *gui) showQuests(quests []questView) {
 	var rows []fyne.CanvasObject
 	for _, quest := range quests {
-		label := widget.NewLabel(ui.catalog.label("quest", quest.QuestID, ui.locale) + " - " + quest.Status + " " + quest.Progress)
+		label := widget.NewLabel(ui.catalog.label("quest", quest.QuestID, ui.locale) + " - " + ui.statusWord(quest.Status) + " " + quest.Progress)
 		label.Wrapping = fyne.TextWrapWord
 		rows = append(rows, label)
 	}

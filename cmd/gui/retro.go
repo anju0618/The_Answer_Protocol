@@ -38,8 +38,10 @@ func (t retroTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) c
 		return gold
 	case theme.ColorNamePlaceHolder:
 		return color.NRGBA{R: 147, G: 153, B: 166, A: 255}
-	case theme.ColorNameDisabled, theme.ColorNameDisabledButton:
-		return color.NRGBA{R: 70, G: 75, B: 88, A: 255}
+	case theme.ColorNameDisabledButton:
+		return color.NRGBA{R: 28, G: 38, B: 60, A: 255}
+	case theme.ColorNameDisabled:
+		return color.NRGBA{R: 150, G: 156, B: 172, A: 255}
 	}
 	return t.base.Color(name, theme.VariantDark)
 }

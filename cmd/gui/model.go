@@ -48,6 +48,7 @@ type catalogEntry struct {
 }
 
 type worldCatalog struct {
+	Rooms  map[string]catalogEntry `json:"rooms"`
 	Items  map[string]catalogEntry `json:"items"`
 	NPCs   map[string]catalogEntry `json:"npcs"`
 	Quests map[string]catalogEntry `json:"quests"`
@@ -91,6 +92,8 @@ func (catalog *worldCatalog) label(kind, id, locale string) string {
 	}
 	var entry catalogEntry
 	switch kind {
+	case "room":
+		entry = catalog.Rooms[id]
 	case "item":
 		entry = catalog.Items[id]
 	case "npc":
@@ -98,11 +101,10 @@ func (catalog *worldCatalog) label(kind, id, locale string) string {
 	case "quest":
 		entry = catalog.Quests[id]
 	}
-	name := entry.Name.get(locale)
-	if name == "" || strings.EqualFold(name, id) {
-		return id
+	if name := entry.Name.get(locale); name != "" {
+		return name
 	}
-	return name + " [" + id + "]"
+	return id
 }
 
 func decodeOK(line string, target any) error {
