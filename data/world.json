@@ -604,7 +604,8 @@
       },
       "exits": {
         "west": "loc.ody_phaeacia",
-        "north": "loc.ody_palace"
+        "north": "loc.ody_palace",
+        "east": "loc.hall_of_fates"
       }
     },
     "loc.ody_palace": {
