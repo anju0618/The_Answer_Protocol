@@ -56,6 +56,7 @@ type catalogEntry struct {
 	Description localizedName `json:"description"`
 	Role        string        `json:"role"`
 	GiverNPCID  string        `json:"giver_npc_id"`
+	HP          int           `json:"hp"`
 	Hazard      *struct {
 		Type string `json:"type"`
 	} `json:"hazard"`

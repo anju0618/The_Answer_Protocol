@@ -51,6 +51,11 @@ type gui struct {
 	totalCount       *widget.Label
 	hpLabel          *widget.Label
 	hpBar            *statBar
+	combatPanel      *fyne.Container
+	combatName       *widget.Label
+	combatHP         *widget.Label
+	combatBar        *statBar
+	fight            *fightState
 	crewBar          *statBar
 	crewLabel        *widget.Label
 	groupLabel       *widget.Label
@@ -255,6 +260,7 @@ func (ui *gui) disconnect() {
 	ui.totalCount.SetText(ui.tr("Online: -", "全体: - 人"))
 	ui.hpLabel.SetText("HP: -")
 	ui.hpBar.Set(0, 1)
+	ui.showFight(nil)
 	ui.showState(stateView{})
 	ui.scene.Resource = nil
 	ui.scene.Image = loadArt("rooms", "unknown")
@@ -293,6 +299,7 @@ func (ui *gui) handleEvent(line string) {
 		ui.addStoryKind(storyKindOf(kind), text)
 		switch kind {
 		case "DEATH":
+			ui.showFight(nil)
 			ui.refresh("LOOK", "INVENTORY", "STATUS", "STATE")
 		case "QUEST":
 			ui.refresh("STATUS", "QUESTS")
@@ -400,6 +407,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 	case "MOVE":
 		destination := strings.TrimPrefix(line, "OK room=")
 		ui.addStory(ui.tr("Moved to: ", "移動: ") + destination)
+		ui.showFight(nil)
 		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")
 		if room, ok := ui.catalog.gameOverRoom(destination); ok {
 			ui.showGameOver(destination, room)
@@ -413,7 +421,13 @@ func (ui *gui) handleResponse(command, request, line string) {
 		}
 		ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS", "STATE")
 	case "ATTACK", "FLEE":
-		ui.addStory(strings.TrimPrefix(line, "OK "))
+		handled := ui.handleAttack(request, line)
+		if command == "FLEE" {
+			handled = ui.handleFlee(line)
+		}
+		if !handled {
+			ui.addStory(strings.TrimPrefix(line, "OK "))
+		}
 		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")
 	case "TALK":
 		words := strings.TrimPrefix(line, "OK ")
