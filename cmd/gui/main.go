@@ -197,7 +197,9 @@ func (ui *gui) build() {
 	)
 	right := container.NewVSplit(commandPane, framed(ui.tr("Journal", "記録"), journal))
 	right.Offset = 0.62
-	worldSplit := container.NewHSplit(scene, right)
+	roomColumn := container.NewVSplit(scene, container.NewVScroll(ui.roomDesc))
+	roomColumn.Offset = 0.8
+	worldSplit := container.NewHSplit(roomColumn, right)
 	worldSplit.Offset = 0.61
 
 	ui.chatLabel = widget.NewLabel("")
@@ -212,14 +214,14 @@ func (ui *gui) build() {
 	ui.storyLabel = widget.NewLabel(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
 	ui.storyLabel.Wrapping = fyne.TextWrapWord
 	ui.storyScroll = container.NewVScroll(ui.storyLabel)
-	adventure := container.NewBorder(ui.roomDesc, nil, nil, nil, ui.storyScroll)
+	adventure := ui.storyScroll
 	ui.messages = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Adventure", "ぼうけん"), adventure),
 		container.NewTabItem(ui.tr("Chat", "チャット"), chatPane),
 		container.NewTabItem(ui.tr("Log", "ログ"), ui.logScroll),
 	)
 	mainSplit := container.NewVSplit(worldSplit, framed(ui.tr("Messages", "ことば"), ui.messages))
-	mainSplit.Offset = 0.64
+	mainSplit.Offset = 0.58
 	connectionRow := container.NewBorder(nil, nil, widget.NewLabel(ui.tr("Server", "サーバー")), nil, ui.hostEntry)
 	nameRow := container.NewBorder(nil, nil, widget.NewLabel(ui.tr("Name", "名前")),
 		container.NewHBox(ui.languageSelect, ui.connectButton, ui.quitButton), ui.nameEntry)

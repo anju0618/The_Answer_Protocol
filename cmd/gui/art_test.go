@@ -20,8 +20,12 @@ func TestArtCoversWorld(t *testing.T) {
 		t.Fatal(err)
 	}
 	var world struct {
-		Rooms map[string]json.RawMessage `json:"rooms"`
-		NPCs  map[string]json.RawMessage `json:"npcs"`
+		Rooms map[string]struct {
+			Hazard *struct {
+				Type string `json:"type"`
+			} `json:"hazard"`
+		} `json:"rooms"`
+		NPCs map[string]json.RawMessage `json:"npcs"`
 	}
 	if err := json.Unmarshal(data, &world); err != nil {
 		t.Fatal(err)
@@ -34,17 +38,27 @@ func TestArtCoversWorld(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(roomFiles) != len(world.Rooms)+1 || len(npcFiles) != len(world.NPCs)+1 {
-		t.Fatalf("art coverage: %d/%d rooms, %d/%d NPCs (including unknown fallbacks)", len(roomFiles), len(world.Rooms)+1, len(npcFiles), len(world.NPCs)+1)
+	// A lethal room kills on entry and the player is respawned at once, so the
+	// GUI never gets to show it; those rooms may have no art.
+	drawnRooms := 1
+	for _, room := range world.Rooms {
+		if room.Hazard == nil || room.Hazard.Type != "lethal" {
+			drawnRooms++
+		}
+	}
+	if len(roomFiles) < drawnRooms || len(roomFiles) > len(world.Rooms)+1 || len(npcFiles) != len(world.NPCs)+1 {
+		t.Fatalf("art coverage: %d room files (want %d to %d), %d/%d NPCs (including unknown fallbacks)", len(roomFiles), drawnRooms, len(world.Rooms)+1, len(npcFiles), len(world.NPCs)+1)
 	}
 	roomIDs := make([]string, 0, len(world.Rooms))
 	npcIDs := make([]string, 0, len(world.NPCs))
 	roomHashes := make(map[[32]byte]string)
 	spriteHashes := make(map[[32]byte]string)
-	for id := range world.Rooms {
+	for id, room := range world.Rooms {
 		data, err := artAssets.ReadFile("assets/rooms/" + id + ".png")
 		if err != nil {
-			t.Errorf("room %s has no art: %v", id, err)
+			if room.Hazard == nil || room.Hazard.Type != "lethal" {
+				t.Errorf("room %s has no art: %v", id, err)
+			}
 			continue
 		}
 		config, err := png.DecodeConfig(bytes.NewReader(data))
