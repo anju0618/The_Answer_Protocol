@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -79,6 +80,7 @@ func (ui *gui) handleAttack(request, line string) bool {
 		}
 		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You hit %s for %d damage. (%d HP left)", "%s に %d ダメージ!(残りHP %d)"), enemy, result.Damage, result.TargetHP))
 		ui.showFight(&fightState{npcID: npcID, hp: result.TargetHP, maxHP: maxHP})
+		ui.flashScene(flashHurt, 350*time.Millisecond) // the enemy survived, so it hit back
 	case "victory":
 		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("Victory! %s is defeated.", "勝利!%s を倒した。"), enemy))
 		ui.showFight(nil)

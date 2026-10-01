@@ -57,6 +57,8 @@ type gui struct {
 	combatBar        *statBar
 	fight            *fightState
 	visited          map[string]bool
+	flash            *canvas.Rectangle
+	flashAnim        *fyne.Animation
 	lastArc          string
 	mapBox           *fyne.Container
 	crewBar          *statBar
@@ -303,6 +305,7 @@ func (ui *gui) handleEvent(line string) {
 		ui.addStoryKind(storyKindOf(kind), text)
 		switch kind {
 		case "DEATH":
+			ui.flashScene(flashDeath, 900*time.Millisecond)
 			ui.showFight(nil)
 			ui.refresh("LOOK", "INVENTORY", "STATUS", "STATE")
 		case "QUEST":
@@ -411,6 +414,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 	case "MOVE":
 		destination := strings.TrimPrefix(line, "OK room=")
 		ui.addStory(ui.tr("Moved to: ", "移動: ") + destination)
+		ui.flashScene(flashTravel, 450*time.Millisecond)
 		ui.showFight(nil)
 		ui.markVisited(destination)
 		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")

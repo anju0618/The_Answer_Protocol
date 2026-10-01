@@ -61,7 +61,8 @@ func (ui *gui) build() {
 	ui.photoStrip = container.NewGridWrap(fyne.NewSize(290, 112), photos)
 	ui.photoStrip.Hide()
 	photoOverlay := container.NewHBox(layout.NewSpacer(), ui.photoStrip)
-	sceneVisual := container.NewStack(ui.scene, container.NewBorder(nil, photoOverlay, nil, nil))
+	ui.flash = newFlashLayer()
+	sceneVisual := container.NewStack(ui.scene, ui.flash, container.NewBorder(nil, photoOverlay, nil, nil))
 	sceneFrame := canvas.NewRectangle(ink)
 	sceneFrame.StrokeColor = gold
 	sceneFrame.StrokeWidth = 1
