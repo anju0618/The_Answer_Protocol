@@ -26,6 +26,9 @@ var (
 type retroTheme struct{ base fyne.Theme }
 
 func (t retroTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
+	if c, ok := storyColor(name); ok {
+		return c
+	}
 	switch name {
 	case theme.ColorNameBackground, theme.ColorNameMenuBackground:
 		return ink
