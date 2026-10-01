@@ -5044,7 +5044,10 @@ protocolClient.Send ──▶ [送信goroutine] ──▶ サーバー
   7. `ui_layout.go`:画面組み立てと幅に応じた配置
   8. `ui_actions.go`:マウスでグループ・招待を選ぶ
   9. `ui_journal.go`:まわり・持ち物・クエストの表示
-  10. `cmd/server/gui_state.go`:GUI向けSTATE拡張の応答
+  10. `ui_bars.go` / `ui_combat.go`:HP・仲間のバーと戦闘パネル
+  11. `ui_story.go` / `ui_effects.go`:色付きの冒険ログと画面のフラッシュ
+  12. `ui_map.go` / `ui_endings.go`:地図とエンディング一覧
+  13. `cmd/server/gui_state.go`:GUI向けSTATE拡張の応答
 
 ## 15-1 `protocol.go`(150行)— 通信層
 
@@ -5253,7 +5256,7 @@ func (client *protocolClient) readLoop() {
 - 分類した結果を `incoming` に送る。
 - ループが終わったら(サーバーが切れた)、理由を付けた**切断メッセージ**を送る。正常な切断はエラーが `nil` なので、 `io.EOF`(「終わり」を意味する標準のエラー)を入れる。
 
-## 15-2 `model.go`(143行)— 受け取るデータの型
+## 15-2 `model.go`(155行)— 受け取るデータの型
 
 ```go
 type roomView struct {
@@ -5306,11 +5309,23 @@ func (name localizedName) get(locale string) string {
 }
 
 type catalogEntry struct {
-	Name        localizedName `json:"name"`
-	Description localizedName `json:"description"`
-	Role        string        `json:"role"`
-	GiverNPCID  string        `json:"giver_npc_id"`
-	Hazard      *struct {
+	Name        localizedName     `json:"name"`
+	Description localizedName     `json:"description"`
+	Role        string            `json:"role"`
+	GiverNPCID  string            `json:"giver_npc_id"`
+	HP          int               `json:"hp"`
+	Exits       map[string]string `json:"exits"`
+	Ending      *struct {
+		ID         string        `json:"id"`
+		Name       localizedName `json:"name"`
+		RewardItem string        `json:"reward_item"`
+		Blessing   *struct {
+			God         localizedName `json:"god"`
+			Name        localizedName `json:"name"`
+			Description localizedName `json:"description"`
+		} `json:"blessing"`
+	} `json:"ending"`
+	Hazard *struct {
 		Type string `json:"type"`
 	} `json:"hazard"`
 }
@@ -5423,7 +5438,7 @@ func (catalog *worldCatalog) gameOverRoom(roomID string) (catalogEntry, bool) {
 - `Hazard.Type == "lethal"` の部屋なら、表示に使う名前・説明文と `true` を返す。カタログが無い、部屋が無い、危険が無い、種類が違う場合は `false`。
 - 15-7-7のMOVE応答で呼ばれ、ゲームオーバー画面を開くか決める。判定に使う情報は、GUIが読み込んだ `data/world.json` にある。
 
-## 15-3 `retro.go`(87行)— 見た目
+## 15-3 `retro.go`(90行)— 見た目
 
 ```go
 //go:embed assets/fonts/DroidSansFallbackFull.ttf
@@ -5450,6 +5465,9 @@ var (
 type retroTheme struct{ base fyne.Theme }
 
 func (t retroTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
+	if c, ok := storyColor(name); ok {
+		return c
+	}
 	switch name {
 	case theme.ColorNameBackground, theme.ColorNameMenuBackground:
 		return ink
@@ -5489,7 +5507,7 @@ func sceneImage() *canvas.Image {
 
 - 部屋の絵を表示する画像部品。最初は「不明の部屋」の絵。 `FillMode = Contain`(枠に収まるように拡縮)。
 
-## 15-4 `ui_locale.go`(69行)— 言語切替と表示文
+## 15-4 `ui_locale.go`(70行)— 言語切替と表示文
 
 ```go
 func (ui *gui) tr(english, japanese string) string {
@@ -5530,6 +5548,7 @@ func (ui *gui) switchLocale(locale string) {
 	ui.showInventory(inventory)
 	ui.showQuests(quests)
 	ui.showState(state)
+	ui.showFight(ui.fight)
 	if ui.client != nil {
 		ui.connectButton.Disable()
 		ui.settingsButton.Disable()
@@ -5715,7 +5734,7 @@ func itemPhotoCard(id string) fyne.CanvasObject {
 
 - アイテムのIDから、 **金の枠付きの画像カード**(104×104)を作る。画像が無いアイテムは `nil`(カードを出さない)。
 
-## 15-7 `main.go`(537行)— 接続と応答の処理
+## 15-7 `main.go`(567行)— 接続と応答の処理
 
 画面の組み立ては15-8へ、グループ選択は15-9へ、一覧の表示は15-10へ分けています。ゲーム中の文字入力はチャットだけです。接続先と名前は接続設定の画面で入力します。
 
@@ -5763,6 +5782,19 @@ type gui struct {
 	roomCount        *widget.Label
 	totalCount       *widget.Label
 	hpLabel          *widget.Label
+	hpBar            *statBar
+	combatPanel      *fyne.Container
+	combatName       *widget.Label
+	combatHP         *widget.Label
+	combatBar        *statBar
+	fight            *fightState
+	visited          map[string]bool
+	endingBox        *fyne.Container
+	flash            *canvas.Rectangle
+	flashAnim        *fyne.Animation
+	lastArc          string
+	mapBox           *fyne.Container
+	crewBar          *statBar
 	crewLabel        *widget.Label
 	groupLabel       *widget.Label
 	exitBox          *fyne.Container
@@ -5785,14 +5817,14 @@ type gui struct {
 	chatScope        *widget.Select
 	chatEntry        *widget.Entry
 	chatLabel        *widget.Label
-	storyLabel       *widget.Label
+	storyText        *widget.RichText
 	logLabel         *widget.Label
 	chatScroll       *container.Scroll
 	storyScroll      *container.Scroll
 	logScroll        *container.Scroll
 	messages         *container.AppTabs
 	chatLines        []string
-	storyLines       []string
+	storyLines       []storyEntry
 	logLines         []string
 }
 ```
@@ -6062,9 +6094,11 @@ func (ui *gui) handleEvent(line string) {
 	if strings.HasPrefix(line, "EVT PLAYER ") {
 
 		kind, text, _ := strings.Cut(strings.TrimPrefix(line, "EVT PLAYER "), " ")
-		ui.addStory(text)
+		ui.addStoryKind(storyKindOf(kind), text)
 		switch kind {
 		case "DEATH":
+			ui.flashScene(flashDeath, 900*time.Millisecond)
+			ui.showFight(nil)
 			ui.refresh("LOOK", "INVENTORY", "STATUS", "STATE")
 		case "QUEST":
 			ui.refresh("STATUS", "QUESTS")
@@ -6082,7 +6116,7 @@ func (ui *gui) handleEvent(line string) {
 		ui.send("LOOK")
 	}
 	if strings.HasPrefix(line, "EVT ROOM COMBAT ") {
-		ui.addStory(strings.TrimPrefix(line, "EVT ROOM COMBAT "))
+		ui.addStoryKind(storyCombat, strings.TrimPrefix(line, "EVT ROOM COMBAT "))
 		ui.send("LOOK")
 		ui.send("STATUS")
 		ui.refresh("STATE")
@@ -6112,7 +6146,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 			ui.addLog(ui.tr("Crew and online names are unavailable on this server.", "このサーバーでは仲間の人数と全体の名前一覧を取得できません。"))
 			return
 		}
-		ui.addStory(line)
+		ui.addStoryKind(storyError, line)
 		if command == "QUIT" {
 			ui.quitButton.Enable()
 			if ui.pollStop == nil && ui.client != nil {
@@ -6160,6 +6194,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 			return
 		}
 		ui.hpLabel.SetText(fmt.Sprintf("HP: %d/%d", status.HP, status.MaxHP))
+		ui.hpBar.Set(status.HP, status.MaxHP)
 		if status.Status != "healthy" {
 			ui.hpLabel.SetText(ui.hpLabel.Text + " (" + ui.statusWord(status.Status) + ")")
 		}
@@ -6177,8 +6212,12 @@ func (ui *gui) handleResponse(command, request, line string) {
 	case "MOVE":
 		destination := strings.TrimPrefix(line, "OK room=")
 		ui.addStory(ui.tr("Moved to: ", "移動: ") + destination)
+		ui.flashScene(flashTravel, 450*time.Millisecond)
+		ui.showFight(nil)
+		ui.markVisited(destination)
 		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")
 		if room, ok := ui.catalog.gameOverRoom(destination); ok {
+			ui.recordFatalRoom(destination)
 			ui.showGameOver(destination, room)
 		}
 	case "TAKE", "DROP":
@@ -6189,8 +6228,19 @@ func (ui *gui) handleResponse(command, request, line string) {
 			ui.addStory(ui.tr("Dropped: ", "置いた: ") + ui.catalog.label("item", id, ui.locale))
 		}
 		ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS", "STATE")
+	case "DEFEND":
+		if !ui.handleDefend(line) {
+			ui.addStory(strings.TrimPrefix(line, "OK "))
+		}
+		ui.refresh("STATUS")
 	case "ATTACK", "FLEE":
-		ui.addStory(strings.TrimPrefix(line, "OK "))
+		handled := ui.handleAttack(request, line)
+		if command == "FLEE" {
+			handled = ui.handleFlee(line)
+		}
+		if !handled {
+			ui.addStory(strings.TrimPrefix(line, "OK "))
+		}
 		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")
 	case "TALK":
 		words := strings.TrimPrefix(line, "OK ")
@@ -6264,6 +6314,9 @@ func (ui *gui) disconnect() {
 	ui.roomCount.SetText(ui.tr("Here: -", "部屋: - 人"))
 	ui.totalCount.SetText(ui.tr("Online: -", "全体: - 人"))
 	ui.hpLabel.SetText("HP: -")
+	ui.hpBar.Set(0, 1)
+	ui.showFight(nil)
+	ui.visited, ui.lastArc = nil, ""
 	ui.showState(stateView{})
 	ui.scene.Resource = nil
 	ui.scene.Image = loadArt("rooms", "unknown")
@@ -6331,7 +6384,8 @@ func (ui *gui) showGameOver(roomID string, room catalogEntry) {
 	scene.FillMode = canvas.ImageFillContain
 	scene.ScaleMode = canvas.ImageScaleSmooth
 	scene.SetMinSize(fyne.NewSize(480, 288))
-	title := widget.NewLabelWithStyle(ui.tr("GAME OVER", "ゲームオーバー")+"  -  "+room.Name.get(ui.locale), fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	title := widget.NewLabelWithStyle(room.Name.get(ui.locale), fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	title.Wrapping = fyne.TextWrapWord
 	story := widget.NewLabel(room.Description.get(ui.locale))
 	story.Wrapping = fyne.TextWrapWord
 	var popup *widget.PopUp
@@ -6339,14 +6393,15 @@ func (ui *gui) showGameOver(roomID string, room catalogEntry) {
 		popup.Hide()
 		ui.window.Canvas().Unfocus()
 	})
-	content := framed("", container.NewBorder(title, closeButton, nil, nil, container.NewVBox(scene, story)))
+	content := framed(ui.tr("GAME OVER", "ゲームオーバー"),
+		container.NewBorder(nil, closeButton, nil, nil, container.NewVScroll(textVBox(title, scene, story))))
 	popup = widget.NewModalPopUp(container.NewGridWrap(fyne.NewSize(540, 520), content), ui.window.Canvas())
 	popup.Show()
 	ui.window.Canvas().Focus(closeButton)
 }
 ```
 
-- 即死部屋の背景・名前・説明文を表示します。戻るボタンは画面を閉じる操作です。サーバー側の死亡処理と復活は既に行われています。
+- 即死部屋の背景・折り返し可能な名前・説明文をスクロール内へ表示し、戻るボタンを下部へ固定します。長い日本語の説明もボタンの上にはみ出しません。戻るボタンは画面を閉じる操作です。サーバー側の死亡処理と復活は既に行われています。
 
 #### `addChat`
 
@@ -6363,14 +6418,10 @@ func (ui *gui) addChat(line string) {
 #### `addStory`
 
 ```go
-func (ui *gui) addStory(line string) {
-	ui.storyLines = appendLine(ui.storyLines, line)
-	ui.storyLabel.SetText(strings.Join(ui.storyLines, "\n"))
-	ui.storyScroll.ScrollToBottom()
-}
+func (ui *gui) addStory(line string) { ui.addStoryKind(storyPlain, line) }
 ```
 
-- 時刻付きの履歴を更新し、冒険欄の末尾へスクロールします。
+- `addStory`は`ui_story.go`にあります。種類付きの履歴をRichTextへ反映し、冒険欄の末尾へスクロールします。死亡・クエスト・戦闘・エンディング・仲間・ヒント等で色を変えます。
 
 #### `addLog`
 
@@ -6398,7 +6449,7 @@ func appendLine(lines []string, line string) []string {
 
 - 現在時刻と文章を追加し、300行を超えたら古い行を取り除きます。
 
-## 15-8 `ui_layout.go`(250行)— 画面とウインドウサイズ
+## 15-8 `ui_layout.go`(365行)— 画面とウインドウサイズ
 
 ### `build`
 
@@ -6426,33 +6477,36 @@ func (ui *gui) build() {
 	ui.totalCount = compactLabel(ui.tr("Online: -", "全体: - 人"))
 	ui.hpLabel = compactLabel("HP: -")
 	ui.crewLabel = compactLabel(ui.tr("Crew: -", "仲間: - 人"))
+	ui.hpBar, ui.crewBar = newStatBar(), newStatBar()
 	ui.groupLabel = compactLabel(ui.tr("Group: -", "グループ: -"))
 
 	ui.roomTitle = widget.NewLabelWithStyle(ui.tr("Your journey", "冒険の旅"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	ui.roomTitle.Truncation = fyne.TextTruncateEllipsis
 	ui.roomDesc = widget.NewLabel(ui.tr("Connect to begin your journey.", "接続して冒険を始めましょう。"))
 	ui.roomDesc.Wrapping = fyne.TextWrapWord
-	ui.exitBox = container.NewVBox()
-	ui.playerBox = container.NewVBox()
-	ui.itemBox = container.NewVBox()
-	ui.npcBox = container.NewVBox()
-	ui.inventoryBox = container.NewVBox()
-	ui.questBox = container.NewVBox()
+	ui.exitBox = textVBox()
+	ui.playerBox = textVBox()
+	ui.itemBox = textVBox()
+	ui.npcBox = textVBox()
+	ui.inventoryBox = textVBox()
+	ui.questBox = textVBox()
+	ui.endingBox = newEndingBox()
 	ui.choiceTitle = widget.NewLabel("")
-	ui.choiceBox = container.NewVBox()
+	ui.choiceBox = textVBox()
 	ui.itemPhotoBox = container.NewHBox()
 	ui.itemPhotoScroll = container.NewHScroll(ui.itemPhotoBox)
 	ui.itemPhotoScroll.Hide()
 	ui.scene = sceneImage()
 	photos := container.NewBorder(nil, nil,
-		widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() { ui.scrollItemPhotos(-110) }),
-		widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() { ui.scrollItemPhotos(110) }),
+		widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() { ui.scrollItemPhotos(-1) }),
+		widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() { ui.scrollItemPhotos(1) }),
 		ui.itemPhotoScroll,
 	)
-	ui.photoStrip = container.NewGridWrap(fyne.NewSize(290, 112), photos)
+	ui.photoStrip = photos
 	ui.photoStrip.Hide()
-	photoOverlay := container.NewHBox(layout.NewSpacer(), ui.photoStrip)
-	sceneVisual := container.NewStack(ui.scene, container.NewBorder(nil, photoOverlay, nil, nil))
+	ui.flash = newFlashLayer()
+	sceneVisual := container.NewScroll(container.New(&sceneVisualLayout{photos: ui.itemPhotoBox}, ui.scene, ui.flash, ui.photoStrip))
+	sceneVisual.Direction = container.ScrollNone
 	sceneFrame := canvas.NewRectangle(ink)
 	sceneFrame.StrokeColor = gold
 	sceneFrame.StrokeWidth = 1
@@ -6460,7 +6514,7 @@ func (ui *gui) build() {
 	ui.scenePanel = container.NewBorder(ui.roomTitle, nil, nil, nil,
 		container.New(&sceneLayout{}, visual, container.NewVScroll(ui.roomDesc)))
 
-	surroundings := container.NewVBox(
+	surroundings := textVBox(
 		journalSection(ui.tr("Paths", "移動先"), ui.exitBox),
 		journalSection(ui.tr("People & creatures", "人物・生きもの"), ui.npcBox),
 		journalSection(ui.tr("Items here", "落ちている道具"), ui.itemBox),
@@ -6469,7 +6523,8 @@ func (ui *gui) build() {
 	ui.journal = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Around", "まわり"), container.NewVScroll(surroundings)),
 		container.NewTabItem(ui.tr("Inventory", "持ち物"), container.NewVScroll(ui.inventoryBox)),
-		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(ui.questBox)),
+		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(textVBox(ui.questBox, ui.endingBox))),
+		container.NewTabItem(ui.tr("Map", "地図"), ui.buildMapTab()),
 	)
 	ui.journal.OnSelected = func(item *container.TabItem) {
 		if !ui.connected {
@@ -6482,13 +6537,13 @@ func (ui *gui) build() {
 			ui.send("QUESTS")
 		}
 	}
-	ui.commandButtons = container.NewGridWithColumns(4,
+	ui.commandButtons = container.NewGridWithColumns(3,
 		ui.commandButton(ui.tr("Refresh", "更新"), func() { ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS", "WHO", "STATE") }),
 		ui.commandButton(ui.tr("Group", "グループ"), func() { ui.chooseAction("GROUP") }),
-		ui.commandButton(ui.tr("Flee", "逃げる"), func() { ui.send("FLEE") }),
 		ui.commandButton(ui.tr("Chat", "チャット"), ui.focusChat),
 	)
-	ui.detailPanel = container.NewBorder(nil, ui.commandButtons, nil, nil, ui.journal)
+	ui.buildCombatPanel()
+	ui.detailPanel = container.NewBorder(ui.combatPanel, ui.commandButtons, nil, nil, ui.journal)
 	ui.playArea = container.New(&adventureLayout{}, ui.scenePanel, ui.detailPanel)
 
 	ui.chatScope = widget.NewSelect([]string{"GLOBAL", "ROOM", "GROUP"}, nil)
@@ -6504,9 +6559,8 @@ func (ui *gui) build() {
 	ui.logLabel = widget.NewLabel("")
 	ui.logLabel.Wrapping = fyne.TextWrapWord
 	ui.logScroll = container.NewVScroll(ui.logLabel)
-	ui.storyLabel = widget.NewLabel(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
-	ui.storyLabel.Wrapping = fyne.TextWrapWord
-	ui.storyScroll = container.NewVScroll(ui.storyLabel)
+	ui.storyText = newStoryText()
+	ui.storyScroll = container.NewVScroll(ui.storyText)
 	ui.messages = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Adventure", "ぼうけん"), ui.storyScroll),
 		container.NewTabItem(ui.tr("Chat", "チャット"), chatPane),
@@ -6515,9 +6569,9 @@ func (ui *gui) build() {
 	brand := canvas.NewText("THE ANSWER PROTOCOL", gold)
 	brand.TextSize = 17
 	brand.TextStyle.Bold = true
-	header := container.NewBorder(nil, nil, brand,
+	header := container.New(&headerLayout{}, brand,
 		container.NewHBox(ui.languageSelect, ui.settingsButton, ui.connectButton, ui.quitButton))
-	stats := container.New(&statsLayout{}, ui.hpLabel, ui.crewLabel, ui.groupLabel, ui.roomCount, ui.totalCount, ui.statusLabel)
+	stats := container.New(&statsLayout{}, container.NewStack(ui.hpBar.box, ui.hpLabel), container.NewStack(ui.crewBar.box, ui.crewLabel), ui.groupLabel, ui.roomCount, ui.totalCount, ui.statusLabel)
 	ui.window.SetContent(container.NewPadded(container.New(&screenLayout{}, header, stats, ui.playArea, ui.messages)))
 	ui.languageSelect.OnChanged = func(selection string) {
 		if ui.client != nil || ui.connected || ui.dialing {
@@ -6532,20 +6586,27 @@ func (ui *gui) build() {
 	ui.showRoom(lookView{})
 	ui.showInventory(nil)
 	ui.showQuests(nil)
+	ui.showEndings()
 	for _, saved := range []struct {
 		lines []string
 		label *widget.Label
 	}{
-		{ui.chatLines, ui.chatLabel}, {ui.storyLines, ui.storyLabel}, {ui.logLines, ui.logLabel},
+		{ui.chatLines, ui.chatLabel}, {ui.logLines, ui.logLabel},
 	} {
 		if len(saved.lines) > 0 {
 			saved.label.SetText(strings.Join(saved.lines, "\n"))
 		}
 	}
+	if len(ui.storyLines) > 0 {
+		ui.storyText.Segments = storySegments(ui.storyLines)
+		ui.storyText.Refresh()
+	} else {
+		ui.addStory(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
+	}
 }
 ```
 
-- 接続・状態・部屋の絵・まわり／持ち物／クエスト・冒険／チャット／ログを作ります。入れ子のタブとコマンド入力欄を廃止し、一覧の対象からボタンで操作する形です。持ち物・クエストのタブを選んだ際は対応する情報を取得します。アイテムの絵は左右のボタンでも送れます。
+- 接続・状態・部屋の絵・まわり／持ち物／クエスト／地図・冒険／チャット／ログを作ります。HP・仲間のバー、戦闘パネル、エンディング一覧もここで組み立てます。画像はスクロール操作を無効にしたScrollの内側でクリップし、アイテムの絵は左右のボタンで送れます。「逃げる」は敵の「戦う」と同じ行にあります。
 
 ### `compactLabel`
 
@@ -6557,7 +6618,7 @@ func compactLabel(text string) *widget.Label {
 }
 ```
 
-- 状態欄の文章が長い場合は省略記号を使い、狭いウインドウでも横にはみ出さないようにします。
+- 長い状態表示は省略記号で収めます。文字の高さはテーマから計算します。
 
 ### `showConnectionSettings`
 
@@ -6584,7 +6645,7 @@ func (ui *gui) showConnectionSettings() {
 }
 ```
 
-- 接続先とプレイヤー名だけを入力する画面です。接続中や接続処理中には開きません。接続・戻るボタンのどちらでも閉じられます。
+- 接続先とプレイヤー名を入力する画面です。接続中や接続処理中には開きません。
 
 ### `screenLayout`
 
@@ -6592,30 +6653,34 @@ func (ui *gui) showConnectionSettings() {
 type screenLayout struct{}
 ```
 
-- ウインドウの中を見出し・状態・冒険領域・メッセージ欄へ分けます。幅に応じて状態を1行または2行へ並べ、メッセージ欄を控えめな高さにします。
+- 見出し・状態・冒険領域・メッセージ欄を縦に配置するレイアウトです。
 
 ### `screenLayout.MinSize`
 
 ```go
-func (*screenLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(560, 680) }
+func (*screenLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	height := float32(3) * theme.Padding()
+	for _, object := range objects {
+		height += object.MinSize().Height
+	}
+	return fyne.NewSize(560, max(680, height))
+}
 ```
 
-- レイアウト全体の最小サイズを返します。画面幅の切替では部品を再作成しません。
+- 560×680を基準に、各部品に必要な高さを合計します。文字サイズや戦闘パネルの表示で必要な最小高さが増えます。
 
 ### `screenLayout.Layout`
 
 ```go
 func (*screenLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	gap := theme.Padding()
-	headerHeight := objects[0].MinSize().Height
-	statsHeight := float32(30)
-	if size.Width < 1000 {
-		statsHeight = 60 + gap
-	}
-	messagesHeight := min(float32(150), size.Height*0.18)
+	headerHeight := heightForWidth(objects[0], size.Width)
+	statsHeight := heightForWidth(objects[1], size.Width)
+	messagesHeight := min(float32(230), size.Height*0.26)
 	if size.Width < 960 {
-		messagesHeight = min(float32(120), size.Height*0.16)
+		messagesHeight = min(float32(170), size.Height*0.22)
 	}
+	messagesHeight = max(objects[3].MinSize().Height, min(messagesHeight, size.Height-headerHeight-statsHeight-objects[2].MinSize().Height-3*gap))
 	playHeight := max(float32(0), size.Height-headerHeight-statsHeight-messagesHeight-3*gap)
 	y := float32(0)
 	for index, height := range []float32{headerHeight, statsHeight, playHeight, messagesHeight} {
@@ -6626,61 +6691,171 @@ func (*screenLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 }
 ```
 
-- 部品の配置を決めます。Moveは位置、Resizeは大きさを設定します。
+- 見出しと状態の実際の高さを測り、残りを絵と一覧へ割り当てます。メッセージ欄の希望高さは広い画面で最大230、狭い画面で最大170とし、冒険領域の最小高さを確保します。
+
+### `heightForWidth`
+
+```go
+func heightForWidth(object fyne.CanvasObject, width float32) float32 {
+	object.Resize(fyne.NewSize(width, object.MinSize().Height))
+	return object.MinSize().Height
+}
+```
+
+- 先に表示幅を設定してから最小高さを測ります。日本語などの折り返しで増えた高さを次の行の位置へ反映できます。
+
+### `headerLayout`
+
+```go
+type headerLayout struct{ stacked bool }
+```
+
+- 題名と接続操作を並べるレイアウトです。幅が足りるかをstackedへ保存します。
+
+### `headerLayout.MinSize`
+
+```go
+func (l *headerLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	brand, controls := objects[0].MinSize(), objects[1].MinSize()
+	if l.stacked {
+		return fyne.NewSize(max(brand.Width, controls.Width), brand.Height+controls.Height+theme.Padding())
+	}
+	return fyne.NewSize(brand.Width+controls.Width+theme.Padding(), max(brand.Height, controls.Height))
+}
+```
+
+- 横並びなら幅を合計し、上下なら高さを合計します。固定の文字高さを使いません。
+
+### `headerLayout.Layout`
+
+```go
+func (l *headerLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	brand, controls := objects[0].MinSize(), objects[1].MinSize()
+	l.stacked = brand.Width+controls.Width+theme.Padding() > size.Width
+	objects[0].Resize(brand)
+	objects[1].Resize(controls)
+	if l.stacked {
+		objects[0].Move(fyne.NewPos(0, 0))
+		objects[1].Move(fyne.NewPos(max(0, size.Width-controls.Width), brand.Height+theme.Padding()))
+		return
+	}
+	height := max(brand.Height, controls.Height)
+	objects[0].Move(fyne.NewPos(0, (height-brand.Height)/2))
+	objects[1].Move(fyne.NewPos(size.Width-controls.Width, (height-controls.Height)/2))
+}
+```
+
+- 題名と接続操作が同じ行に収まらなければ、接続操作を下へ置きます。言語選択や大きな文字でも題名と重なりません。
 
 ### `statsLayout`
 
 ```go
-type statsLayout struct{}
+type statsLayout struct{ columns int }
 ```
 
-- 幅1000未満なら3列、それ以上なら6列です。状態の部品そのものは作り直しません。
+- HP・仲間・グループ・部屋人数・全体人数・接続状態を並べます。
 
 ### `statsLayout.MinSize`
 
 ```go
-func (*statsLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 30) }
+func (l *statsLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	return layout.NewGridLayoutWithColumns(max(3, l.columns)).MinSize(objects)
+}
 ```
 
-- レイアウト全体の最小サイズを返します。画面幅の切替では部品を再作成しません。
+- 現在の列数で必要な高さを計算します。HPと仲間の背景バーも含めて測ります。
 
 ### `statsLayout.Layout`
 
 ```go
-func (*statsLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
-	columns := 6
+func (l *statsLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	l.columns = 6
 	if size.Width < 1000 {
-		columns = 3
+		l.columns = 3
 	}
-	layout.NewGridLayoutWithColumns(columns).Layout(objects, size)
+	layout.NewGridLayoutWithColumns(l.columns).Layout(objects, size)
 }
 ```
 
-- 部品の配置を決めます。Moveは位置、Resizeは大きさを設定します。
+- 幅1000以上は6列、それ未満は3列2行にします。状態表示の部品は作り直しません。
+
+### `textVBox`
+
+```go
+func textVBox(objects ...fyne.CanvasObject) *fyne.Container {
+	return container.New(&textVBoxLayout{}, objects...)
+}
+```
+
+- 幅を設定してから折り返しの高さを測る縦並びのコンテナを作ります。一覧のカードや文章を含むダイアログで使います。
+
+### `textVBoxLayout`
+
+```go
+type textVBoxLayout struct{}
+```
+
+- 文章の幅と高さを順に計算する縦並びのレイアウトです。
+
+### `textVBoxLayout.MinSize`
+
+```go
+func (*textVBoxLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	return layout.NewVBoxLayout().MinSize(objects)
+}
+```
+
+- 表示中の部品の最小高さと間隔を合計します。
+
+### `textVBoxLayout.Layout`
+
+```go
+func (*textVBoxLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	y := float32(0)
+	for _, object := range objects {
+		if !object.Visible() {
+			continue
+		}
+		height := heightForWidth(object, size.Width)
+		object.Move(fyne.NewPos(0, y))
+		object.Resize(fyne.NewSize(size.Width, height))
+		y += height + theme.Padding()
+	}
+}
+```
+
+- 各部品へ幅を渡し、折り返し後の高さを測ってから次の部品を置きます。長い名前・クエスト説明・祝福文が次の行やボタンと重なることを防ぎます。
 
 ### `adventureLayout`
 
 ```go
-type adventureLayout struct{}
+type adventureLayout struct{ wide bool }
 ```
 
-- 幅960以上なら絵と一覧を左右に並べ、一覧の幅は330にします。狭いときは絵を上、一覧を下へ配置し、一覧の高さを確保します。
+- 絵と詳細欄を横並びまたは縦並びにするレイアウトです。
 
 ### `adventureLayout.MinSize`
 
 ```go
-func (*adventureLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 400) }
+func (l *adventureLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	height := max(objects[0].MinSize().Height, objects[1].MinSize().Height)
+	if !l.wide {
+		height = objects[0].MinSize().Height + objects[1].MinSize().Height + theme.Padding()
+	}
+	return fyne.NewSize(0, max(400, height))
+}
 ```
 
-- レイアウト全体の最小サイズを返します。画面幅の切替では部品を再作成しません。
+- 横並びでは高い方、縦並びでは両方の高さと間隔を使います。戦闘パネルの表示も最小サイズへ反映します。
 
 ### `adventureLayout.Layout`
 
 ```go
-func (*adventureLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+func (l *adventureLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	gap := theme.Padding()
-	if size.Width >= 960 {
-		sideWidth := float32(330)
+	l.wide = size.Width >= 960
+	if l.wide {
+		sideWidth := max(float32(330), objects[1].MinSize().Width)
 		objects[0].Move(fyne.NewPos(0, 0))
 		objects[0].Resize(fyne.NewSize(size.Width-sideWidth-gap, size.Height))
 		objects[1].Move(fyne.NewPos(size.Width-sideWidth, 0))
@@ -6688,6 +6863,7 @@ func (*adventureLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 		return
 	}
 	sceneHeight := min(size.Width*0.6+80, max(100, size.Height-190))
+	sceneHeight = min(max(objects[0].MinSize().Height, sceneHeight), max(0, size.Height-objects[1].MinSize().Height-gap))
 	objects[0].Move(fyne.NewPos(0, 0))
 	objects[0].Resize(fyne.NewSize(size.Width, sceneHeight))
 	objects[1].Move(fyne.NewPos(0, sceneHeight+gap))
@@ -6695,7 +6871,7 @@ func (*adventureLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 }
 ```
 
-- 部品の配置を決めます。Moveは位置、Resizeは大きさを設定します。
+- 幅960以上なら左右へ配置し、詳細欄の幅は330または実際の最小幅の大きい方です。狭い画面では上下にし、一覧・戦闘パネルの最小高さを確保して絵の高さを調整します。
 
 ### `sceneLayout`
 
@@ -6703,21 +6879,25 @@ func (*adventureLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 type sceneLayout struct{}
 ```
 
-- 部屋の絵と説明文を上下に置きます。説明文はスクロールでき、絵に使う領域を広く残します。
+- 部屋の絵とスクロールできる説明文を上下へ置きます。
 
 ### `sceneLayout.MinSize`
 
 ```go
-func (*sceneLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 100) }
+func (*sceneLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	art, description := objects[0].MinSize(), objects[1].MinSize()
+	return fyne.NewSize(max(art.Width, description.Width), art.Height+max(description.Height, textLineHeight())+theme.Padding())
+}
 ```
 
-- レイアウト全体の最小サイズを返します。画面幅の切替では部品を再作成しません。
+- 絵の最小高さに説明文1行と間隔を加えます。
 
 ### `sceneLayout.Layout`
 
 ```go
 func (*sceneLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
-	descriptionHeight := min(float32(62), size.Height*0.2)
+	descriptionHeight := min(float32(62), max(textLineHeight(), size.Height*0.2))
+	descriptionHeight = min(descriptionHeight, max(0, size.Height-objects[0].MinSize().Height-theme.Padding()))
 	artHeight := max(float32(0), size.Height-descriptionHeight-theme.Padding())
 	objects[0].Move(fyne.NewPos(0, 0))
 	objects[0].Resize(fyne.NewSize(size.Width, artHeight))
@@ -6726,7 +6906,65 @@ func (*sceneLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 }
 ```
 
-- 部品の配置を決めます。Moveは位置、Resizeは大きさを設定します。
+- 説明文は少なくとも1行が読める高さを確保し、残りを絵へ使います。複数行の説明はスクロールできます。
+
+### `textLineHeight`
+
+```go
+func textLineHeight() float32 {
+	textTheme := theme.Current()
+	style := fyne.TextStyle{}
+	size, _ := fyne.CurrentApp().Driver().RenderedTextSize("Ag国", textTheme.Size(theme.SizeNameText), style, textTheme.Font(style))
+	return size.Height + 2*textTheme.Size(theme.SizeNameInnerPadding)
+}
+```
+
+- 現在のテーマのフォントと文字サイズを使って、日本語を含む1行の高さを測ります。上下の内側余白も加えます。
+
+### `sceneVisualLayout`
+
+```go
+type sceneVisualLayout struct{ photos *fyne.Container }
+```
+
+- 背景・フラッシュ・アイテムの絵を、部屋の絵の枠内へ配置します。
+
+### `sceneVisualLayout.MinSize`
+
+```go
+func (*sceneVisualLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(100, 100) }
+```
+
+- 絵の表示領域の最小サイズを100×100にします。
+
+### `sceneVisualLayout.Layout`
+
+```go
+func (l *sceneVisualLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	gap := theme.Padding()
+	inside := fyne.NewSize(max(0, size.Width-2*gap), max(0, size.Height-2*gap))
+	for _, layer := range objects[:2] {
+		layer.Move(fyne.NewPos(gap, gap))
+		layer.Resize(inside)
+	}
+	if objects[2].Visible() {
+		thumbnail := fyne.NewSquareSize(min(104, max(48, inside.Height*0.3)))
+		for _, photo := range l.photos.Objects {
+			card := photo.(*fyne.Container)
+			if card.MinSize() != thumbnail {
+				card.Layout = layout.NewGridWrapLayout(thumbnail)
+				card.Resize(thumbnail)
+			}
+		}
+		strip := fyne.NewSize(min(290, inside.Width), objects[2].MinSize().Height)
+		strip.Height = min(strip.Height, inside.Height)
+		objects[2].Move(fyne.NewPos(size.Width-gap-strip.Width, size.Height-gap-strip.Height))
+		objects[2].Resize(strip)
+	}
+}
+```
+
+- 背景とフラッシュを枠から余白分だけ離します。アイテムは右下に置き、絵の高さに応じて48～104の正方形へ縮小・拡大します。アイテム欄の幅と高さも枠の内側へ収めます。
 
 ## 15-9 `ui_actions.go`(94行)— マウス操作とグループ
 
@@ -6845,7 +7083,9 @@ func (ui *gui) clearChoices() {
 
 - 開いている選択画面を閉じ、古い選択肢を取り除きます。部屋変更と切断の際にも使います。
 
-## 15-10 `ui_journal.go`(215行)— まわり・持ち物・クエスト
+## 15-10 `ui_journal.go`(237行)— まわり・持ち物・クエスト
+
+敵と未知のNPCでは「戦う／逃げる」を同じ行に表示し、会話・依頼とは別の行にします。文章を含むカードは`textVBox`で高さを測ります。アイテムの左右ボタンは現在のカード1枚と余白分だけスクロールします。
 
 ### `journalSection`
 
@@ -6854,7 +7094,7 @@ func journalSection(title string, content fyne.CanvasObject) fyne.CanvasObject {
 	heading := canvas.NewText(title, gold)
 	heading.TextSize = 14
 	heading.TextStyle.Bold = true
-	return container.NewVBox(container.NewPadded(heading), content)
+	return textVBox(container.NewPadded(heading), content)
 }
 ```
 
@@ -6906,6 +7146,13 @@ func (ui *gui) showRoom(view lookView) {
 		ui.clearChoices()
 	}
 	ui.room = view
+	if view.Room.ID != "" {
+		if ui.visited == nil {
+			ui.visited = map[string]bool{}
+		}
+		ui.visited[view.Room.ID] = true
+	}
+	defer ui.refreshMap()
 	if ui.scene.Image == nil || previous.Room.ID != view.Room.ID || !slices.Equal(previous.NPCs, view.NPCs) {
 		ui.scene.Resource = nil
 		ui.scene.Image = composeScene(view.Room.ID, view.NPCs)
@@ -6941,11 +7188,15 @@ func (ui *gui) showRoom(view lookView) {
 		if !known || ui.catalog.hasQuest(id) {
 			buttons = append(buttons, ui.commandButton(ui.tr("Quest", "依頼"), func() { ui.send("QUEST " + id) }))
 		}
-		if !known || ui.catalog.NPCs[id].Role == "enemy" {
-			buttons = append(buttons, ui.commandButton(ui.tr("Attack", "戦う"), func() { ui.send("ATTACK " + id) }))
-		}
 		actions := container.NewGridWithColumns(len(buttons), buttons...)
-		npcs = append(npcs, journalCard(container.NewVBox(journalName(ui.catalog.label("npc", id, ui.locale)), actions)))
+		content := textVBox(journalName(ui.catalog.label("npc", id, ui.locale)), actions)
+		if !known || ui.catalog.NPCs[id].Role == "enemy" {
+			content.Add(container.NewGridWithColumns(2,
+				ui.commandButton(ui.tr("Attack", "戦う"), func() { ui.send("ATTACK " + id) }),
+				ui.commandButton(ui.tr("Flee", "逃げる"), func() { ui.send("FLEE") }),
+			))
+		}
+		npcs = append(npcs, journalCard(content))
 	}
 	for _, id := range view.Items {
 		items = append(items, ui.itemRow(id, "TAKE", ui.tr("Take", "取る")))
@@ -7014,6 +7265,7 @@ func (ui *gui) showInventory(ids []string) {
 		rows = append(rows, ui.itemRow(id, "DROP", ui.tr("Drop", "置く")))
 	}
 	ui.setJournalRows(ui.inventoryBox, rows, ui.tr("Your bag is empty. Pick up items in Around.", "持ち物はありません。「まわり」から道具を拾えます。"))
+	ui.showEndings()
 }
 ```
 
@@ -7028,7 +7280,7 @@ func (ui *gui) showQuests(quests []questView) {
 	for _, quest := range quests {
 		name := journalName(ui.catalog.label("quest", quest.QuestID, ui.locale))
 		status := widget.NewLabel(ui.statusWord(quest.Status) + "  ·  " + quest.Progress)
-		content := container.NewVBox(name, status)
+		content := textVBox(name, status)
 		if ui.catalog != nil {
 			if description := ui.catalog.Quests[quest.QuestID].Description.get(ui.locale); description != "" {
 				label := widget.NewLabel(description)
@@ -7096,14 +7348,18 @@ func (ui *gui) showItemPhotos(ids []string) {
 ### `scrollItemPhotos`
 
 ```go
-func (ui *gui) scrollItemPhotos(delta float32) {
+func (ui *gui) scrollItemPhotos(direction float32) {
+	if len(ui.itemPhotoBox.Objects) == 0 {
+		return
+	}
+	step := ui.itemPhotoBox.Objects[0].MinSize().Width + theme.Padding()
 	offset := ui.itemPhotoScroll.Offset
-	offset.X = max(0, offset.X+delta)
+	offset.X = max(0, offset.X+direction*step)
 	ui.itemPhotoScroll.ScrollToOffset(offset)
 }
 ```
 
-- 横方向のスクロール位置を増減し、0未満にはしません。
+- directionが1なら右、-1なら左へ、現在のカード1枚の幅と余白分だけ送ります。0未満にはしません。狭い画面でカードが縮小しても1枚ずつ操作できます。
 
 ### `showState`
 
@@ -7112,8 +7368,10 @@ func (ui *gui) showState(state stateView) {
 	ui.state = state
 	if state.CrewInitialized {
 		ui.crewLabel.SetText(fmt.Sprintf(ui.tr("Crew: %d", "仲間: %d 人"), state.Crew))
+		ui.crewBar.Set(state.Crew, max(startingCrew, state.Crew))
 	} else {
 		ui.crewLabel.SetText(ui.tr("Crew: -", "仲間: - 人"))
+		ui.crewBar.Set(0, startingCrew)
 	}
 	group := "-"
 	if state.Group != "" {
@@ -7199,6 +7457,25 @@ func handleState(s *Server, conn net.Conn, name *string, parts []string) bool {
 - `gui_state_test.go`:自分宛ての招待だけが返ること、Crew・オンライン・グループの内容、STATUSとWHOの従来応答、TCP接続上の移動による12人から10人への変化を確認します。
 
 ---
+
+## 15-12 戦闘・地図・演出と表示の検証
+
+最新mainから取り込んだGUIの機能は次のファイルへ分かれています。
+
+| ファイル | 担当する表示と処理 |
+| --- | --- |
+| `ui_bars.go` | HPと仲間のラベルの背景へ残量を描画する |
+| `ui_combat.go` | 戦闘中の敵名・HP・「戦う／構える／逃げる」を表示し、ATTACK・DEFEND・FLEEの応答を反映する |
+| `ui_story.go` | 冒険の履歴を種類付きで保存し、種類別の色を使ったRichTextへ変換する |
+| `ui_effects.go` | 移動・被害・死亡時のフラッシュを作り、時間経過で透明にする |
+| `ui_map.go` | 訪れた部屋と接続関係、危険・即死等の凡例を表示する。狭い画面では地図と凡例全体をスクロールできる |
+| `ui_endings.go` | 持ち物の記念品から取得したエンディングと祝福を表示し、設定へ記録した即死部屋の数も表示する |
+
+長い敵名、エンディングの祝福文にも`textVBox`を使います。地図の凡例は色見本以外へ残りの幅を割り当て、言語による文字幅の違いに対応します。
+
+`ui_overlap_test.go`は日本語・英語、文字サイズ15・22、画面の横並び・縦並びの切替で、文章・ボタンの重なりと画像の枠外表示を確認します。4種類の一覧、戦闘中のパネル、ゲームオーバー画面、アイテム画像の縮小と1枚ずつのスクロールも確認します。実際の部屋・NPC・クエストを使い、長い日本語名を追加して折り返しを検証します。
+
+Fyneのテスト用ウインドウは実ウインドウの最小サイズ制約を自動では適用しないため、テスト側で現在の最小サイズ以上へ調整します。`TAP_GUI_PREVIEW_DIR`に既存の出力ディレクトリを指定すると、同じ検証画面をPNGへ保存できます。通常のテストではPNGをファイルへ書きません。これはFyneのテスト用Canvasでの確認であり、OSの実ウインドウの起動確認とは別です。
 
 # おわりに
 

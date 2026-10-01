@@ -41,29 +41,29 @@ func (ui *gui) build() {
 	ui.roomTitle.Truncation = fyne.TextTruncateEllipsis
 	ui.roomDesc = widget.NewLabel(ui.tr("Connect to begin your journey.", "接続して冒険を始めましょう。"))
 	ui.roomDesc.Wrapping = fyne.TextWrapWord
-	ui.exitBox = container.NewVBox()
-	ui.playerBox = container.NewVBox()
-	ui.itemBox = container.NewVBox()
-	ui.npcBox = container.NewVBox()
-	ui.inventoryBox = container.NewVBox()
-	ui.questBox = container.NewVBox()
+	ui.exitBox = textVBox()
+	ui.playerBox = textVBox()
+	ui.itemBox = textVBox()
+	ui.npcBox = textVBox()
+	ui.inventoryBox = textVBox()
+	ui.questBox = textVBox()
 	ui.endingBox = newEndingBox()
 	ui.choiceTitle = widget.NewLabel("")
-	ui.choiceBox = container.NewVBox()
+	ui.choiceBox = textVBox()
 	ui.itemPhotoBox = container.NewHBox()
 	ui.itemPhotoScroll = container.NewHScroll(ui.itemPhotoBox)
 	ui.itemPhotoScroll.Hide()
 	ui.scene = sceneImage()
 	photos := container.NewBorder(nil, nil,
-		widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() { ui.scrollItemPhotos(-110) }),
-		widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() { ui.scrollItemPhotos(110) }),
+		widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() { ui.scrollItemPhotos(-1) }),
+		widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() { ui.scrollItemPhotos(1) }),
 		ui.itemPhotoScroll,
 	)
-	ui.photoStrip = container.NewGridWrap(fyne.NewSize(290, 112), photos)
+	ui.photoStrip = photos
 	ui.photoStrip.Hide()
-	photoOverlay := container.NewHBox(layout.NewSpacer(), ui.photoStrip)
 	ui.flash = newFlashLayer()
-	sceneVisual := container.NewStack(ui.scene, ui.flash, container.NewBorder(nil, photoOverlay, nil, nil))
+	sceneVisual := container.NewScroll(container.New(&sceneVisualLayout{photos: ui.itemPhotoBox}, ui.scene, ui.flash, ui.photoStrip))
+	sceneVisual.Direction = container.ScrollNone
 	sceneFrame := canvas.NewRectangle(ink)
 	sceneFrame.StrokeColor = gold
 	sceneFrame.StrokeWidth = 1
@@ -71,7 +71,7 @@ func (ui *gui) build() {
 	ui.scenePanel = container.NewBorder(ui.roomTitle, nil, nil, nil,
 		container.New(&sceneLayout{}, visual, container.NewVScroll(ui.roomDesc)))
 
-	surroundings := container.NewVBox(
+	surroundings := textVBox(
 		journalSection(ui.tr("Paths", "移動先"), ui.exitBox),
 		journalSection(ui.tr("People & creatures", "人物・生きもの"), ui.npcBox),
 		journalSection(ui.tr("Items here", "落ちている道具"), ui.itemBox),
@@ -80,7 +80,7 @@ func (ui *gui) build() {
 	ui.journal = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Around", "まわり"), container.NewVScroll(surroundings)),
 		container.NewTabItem(ui.tr("Inventory", "持ち物"), container.NewVScroll(ui.inventoryBox)),
-		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(container.NewVBox(ui.questBox, ui.endingBox))),
+		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(textVBox(ui.questBox, ui.endingBox))),
 		container.NewTabItem(ui.tr("Map", "地図"), ui.buildMapTab()),
 	)
 	ui.journal.OnSelected = func(item *container.TabItem) {
@@ -94,10 +94,9 @@ func (ui *gui) build() {
 			ui.send("QUESTS")
 		}
 	}
-	ui.commandButtons = container.NewGridWithColumns(4,
+	ui.commandButtons = container.NewGridWithColumns(3,
 		ui.commandButton(ui.tr("Refresh", "更新"), func() { ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS", "WHO", "STATE") }),
 		ui.commandButton(ui.tr("Group", "グループ"), func() { ui.chooseAction("GROUP") }),
-		ui.commandButton(ui.tr("Flee", "逃げる"), func() { ui.send("FLEE") }),
 		ui.commandButton(ui.tr("Chat", "チャット"), ui.focusChat),
 	)
 	ui.buildCombatPanel()
@@ -127,7 +126,7 @@ func (ui *gui) build() {
 	brand := canvas.NewText("THE ANSWER PROTOCOL", gold)
 	brand.TextSize = 17
 	brand.TextStyle.Bold = true
-	header := container.NewBorder(nil, nil, brand,
+	header := container.New(&headerLayout{}, brand,
 		container.NewHBox(ui.languageSelect, ui.settingsButton, ui.connectButton, ui.quitButton))
 	stats := container.New(&statsLayout{}, container.NewStack(ui.hpBar.box, ui.hpLabel), container.NewStack(ui.crewBar.box, ui.crewLabel), ui.groupLabel, ui.roomCount, ui.totalCount, ui.statusLabel)
 	ui.window.SetContent(container.NewPadded(container.New(&screenLayout{}, header, stats, ui.playArea, ui.messages)))
@@ -192,19 +191,23 @@ func (ui *gui) showConnectionSettings() {
 
 type screenLayout struct{}
 
-func (*screenLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(560, 680) }
+func (*screenLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	height := float32(3) * theme.Padding()
+	for _, object := range objects {
+		height += object.MinSize().Height
+	}
+	return fyne.NewSize(560, max(680, height))
+}
 
 func (*screenLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	gap := theme.Padding()
-	headerHeight := objects[0].MinSize().Height
-	statsHeight := float32(30)
-	if size.Width < 1000 {
-		statsHeight = 60 + gap
-	}
+	headerHeight := heightForWidth(objects[0], size.Width)
+	statsHeight := heightForWidth(objects[1], size.Width)
 	messagesHeight := min(float32(230), size.Height*0.26)
 	if size.Width < 960 {
 		messagesHeight = min(float32(170), size.Height*0.22)
 	}
+	messagesHeight = max(objects[3].MinSize().Height, min(messagesHeight, size.Height-headerHeight-statsHeight-objects[2].MinSize().Height-3*gap))
 	playHeight := max(float32(0), size.Height-headerHeight-statsHeight-messagesHeight-3*gap)
 	y := float32(0)
 	for index, height := range []float32{headerHeight, statsHeight, playHeight, messagesHeight} {
@@ -214,26 +217,88 @@ func (*screenLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	}
 }
 
-type statsLayout struct{}
-
-func (*statsLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 30) }
-
-func (*statsLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
-	columns := 6
-	if size.Width < 1000 {
-		columns = 3
-	}
-	layout.NewGridLayoutWithColumns(columns).Layout(objects, size)
+func heightForWidth(object fyne.CanvasObject, width float32) float32 {
+	object.Resize(fyne.NewSize(width, object.MinSize().Height))
+	return object.MinSize().Height
 }
 
-type adventureLayout struct{}
+type headerLayout struct{ stacked bool }
 
-func (*adventureLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 400) }
+func (l *headerLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	brand, controls := objects[0].MinSize(), objects[1].MinSize()
+	if l.stacked {
+		return fyne.NewSize(max(brand.Width, controls.Width), brand.Height+controls.Height+theme.Padding())
+	}
+	return fyne.NewSize(brand.Width+controls.Width+theme.Padding(), max(brand.Height, controls.Height))
+}
 
-func (*adventureLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+func (l *headerLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	brand, controls := objects[0].MinSize(), objects[1].MinSize()
+	l.stacked = brand.Width+controls.Width+theme.Padding() > size.Width
+	objects[0].Resize(brand)
+	objects[1].Resize(controls)
+	if l.stacked {
+		objects[0].Move(fyne.NewPos(0, 0))
+		objects[1].Move(fyne.NewPos(max(0, size.Width-controls.Width), brand.Height+theme.Padding()))
+		return
+	}
+	height := max(brand.Height, controls.Height)
+	objects[0].Move(fyne.NewPos(0, (height-brand.Height)/2))
+	objects[1].Move(fyne.NewPos(size.Width-controls.Width, (height-controls.Height)/2))
+}
+
+type statsLayout struct{ columns int }
+
+func (l *statsLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	return layout.NewGridLayoutWithColumns(max(3, l.columns)).MinSize(objects)
+}
+
+func (l *statsLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	l.columns = 6
+	if size.Width < 1000 {
+		l.columns = 3
+	}
+	layout.NewGridLayoutWithColumns(l.columns).Layout(objects, size)
+}
+
+func textVBox(objects ...fyne.CanvasObject) *fyne.Container {
+	return container.New(&textVBoxLayout{}, objects...)
+}
+
+type textVBoxLayout struct{}
+
+func (*textVBoxLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	return layout.NewVBoxLayout().MinSize(objects)
+}
+
+func (*textVBoxLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	y := float32(0)
+	for _, object := range objects {
+		if !object.Visible() {
+			continue
+		}
+		height := heightForWidth(object, size.Width)
+		object.Move(fyne.NewPos(0, y))
+		object.Resize(fyne.NewSize(size.Width, height))
+		y += height + theme.Padding()
+	}
+}
+
+type adventureLayout struct{ wide bool }
+
+func (l *adventureLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	height := max(objects[0].MinSize().Height, objects[1].MinSize().Height)
+	if !l.wide {
+		height = objects[0].MinSize().Height + objects[1].MinSize().Height + theme.Padding()
+	}
+	return fyne.NewSize(0, max(400, height))
+}
+
+func (l *adventureLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	gap := theme.Padding()
-	if size.Width >= 960 {
-		sideWidth := float32(330)
+	l.wide = size.Width >= 960
+	if l.wide {
+		sideWidth := max(float32(330), objects[1].MinSize().Width)
 		objects[0].Move(fyne.NewPos(0, 0))
 		objects[0].Resize(fyne.NewSize(size.Width-sideWidth-gap, size.Height))
 		objects[1].Move(fyne.NewPos(size.Width-sideWidth, 0))
@@ -241,6 +306,7 @@ func (*adventureLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 		return
 	}
 	sceneHeight := min(size.Width*0.6+80, max(100, size.Height-190))
+	sceneHeight = min(max(objects[0].MinSize().Height, sceneHeight), max(0, size.Height-objects[1].MinSize().Height-gap))
 	objects[0].Move(fyne.NewPos(0, 0))
 	objects[0].Resize(fyne.NewSize(size.Width, sceneHeight))
 	objects[1].Move(fyne.NewPos(0, sceneHeight+gap))
@@ -249,13 +315,51 @@ func (*adventureLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 
 type sceneLayout struct{}
 
-func (*sceneLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 100) }
+func (*sceneLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	art, description := objects[0].MinSize(), objects[1].MinSize()
+	return fyne.NewSize(max(art.Width, description.Width), art.Height+max(description.Height, textLineHeight())+theme.Padding())
+}
 
 func (*sceneLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
-	descriptionHeight := min(float32(62), size.Height*0.2)
+	descriptionHeight := min(float32(62), max(textLineHeight(), size.Height*0.2))
+	descriptionHeight = min(descriptionHeight, max(0, size.Height-objects[0].MinSize().Height-theme.Padding()))
 	artHeight := max(float32(0), size.Height-descriptionHeight-theme.Padding())
 	objects[0].Move(fyne.NewPos(0, 0))
 	objects[0].Resize(fyne.NewSize(size.Width, artHeight))
 	objects[1].Move(fyne.NewPos(0, artHeight+theme.Padding()))
 	objects[1].Resize(fyne.NewSize(size.Width, descriptionHeight))
+}
+
+func textLineHeight() float32 {
+	textTheme := theme.Current()
+	style := fyne.TextStyle{}
+	size, _ := fyne.CurrentApp().Driver().RenderedTextSize("Ag国", textTheme.Size(theme.SizeNameText), style, textTheme.Font(style))
+	return size.Height + 2*textTheme.Size(theme.SizeNameInnerPadding)
+}
+
+type sceneVisualLayout struct{ photos *fyne.Container }
+
+func (*sceneVisualLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(100, 100) }
+
+func (l *sceneVisualLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	gap := theme.Padding()
+	inside := fyne.NewSize(max(0, size.Width-2*gap), max(0, size.Height-2*gap))
+	for _, layer := range objects[:2] {
+		layer.Move(fyne.NewPos(gap, gap))
+		layer.Resize(inside)
+	}
+	if objects[2].Visible() {
+		thumbnail := fyne.NewSquareSize(min(104, max(48, inside.Height*0.3)))
+		for _, photo := range l.photos.Objects {
+			card := photo.(*fyne.Container)
+			if card.MinSize() != thumbnail {
+				card.Layout = layout.NewGridWrapLayout(thumbnail)
+				card.Resize(thumbnail)
+			}
+		}
+		strip := fyne.NewSize(min(290, inside.Width), objects[2].MinSize().Height)
+		strip.Height = min(strip.Height, inside.Height)
+		objects[2].Move(fyne.NewPos(size.Width-gap-strip.Width, size.Height-gap-strip.Height))
+		objects[2].Resize(strip)
+	}
 }
