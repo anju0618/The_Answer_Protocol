@@ -588,6 +588,7 @@ func TestQuitSavesAndConnectRestoresPlayer(t *testing.T) {
 	server.mu.Lock()
 	restored := *server.players[want.Name]
 	server.mu.Unlock()
+	restored.lastRegen = time.Time{}
 
 	wantRestored := want
 	wantRestored.IntroSeen = true
@@ -607,6 +608,7 @@ func TestQuitSavesAndConnectRestoresPlayer(t *testing.T) {
 	restarted.mu.Lock()
 	restored = *restarted.players[want.Name]
 	restarted.mu.Unlock()
+	restored.lastRegen = time.Time{}
 	if !reflect.DeepEqual(restored, wantRestored) {
 		t.Fatalf("restored after restart = %+v, want %+v", restored, wantRestored)
 	}
