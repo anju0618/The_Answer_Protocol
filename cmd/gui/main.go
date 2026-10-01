@@ -99,7 +99,7 @@ type gui struct {
 }
 
 func main() {
-	application := app.New()
+	application := app.NewWithID("io.github.anju0618.the-answer-protocol")
 	application.Settings().SetTheme(retroTheme{base: theme.DarkTheme()})
 	window := application.NewWindow("The Answer Protocol")
 	window.Resize(fyne.NewSize(1280, 900))
