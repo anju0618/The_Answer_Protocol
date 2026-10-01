@@ -5902,7 +5902,7 @@ type gui struct {
 
 ```go
 func main() {
-	application := app.New()
+	application := app.NewWithID("io.github.anju0618.the-answer-protocol")
 	application.Settings().SetTheme(retroTheme{base: theme.DarkTheme()})
 	window := application.NewWindow("The Answer Protocol")
 	window.Resize(fyne.NewSize(1280, 900))
@@ -5924,6 +5924,8 @@ func main() {
 ```
 
 - アプリとウインドウ、配色を作り、カタログを読み込みます。`build`で部品を作った後に`Show`と`Run`で表示・イベント処理を始めます。ウインドウを閉じると接続も閉じます。
+
+- `app.NewWithID`で固定IDを指定し、発見した即死部屋の履歴をPreferencesで保存・復元します。`make run-client-gui`は、Fyneのパッケージ初期化前に`LANGUAGE`の空の候補を取り除いて起動します。直接`go run ./cmd/gui`で起動する場合は、このMakefileの補正は入りません。
 
 ### 15-7-3 チャット入力
 
