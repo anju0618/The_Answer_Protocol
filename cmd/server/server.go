@@ -228,6 +228,7 @@ var commandHandlers = map[string]commandHandler{
 	"TALK":      handleTalk,
 	"ATTACK":    handleAttack,
 	"FLEE":      handleFlee,
+	"DEFEND":    handleDefend,
 	"STATUS":    handleStatus,
 	"STATE":     handleState,
 	"QUEST":     handleQuest,

@@ -38,13 +38,14 @@ func (ui *gui) buildCombatPanel() {
 		}
 	})
 	flee := ui.commandButton(ui.tr("Flee", "逃げる"), func() { ui.send("FLEE") })
+	defend := ui.commandButton(ui.tr("Brace", "構える"), func() { ui.send("DEFEND") })
 	frame := canvas.NewRectangle(ink)
 	frame.StrokeColor, _ = storyColor(colorStoryCombat)
 	frame.StrokeWidth = 2
 	inside := container.NewVBox(
 		ui.combatName,
 		container.NewStack(ui.combatBar.box, ui.combatHP),
-		container.NewGridWithColumns(2, attack, flee),
+		container.NewGridWithColumns(3, attack, defend, flee),
 	)
 	ui.combatPanel = container.NewStack(frame, container.NewPadded(inside))
 	ui.combatPanel.Hide()
@@ -121,4 +122,16 @@ func (catalog *worldCatalog) maxHP(npcID string, fallback int) int {
 		}
 	}
 	return fallback
+}
+
+// handleDefend reports a DEFEND stance: no damage dealt, the next counter-attack is halved.
+func (ui *gui) handleDefend(line string) bool {
+	var result struct {
+		Result string `json:"result"`
+	}
+	if decodeOK(line, &result) != nil || result.Result != "braced" {
+		return false
+	}
+	ui.addStoryKind(storyCombat, ui.tr("You brace yourself. The next counter-attack will hurt half as much.", "身構えた。次の反撃のダメージは半分になる。"))
+	return true
 }

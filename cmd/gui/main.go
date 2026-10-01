@@ -431,6 +431,11 @@ func (ui *gui) handleResponse(command, request, line string) {
 			ui.addStory(ui.tr("Dropped: ", "置いた: ") + ui.catalog.label("item", id, ui.locale))
 		}
 		ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS", "STATE")
+	case "DEFEND":
+		if !ui.handleDefend(line) {
+			ui.addStory(strings.TrimPrefix(line, "OK "))
+		}
+		ui.refresh("STATUS")
 	case "ATTACK", "FLEE":
 		handled := ui.handleAttack(request, line)
 		if command == "FLEE" {

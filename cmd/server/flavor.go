@@ -35,6 +35,10 @@ var flavorTexts = map[string]LocalizedText{
 		"en": "{player} attacks {npc} for {n} damage and takes {m} in return.",
 		"ja": "{player}は{npc}に{n}のダメージを与え、{m}の反撃を受けた。",
 	},
+	"defend": {
+		"en": "{player} braces against {npc}.",
+		"ja": "{player}は{npc}の攻撃に身構えた。",
+	},
 	"flee_success": {
 		"en": "{player} flees from {npc}.",
 		"ja": "{player}は{npc}から逃げ出した。",
