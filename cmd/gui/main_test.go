@@ -228,3 +228,32 @@ func TestQuitErrorKeepsGUIConnected(t *testing.T) {
 	}
 	ui.stopPolling()
 }
+
+func TestEnteringALethalRoomShowsGameOver(t *testing.T) {
+	application := test.NewApp()
+	application.Settings().SetTheme(retroTheme{base: theme.DarkTheme()})
+	defer application.Quit()
+	window := application.NewWindow("test")
+	defer window.Close()
+	ui := &gui{window: window, locale: "en", catalog: &worldCatalog{Rooms: map[string]catalogEntry{
+		"loc.pit": {Name: localizedName{"en": "The Pit"}, Description: localizedName{"en": "The floor gives way."}, Hazard: &struct {
+			Type string `json:"type"`
+		}{Type: "lethal"}},
+		"loc.safe": {Name: localizedName{"en": "A Safe Room"}},
+	}}}
+	ui.build()
+	clientConn, serverConn := net.Pipe()
+	defer serverConn.Close()
+	ui.client = newProtocolClient(clientConn)
+	defer ui.client.Close()
+	ui.connected = true
+
+	ui.handleResponse("MOVE", "MOVE east", "OK room=loc.safe")
+	if window.Canvas().Overlays().Top() != nil {
+		t.Fatal("a safe room must not show the game-over screen")
+	}
+	ui.handleResponse("MOVE", "MOVE south", "OK room=loc.pit")
+	if window.Canvas().Overlays().Top() == nil {
+		t.Fatal("a lethal room must show the game-over screen")
+	}
+}

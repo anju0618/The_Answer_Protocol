@@ -44,7 +44,11 @@ func (name localizedName) get(locale string) string {
 }
 
 type catalogEntry struct {
-	Name localizedName `json:"name"`
+	Name        localizedName `json:"name"`
+	Description localizedName `json:"description"`
+	Hazard      *struct {
+		Type string `json:"type"`
+	} `json:"hazard"`
 }
 
 type worldCatalog struct {
@@ -115,4 +119,15 @@ func decodeOK(line string, target any) error {
 		return fmt.Errorf("decode response: %w", err)
 	}
 	return nil
+}
+
+func (catalog *worldCatalog) gameOverRoom(roomID string) (catalogEntry, bool) {
+	if catalog == nil {
+		return catalogEntry{}, false
+	}
+	entry, ok := catalog.Rooms[roomID]
+	if !ok || entry.Hazard == nil || entry.Hazard.Type != "lethal" {
+		return catalogEntry{}, false
+	}
+	return entry, true
 }

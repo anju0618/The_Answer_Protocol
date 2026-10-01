@@ -674,8 +674,12 @@ func (ui *gui) handleResponse(command, request, line string) {
 			ui.setTotal(strings.TrimPrefix(line, "OK players="))
 		}
 	case "MOVE":
-		ui.addStory(ui.tr("Moved to: ", "移動: ") + strings.TrimPrefix(line, "OK room="))
+		destination := strings.TrimPrefix(line, "OK room=")
+		ui.addStory(ui.tr("Moved to: ", "移動: ") + destination)
 		ui.refresh("LOOK", "STATUS", "QUESTS")
+		if room, ok := ui.catalog.gameOverRoom(destination); ok {
+			ui.showGameOver(destination, room)
+		}
 	case "TAKE", "DROP":
 		id := strings.TrimPrefix(strings.TrimPrefix(line, "OK taken="), "OK dropped=")
 		if command == "TAKE" {
@@ -854,6 +858,25 @@ func (ui *gui) showMessage(title, message string) {
 	})
 	content := framed(title, container.NewBorder(nil, closeButton, nil, nil, container.NewVScroll(label)))
 	popup = widget.NewModalPopUp(container.NewGridWrap(fyne.NewSize(520, 220), content), ui.window.Canvas())
+	popup.Show()
+	ui.window.Canvas().Focus(closeButton)
+}
+
+func (ui *gui) showGameOver(roomID string, room catalogEntry) {
+	scene := canvas.NewImageFromImage(loadArt("rooms", roomID))
+	scene.FillMode = canvas.ImageFillContain
+	scene.ScaleMode = canvas.ImageScaleSmooth
+	scene.SetMinSize(fyne.NewSize(480, 288))
+	title := widget.NewLabelWithStyle(ui.tr("GAME OVER", "ゲームオーバー")+"  -  "+room.Name.get(ui.locale), fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
+	story := widget.NewLabel(room.Description.get(ui.locale))
+	story.Wrapping = fyne.TextWrapWord
+	var popup *widget.PopUp
+	closeButton := widget.NewButton(ui.tr("Return to the Hall of the Fates", "運命の間へ戻る"), func() {
+		popup.Hide()
+		ui.window.Canvas().Unfocus()
+	})
+	content := framed("", container.NewBorder(title, closeButton, nil, nil, container.NewVBox(scene, story)))
+	popup = widget.NewModalPopUp(container.NewGridWrap(fyne.NewSize(540, 520), content), ui.window.Canvas())
 	popup.Show()
 	ui.window.Canvas().Focus(closeButton)
 }
