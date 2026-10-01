@@ -37,6 +37,11 @@ func (s *Server) loadPlayers() (map[string]*Player, error) {
 		if player == nil || player.Name != name {
 			return nil, fmt.Errorf("player name mismatch for %q", name)
 		}
+		for questID, state := range player.Quests {
+			if state == nil {
+				return nil, fmt.Errorf("saved player %q has null quest state for %q", name, questID)
+			}
+		}
 	}
 	return players, nil
 }

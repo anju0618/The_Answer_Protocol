@@ -1446,7 +1446,7 @@ func remoteOf(conn net.Conn) string {
 
 - 相手のアドレス(`"192.168.1.5:50123"`)を文字列で返す。取れないときは空文字。
 
-# 第7章 `cmd/server/server.go`(841行)
+# 第7章 `cmd/server/server.go`(846行)
 
 **役割**:サーバー本体です。「サーバー全体の状態(`Server`)」「接続・退室の処理」「基本コマンド(CONNECT / LOOK / MOVE / WHO / QUIT / TAKE / DROP / INVENTORY / TALK / STATUS)」「接続ごとのメインループ(`handleClient`)」が入っています。
 
@@ -1644,6 +1644,7 @@ func (s *Server) connectPlayer(name string) error {
 	if _, exists := s.players[name]; exists {
 		return errNameInUse
 	}
+	player.lastRegen = time.Now()
 	s.players[name] = player
 	return nil
 }
@@ -1652,6 +1653,7 @@ func (s *Server) connectPlayer(name string) error {
 - **第3段階:登録**。
 - `defer s.mu.Unlock()`:関数を抜けるとき自動で鍵を返す。以降どこで `return` してもよい。
 - **もう一度、重複を確認する**。第1段階とここまでの間は鍵を外していたので、別の接続が同じ名前で先に入った可能性がある。 (「**二重チェック**」と呼ばれる定番の書き方)
+- `lastRegen`を接続時刻に設定し、再接続した人も最初の更新から接続後の待機時間をHP回復へ算入します。接続していない間の時間は回復に加算しません。
 - 問題なければ `s.players` に登録して成功(`nil`)。
 
 ## 7-5 `saveAndRemovePlayer`— 保存して退室
@@ -2082,6 +2084,8 @@ func handleConnect(s *Server, conn net.Conn, name *string, parts []string) bool 
 		player.RoomID = destination
 		logger.Info("player_moved", "player", *name, "from", oldRoomID, "to", destination)
 		if oldRoomID != destination {
+			player.CombatTargetID = ""
+			player.guarding = false
 			for playerName, current := range s.players {
 				recipient := s.clients[playerName]
 				if recipient == nil {
@@ -2098,6 +2102,7 @@ func handleConnect(s *Server, conn net.Conn, name *string, parts []string) bool 
 ```
 
 - **通常の移動**。応答を積み、成功したら `player.RoomID` を書き換える。
+- 部屋が変わったときは戦闘対象と防御状態を解除します。移動失敗や同じ部屋への移動では解除せず、過去の逃走成功の記録も保持します。
 - 全プレイヤーを1周して、 **その人のいる部屋が旧部屋なら `LEAVE`、新部屋なら `ENTER`** を送る。 `switch current.RoomID { case 旧: ... case 新: ... }` は、値を比べて分岐する書き方。
 - 自分自身も `players` に含まれるが、自分は今 `destination` にいるので、自分には `ENTER` が届く。
 
@@ -2696,7 +2701,7 @@ func (s *Server) blockingEnemyLocked(player *Player, roomID string) (string, *NP
 - 残った中でID最小の1体を返す。 戻り値は (ID, NPC)。いなければ `"", nil`。
 - `MOVE` と `FLEE` で使われる。
 
-## 8-2 `hardcore.go`(119行)— 仲間の効果と、死亡のペナルティ
+## 8-2 `hardcore.go`(158行)— 仲間の効果と、死亡のペナルティ
 
 ```go
 const (
@@ -2793,60 +2798,94 @@ func (s *Server) applyDeathPenaltyLocked(player *Player, name string) deathOutco
 - 失うものが無ければ `outcomeNothingLost`。仲間に守られていれば何も変えずに `outcomeKept`。
 
 ```go
-	player.Inventory = kept
-	var returned []string
-	for _, itemID := range lost {
-		if !s.world.Items[itemID].Renewable {
-			returned = append(returned, itemID)
-		}
+	if err := s.returnItemsHomeLocked(name, lost); err != nil {
+		logger.Error("return_lost_items_failed", "player", name, "error", err.Error())
+		return outcomeNothingLost
 	}
-	s.returnItemsHomeLocked(name, returned)
+	player.Inventory = kept
 	return outcomeLost
 }
 ```
 
-- 持ち物を「残るもの」だけにする。
-- 失ったもののうち**再生しないもの**を、元の置き場所に戻す(再生アイテムは部屋に残っているので戻す必要が無い)。
+- 保存済みの所有記録を更新してから、再生しないアイテムを元の置き場所へ戻し、持ち物を「残るもの」だけにします。保存前に別の人が取得すると、旧所有者のセーブと二重所有になるため、この順序にします。
+- 保存失敗時はエラーをログに残し、持ち物と未保存の取得記録を保持します。仲間による保護を示す`outcomeKept`は返しません。
 - `outcomeLost` を返す。
 
 ```go
-func (s *Server) returnItemsHomeLocked(name string, itemIDs []string) {
+func (s *Server) returnItemsHomeLocked(name string, itemIDs []string) error {
 	if len(itemIDs) == 0 {
-		return
+		return nil
 	}
+	lost := make(map[string]bool, len(itemIDs))
+	returned := make(map[string]string)
 	for _, itemID := range itemIDs {
+		lost[itemID] = true
 		item := s.world.Items[itemID]
-		item.RoomID = item.HomeRoomID
-		if item.RoomID == "" {
-			item.RoomID = s.world.StartRoomID
+		if item.Renewable {
+			continue
 		}
-		delete(s.unsavedTakes[name], itemID)
+		roomID := item.HomeRoomID
+		if roomID == "" {
+			roomID = s.world.StartRoomID
+		}
+		returned[itemID] = roomID
 	}
-```
 
-- 失ったアイテムを**元の部屋**(`HomeRoomID`)に戻す。元が無い(報酬アイテムなど)なら開始部屋に。
-- 未保存の取得記録からも消す。 `delete` は、 **辞書が `nil` でも安全**に呼べる。
-
-```go
 	s.ioMu.Lock()
 	defer s.ioMu.Unlock()
 	locations, err := s.loadItemLocations()
 	if err != nil {
-		logger.Error("return_lost_items_failed", "player", name, "error", err.Error())
-		return
+		return err
 	}
-	for _, itemID := range itemIDs {
-		locations[itemID] = s.world.Items[itemID].RoomID
+	previousLocations := make(map[string]string, len(locations))
+	for itemID, roomID := range locations {
+		previousLocations[itemID] = roomID
 	}
-	if err := s.writeItemLocations(locations); err != nil {
-		logger.Error("save_item_locations_failed", "player", name, "error", err.Error())
+	for itemID, roomID := range returned {
+		locations[itemID] = roomID
 	}
+	if len(returned) > 0 {
+		if err := s.writeItemLocations(locations); err != nil {
+			return err
+		}
+	}
+
+	// Remove the old saved ownership before another player can take these items.
+	// Keep the rest of the saved state rather than saving the pre-respawn HP and room.
+	players, err := s.loadPlayers()
+	if err == nil {
+		if saved := players[name]; saved != nil {
+			var inventory []string
+			for _, itemID := range saved.Inventory {
+				if !lost[itemID] {
+					inventory = append(inventory, itemID)
+				}
+			}
+			saved.Inventory = inventory
+			err = s.writePlayers(players)
+		}
+	}
+	if err != nil {
+		if len(returned) > 0 {
+			if rollbackErr := s.writeItemLocations(previousLocations); rollbackErr != nil {
+				logger.Error("restore_item_location_failed", "player", name, "error", rollbackErr.Error())
+			}
+		}
+		return err
+	}
+
+	for itemID, roomID := range returned {
+		s.world.Items[itemID].RoomID = roomID
+		delete(s.unsavedTakes[name], itemID)
+	}
+	return nil
 }
 ```
 
-- アイテム位置のファイル(`itemdata.json`)にも反映する(再起動後も元の部屋にあるように)。
-- ここの `defer s.ioMu.Unlock()` で、どこで `return` してもファイルの鍵を返す。
-- 失敗してもゲームは続けたいので、**エラーはログに残すだけ**。
+- 失う全アイテムのIDと、再生しないアイテムの帰還先を準備します。元の部屋が無ければ開始部屋を使います。
+- ファイル用のロックを取り、元の位置情報をコピーしてから帰還先を保存します。続いて旧所有者の保存済み持ち物から失ったIDだけを除きます。保存済みのHP・部屋・クエスト進捗は上書きしません。
+- プレイヤー保存が失敗したら、アイテム位置を以前の状態へ戻す処理を試みます。その復元も失敗した場合はログに残します。再起動時は保存済み所有者の記録が部屋の位置情報に優先します。
+- 保存が成功してから、メモリ上の部屋へ返却し、未保存の取得記録から除きます。呼び出し元は共通ロックを保持しているため、途中で別の人が取得できません。
 
 ```go
 func (s *Server) shareVictoryLocked(attacker string, allies []string, npcID string, npc *NPC) {
@@ -2874,7 +2913,7 @@ func (s *Server) shareVictoryLocked(attacker string, allies []string, npcID stri
 - `LocalizedText{ "en": ..., "ja": ... }.Format(locale, ...)`:**その場で言語別の文字列の辞書を作り、すぐ `Format`** する形。 `%s` が `Format` に渡した引数で順に置き換わる。
 - `sendPlayerEventLocked(名前, "TEAM", 文)`:その人だけに通知を送る(第11章)。
 
-## 8-3 `combat.go`(228行) 前半 — 乱数と死亡処理
+## 8-3 `combat.go`(304行) 前半 — 乱数と死亡処理
 
 ```go
 import (
@@ -3095,9 +3134,10 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 ```go
 	targetID := player.CombatTargetID
 	npc := s.world.NPCs[targetID]
-	if targetID == "" || npc == nil {
+	if targetID == "" || npc == nil || npc.RoomID != player.RoomID || npc.Role != "enemy" || player.enemyHP(targetID, npc) <= 0 {
 
 		player.CombatTargetID = ""
+		player.guarding = false
 		targetID, npc = s.blockingEnemyLocked(player, player.RoomID)
 		if npc == nil {
 			s.mu.Unlock()
@@ -3109,6 +3149,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 ```
 
 - 戦闘中の敵を逃げる対象にする。戦闘中でなくても、 **出口を塞がれている**なら、その敵から逃げられる。
+- 保存された戦闘対象が別の部屋・非敵・撃破済み・存在しないNPCなら、その対象と防御状態を解除し、現在の部屋を塞ぐ敵を調べます。
 - どちらでもなければ `407 NOT_IN_COMBAT`。
 - `targetID, npc = ...`:すでにある変数に**2つ同時に代入**。
 
@@ -3128,15 +3169,16 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		result = "success"
 		event = flavor{key: "flee_success", player: *name, npc: npc}
 		player.CombatTargetID = ""
+		player.guarding = false
 		if player.FledFrom == nil {
 			player.FledFrom = make(map[string]bool)
 		}
 		player.FledFrom[targetID] = true
 	} else {
-		counter := randDamage(counterMinDamage, counterMaxDamage)
+		counter := reduceCounter(randDamage(counterMinDamage, counterMaxDamage), s.blessingTotalLocked(player, blessingCounterReduction)+takeGuard(player))
 		player.HP -= counter
 		if player.HP <= 0 {
-			s.respawnPlayerLocked(player, *name, "flee_failed", npc.Name.Get(locale))
+			s.respawnPlayerLocked(player, *name, "flee_failed", targetID, npc.Name.Get(locale))
 			result = "failure_dead"
 			event = flavor{key: "flee_dead", player: *name, npc: npc}
 		} else {
@@ -3243,7 +3285,7 @@ func (s *Server) applyDropConsequencesLocked(player *Player, name, itemID string
 - **手放した結果の効果**:風の革袋を、 **イタケー海岸以外で**手放すと嵐が起きて仲間が3人減る。
 - 革袋以外、またはイタケー海岸なら何も起きない(`nil`)。
 
-## 9-2 `quest.go`(235行)— クエスト
+## 9-2 `quest.go`(240行)— クエスト
 
 ### 全体の考え方
 
@@ -3470,6 +3512,11 @@ func (s *Server) sendQuestHintLocked(player *Player, npcID string) {
 	list := make([]questEntry, 0, len(ids))
 	for _, id := range ids {
 		state := player.Quests[id]
+		if state == nil {
+			s.mu.Unlock()
+			fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
+			return false
+		}
 		count := 1
 		if quest := s.world.Quests[id]; quest != nil {
 			count = quest.Objective.Count
@@ -3479,6 +3526,7 @@ func (s *Server) sendQuestHintLocked(player *Player, npcID string) {
 ```
 
 - 各クエストについて `{quest_id, status, progress: "2/3"}` を作る。
+- 状態が`nil`なら、共通ロックを解放して`ERR 500 STATE_ERROR`を返します。他のプレイヤーのコマンド処理を止めません。
 - `fmt.Sprintf("%d/%d", 進捗, 目標)` で `"2/3"` の文字列に。
 - 応答は `OK [{...},{...}]`。
 
@@ -4240,7 +4288,7 @@ func (s *Server) sendGuideLocked(name string, index int) {
 - `for i := index; i < len(...); i++ {`:Goの**従来型の`for`**。初期化; 条件; 後処理。
 - 空の台詞は送らない。
 
-## 11-2 `flavor.go`(114行)— 部屋への実況
+## 11-2 `flavor.go`(127行)— 部屋への実況
 
 ### 11-2-1 `flavor` の型と文章表
 
@@ -4309,7 +4357,15 @@ func (s *Server) broadcastFlavorLocked(roomID string, f flavor) {
 			continue
 		}
 		if recipient := s.clients[playerName]; recipient != nil {
-			recipient.enqueueEvent("EVT ROOM COMBAT " + f.text(s.localeOfLocked(playerName)))
+			event := "EVT ROOM COMBAT " + f.text(s.localeOfLocked(playerName))
+			if len(event) > maxProtocolLineBytes {
+				event = event[:maxProtocolLineBytes-len("...")]
+				for !utf8.ValidString(event) {
+					event = event[:len(event)-1]
+				}
+				event += "..."
+			}
+			recipient.enqueueEvent(event)
 		}
 	}
 }
@@ -4317,6 +4373,7 @@ func (s *Server) broadcastFlavorLocked(roomID string, f flavor) {
 
 - 指定の部屋にいる**全員**に、実況を送る。
 - **受け取る人ごとに言語が違うかもしれない**ので、ループの中で `f.text(その人の言語)` を作る。日本語の人には日本語、英語の人には英語。
+- 長いプレイヤー名などで1行が65,535バイトを超える場合は、UTF-8の文字境界で切り詰めて`...`を付けます。標準設定のCLIのScannerでも受信でき、短い実況文はそのまま送ります。
 
 ---
 
@@ -4329,7 +4386,7 @@ func (s *Server) broadcastFlavorLocked(roomID string, f flavor) {
 | `saves/playerdata.json` | 全プレイヤー(名前→`Player`) |
 | `saves/itemdata.json` | 普通のアイテムの置き場所(アイテムID→部屋ID) |
 
-## 12-1 `player_store.go`(109行)
+## 12-1 `player_store.go`(114行)
 
 ```go
 const playersSaveFile = "playerdata.json"
@@ -4374,6 +4431,11 @@ func (s *Server) loadPlayers() (map[string]*Player, error) {
 		if player == nil || player.Name != name {
 			return nil, fmt.Errorf("player name mismatch for %q", name)
 		}
+		for questID, state := range player.Quests {
+			if state == nil {
+				return nil, fmt.Errorf("saved player %q has null quest state for %q", name, questID)
+			}
+		}
 	}
 	return players, nil
 }
@@ -4382,6 +4444,7 @@ func (s *Server) loadPlayers() (map[string]*Player, error) {
 - JSONを辞書に変換。
 - ファイルの中身が `null` だと `players` が `nil` になるので、それは不正として弾く。
 - 辞書のキーと、中の `Name` が**一致しているか**確認(手で書き換えて壊れたデータに気づくため)。
+- クエストの各状態が`null`なら、プレイヤー名とクエストIDを示すエラーで読み込みを拒否します。セーブファイルは書き換えません。クエスト辞書自体の省略・`null`・空の辞書は受け付けます。
 
 ### `savePlayer` と `writePlayers`
 

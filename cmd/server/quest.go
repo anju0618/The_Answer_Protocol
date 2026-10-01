@@ -201,6 +201,11 @@ func handleQuests(s *Server, conn net.Conn, name *string, parts []string) bool {
 	list := make([]questEntry, 0, len(ids))
 	for _, id := range ids {
 		state := player.Quests[id]
+		if state == nil {
+			s.mu.Unlock()
+			fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
+			return false
+		}
 		count := 1
 		if quest := s.world.Quests[id]; quest != nil {
 			count = quest.Objective.Count

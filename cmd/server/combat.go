@@ -192,9 +192,10 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	targetID := player.CombatTargetID
 	npc := s.world.NPCs[targetID]
-	if targetID == "" || npc == nil {
+	if targetID == "" || npc == nil || npc.RoomID != player.RoomID || npc.Role != "enemy" || player.enemyHP(targetID, npc) <= 0 {
 
 		player.CombatTargetID = ""
+		player.guarding = false
 		targetID, npc = s.blockingEnemyLocked(player, player.RoomID)
 		if npc == nil {
 			s.mu.Unlock()
