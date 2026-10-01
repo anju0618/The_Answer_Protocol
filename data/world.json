@@ -12,6 +12,8 @@
         "ja": "時そのものの外側で、三人のモイライが英雄たちの命の糸を紡ぎ、測り、断つ。目の前には三枚の大きなタペストリーが掛かり、それぞれ異なる英雄の時代を描いている。"
       },
       "exits": {
+        "west": "loc.argo_iolcus",
+        "north": "loc.troy_ida",
         "east": "loc.ody_troy_shore"
       }
     },
