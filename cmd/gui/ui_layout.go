@@ -97,7 +97,8 @@ func (ui *gui) build() {
 		ui.commandButton(ui.tr("Flee", "逃げる"), func() { ui.send("FLEE") }),
 		ui.commandButton(ui.tr("Chat", "チャット"), ui.focusChat),
 	)
-	ui.detailPanel = container.NewBorder(nil, ui.commandButtons, nil, nil, ui.journal)
+	ui.buildCombatPanel()
+	ui.detailPanel = container.NewBorder(ui.combatPanel, ui.commandButtons, nil, nil, ui.journal)
 	ui.playArea = container.New(&adventureLayout{}, ui.scenePanel, ui.detailPanel)
 
 	ui.chatScope = widget.NewSelect([]string{"GLOBAL", "ROOM", "GROUP"}, nil)
