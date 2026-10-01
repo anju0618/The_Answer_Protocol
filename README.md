@@ -213,9 +213,9 @@ flowchart TB
 
 **The Answer Protocol (TAP)** is a shared-world, multiplayer, text-based adventure (MUD): a single TCP server (`cmd/server`) plus a CLI client (`cmd/cli`), built strictly against the attached RFC (`rfc.tar.gz` / `protocol-rfc.html`) so that our server and client can interoperate with any other team's implementation of the same protocol.
 
-The world retells three Greek myths — the Voyage of the Argonauts, the Iliad, and the Odyssey — as three branching story arcs that share a single hub room (`loc.hall_of_fates`, the Hall of the Fates). On top of that world, we designed an original combat and quest system around one idea, left deliberately undefined by the RFC (see "Combat System" below): **acting against the myth gets you killed.** For example, attacking Polyphemus without first taking the sharpened olive stake is an instant kill, not a normal fight.
+The world is built from three Greek myths — the Voyage of the Argonauts, the Iliad, and the Odyssey — as three story arcs that share a single hub room (`loc.hall_of_fates`, the Hall of the Fates). Right now only the Odyssey is open to players; the other two arcs are kept in the world data but no road leads to them (see "World Design"). On top of that world, we designed an original combat and quest system around one idea, left deliberately undefined by the RFC (see "Combat System" below): **acting against the myth gets you killed.** For example, attacking Polyphemus without first taking the sharpened olive stake is an instant kill, not a normal fight.
 
-A GUI client (`cmd/gui`) has not been started yet (the directory only holds a placeholder). Structured JSON logging (per-command/response audit logs, abuse-pattern detection) is also not implemented yet; see "Server Logging" for what exists today. These are this project's two most significant known gaps.
+The mandatory part is implemented: the server (all RFC commands and events, plus our two documented extensions), a CLI client (`cmd/cli`), a GUI client (`cmd/gui`, built with the Fyne toolkit) and structured JSON logging (see "Server Logging"). Known limitations: the Argonauts and Iliad arcs cannot currently be reached, and a few GUI illustrations are still placeholders.
 
 ## Instructions
 
