@@ -9,6 +9,9 @@ func (s *Server) applyRoomHazardLocked(player *Player, name string, room *Room, 
 
 	switch hazard.Type {
 	case "lethal":
+		if description := room.Description.Get(locale); description != "" {
+			s.sendPlayerEventLocked(name, "DEATH", description)
+		}
 		s.respawnPlayerLocked(player, name, "hazard_lethal", roomName)
 		return &flavor{key: "hazard_lethal", player: name, room: room}
 

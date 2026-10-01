@@ -396,3 +396,27 @@ func TestTalkMythGateOnNonHostileNPC(t *testing.T) {
 	alice.cmd(t, "TAKE item.moly", "OK taken=item.moly")
 	alice.cmd(t, "TALK npc.host", "OK Welcome.")
 }
+
+func TestLethalRoomTellsWhatHappened(t *testing.T) {
+	server := newServer(t.TempDir())
+	server.world = &World{
+		StartRoomID: "loc.start",
+		Rooms: map[string]*Room{
+			"loc.start": {ID: "loc.start", Name: en("Hall"), Exits: map[string]string{"south": "loc.pit"}},
+			"loc.pit": {ID: "loc.pit", Name: en("Pit"), Description: en("The floor gives way beneath you."),
+				Hazard: &RoomHazard{Type: "lethal"}},
+		},
+	}
+	alice := startTestClient(t, server)
+	alice.connect(t, "alice")
+
+	alice.cmd(t, "MOVE south", "OK room=loc.pit")
+	story := alice.waitEvent(t, "EVT PLAYER DEATH ")
+	if !strings.Contains(story, "The floor gives way beneath you.") {
+		t.Errorf("first death message = %q, want the room's description", story)
+	}
+	verdict := alice.waitEvent(t, "EVT PLAYER DEATH ")
+	if !strings.Contains(verdict, "Pit") || !strings.Contains(verdict, "Hall") {
+		t.Errorf("second death message = %q, want the cause and the respawn room", verdict)
+	}
+}

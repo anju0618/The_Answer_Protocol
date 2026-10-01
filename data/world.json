@@ -389,7 +389,8 @@
       },
       "exits": {
         "west": "loc.ody_troy_shore",
-        "east": "loc.ody_lotus"
+        "east": "loc.ody_lotus",
+        "north": "loc.ody_ismarus_feast"
       },
       "hazard": {
         "type": "crew_cost",
@@ -408,7 +409,8 @@
       },
       "exits": {
         "west": "loc.ody_cicones",
-        "east": "loc.ody_cyclops"
+        "east": "loc.ody_cyclops",
+        "north": "loc.ody_lotus_garden"
       }
     },
     "loc.ody_cyclops": {
@@ -423,7 +425,8 @@
       },
       "exits": {
         "west": "loc.ody_lotus",
-        "east": "loc.ody_aeolus"
+        "east": "loc.ody_aeolus",
+        "south": "loc.ody_sealed_cave"
       },
       "hazard": {
         "type": "crew_cost",
@@ -457,7 +460,8 @@
       },
       "exits": {
         "west": "loc.ody_aeolus",
-        "east": "loc.ody_circe"
+        "east": "loc.ody_circe",
+        "north": "loc.ody_laestrygonian_depths"
       }
     },
     "loc.ody_circe": {
@@ -473,7 +477,8 @@
       "exits": {
         "west": "loc.ody_laestrygonians",
         "east": "loc.ody_underworld",
-        "south": "loc.ody_sirens"
+        "south": "loc.ody_sirens",
+        "north": "loc.ody_pigsty"
       }
     },
     "loc.ody_underworld": {
@@ -574,7 +579,8 @@
       },
       "exits": {
         "west": "loc.ody_thrinacia",
-        "east": "loc.ody_phaeacia"
+        "east": "loc.ody_phaeacia",
+        "south": "loc.ody_eternal_ogygia"
       }
     },
     "loc.ody_phaeacia": {
@@ -620,6 +626,108 @@
       },
       "exits": {
         "south": "loc.ody_ithaca_shore"
+      }
+    },
+    "loc.ody_ismarus_feast": {
+      "id": "loc.ody_ismarus_feast",
+      "name": {
+        "en": "The Feast at Ismarus",
+        "ja": "イスマロスの宴"
+      },
+      "description": {
+        "en": "Odysseus's men ignore the order to flee. They butcher sheep and drink on the shore until the Cicones return at dawn, as many as the leaves of spring. By evening the beach is red, and no one is left to sail.",
+        "ja": "オデュッセウスの命令を無視して、部下たちは浜で羊を屠り酒を飲み続けた。夜明けとともに、春の木の葉ほどの数のキコネス人が戻ってくる。夕暮れには浜は血に染まり、船を出せる者はもう誰も残っていなかった。"
+      },
+      "exits": {
+        "south": "loc.ody_cicones"
+      },
+      "hazard": {
+        "type": "lethal"
+      }
+    },
+    "loc.ody_lotus_garden": {
+      "id": "loc.ody_lotus_garden",
+      "name": {
+        "en": "The Lotus Garden",
+        "ja": "蓮の園"
+      },
+      "description": {
+        "en": "You sit down among the lotus-eaters and eat. Home grows distant, then forgettable. Years pass in a sweet haze, and no one ever comes to drag you back to the ships.",
+        "ja": "あなたはロトパゴイたちの輪に腰を下ろし、実を口にする。故郷は遠くなり、やがて思い出せなくなる。甘いまどろみの中で歳月が過ぎるが、船へ引き戻しに来る者はもういない。"
+      },
+      "exits": {
+        "south": "loc.ody_lotus"
+      },
+      "hazard": {
+        "type": "lethal"
+      }
+    },
+    "loc.ody_sealed_cave": {
+      "id": "loc.ody_sealed_cave",
+      "name": {
+        "en": "The Sealed Cave",
+        "ja": "ふさがれた洞窟"
+      },
+      "description": {
+        "en": "Polyphemus sleeps, and you raise your sword to kill him. Then you remember the boulder at the cave's mouth: no living man can roll it aside. You and your crew starve in the dark beside the sleeping giant.",
+        "ja": "ポリュペモスは眠っている。剣を振り上げたそのとき、洞窟の入り口を塞ぐ大岩を思い出す。生きた人間には動かせない岩だ。あなたと仲間は、眠る巨人のそばの暗闇の中で飢えていく。"
+      },
+      "exits": {
+        "north": "loc.ody_cyclops"
+      },
+      "hazard": {
+        "type": "lethal"
+      }
+    },
+    "loc.ody_laestrygonian_depths": {
+      "id": "loc.ody_laestrygonian_depths",
+      "name": {
+        "en": "The Inner Harbor",
+        "ja": "港の奥"
+      },
+      "description": {
+        "en": "You sail into the calm, sheltered harbor, and the giants line the cliffs above. Boulders as large as houses rain down on every ship. Yours is no exception.",
+        "ja": "あなたは波のない港の奥へ船を進める。崖の上に巨人たちがずらりと並ぶ。家ほどの岩が降り注ぎ、すべての船が砕かれる。あなたの船も、例外ではなかった。"
+      },
+      "exits": {
+        "south": "loc.ody_laestrygonians"
+      },
+      "hazard": {
+        "type": "lethal"
+      }
+    },
+    "loc.ody_pigsty": {
+      "id": "loc.ody_pigsty",
+      "name": {
+        "en": "Circe's Pigsty",
+        "ja": "キルケーの豚小屋"
+      },
+      "description": {
+        "en": "You eat at Circe's table and drink from her cup. The wand falls, and the last thing you hear is your own voice turning into a squeal. The pigsty is warm, and the pigs never remember they were men.",
+        "ja": "あなたはキルケーの食卓につき、杯を干す。杖が振り下ろされ、最後に聞こえたのは、自分の声が豚の鳴き声に変わっていく音だった。豚小屋は暖かく、豚たちは自分がかつて人だったことを思い出さない。"
+      },
+      "exits": {
+        "south": "loc.ody_circe"
+      },
+      "hazard": {
+        "type": "lethal"
+      }
+    },
+    "loc.ody_eternal_ogygia": {
+      "id": "loc.ody_eternal_ogygia",
+      "name": {
+        "en": "Eternal Ogygia",
+        "ja": "果てしなきオギュギア"
+      },
+      "description": {
+        "en": "You accept Calypso's offer. She gives you immortality, and her island gives you everything but an ending. Ithaca fades, Penelope grows old without you, and you do not.",
+        "ja": "あなたはカリュプソの申し出を受け入れる。不死が与えられ、島は終わり以外のすべてをくれる。イタケは遠ざかり、ペネロペイアは夫なしに老いていく。あなたは老いない。"
+      },
+      "exits": {
+        "north": "loc.ody_calypso"
+      },
+      "hazard": {
+        "type": "lethal"
       }
     }
   },

@@ -2,6 +2,7 @@ package main
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -175,5 +176,50 @@ func TestOdysseyArcAgainstRealWorldData(t *testing.T) {
 	suitor = alice.cmdJSON(t, "ATTACK npc.antinous")
 	if suitor["status"] == "dead" {
 		t.Fatalf("attacking the suitors with the bow should not be instant death")
+	}
+}
+
+func TestOdysseyWrongTurnsAreFatal(t *testing.T) {
+	world, err := loadWorld(filepath.Join("..", "..", "data", "world.json"))
+	if err != nil {
+		t.Fatalf("load real world: %v", err)
+	}
+	server := newServer(t.TempDir())
+	server.world = world
+	alice := startTestClient(t, server)
+	alice.connect(t, "alice")
+
+	wrongTurns := []struct{ from, direction, to string }{
+		{"loc.ody_cicones", "north", "loc.ody_ismarus_feast"},
+		{"loc.ody_lotus", "north", "loc.ody_lotus_garden"},
+		{"loc.ody_cyclops", "south", "loc.ody_sealed_cave"},
+		{"loc.ody_laestrygonians", "north", "loc.ody_laestrygonian_depths"},
+		{"loc.ody_circe", "north", "loc.ody_pigsty"},
+		{"loc.ody_calypso", "south", "loc.ody_eternal_ogygia"},
+	}
+	for _, turn := range wrongTurns {
+		if world.Rooms[turn.to].Hazard == nil || world.Rooms[turn.to].Hazard.Type != "lethal" {
+			t.Fatalf("%s should be a lethal room", turn.to)
+		}
+		server.mu.Lock()
+		player := server.players["alice"]
+		player.RoomID = turn.from
+		player.HP = maxPlayerHP
+		player.FledFrom = map[string]bool{"npc.polyphemus": true, "npc.laestrygonian": true}
+		server.mu.Unlock()
+
+		alice.cmd(t, "MOVE "+turn.direction, "OK room="+turn.to)
+		server.mu.Lock()
+		room, hp := server.players["alice"].RoomID, server.players["alice"].HP
+		server.mu.Unlock()
+		if room != world.StartRoomID || hp != respawnHP {
+			t.Errorf("%s %s: alice ended in %s with %d HP, want respawn at %s with %d HP",
+				turn.from, turn.direction, room, hp, world.StartRoomID, respawnHP)
+		}
+		story := alice.waitEvent(t, "EVT PLAYER DEATH ")
+		if len(story) < len("EVT PLAYER DEATH ")+20 || strings.Contains(story, "did not survive") {
+			t.Errorf("%s: first death message should be the room's story, got %q", turn.to, story)
+		}
+		alice.waitEvent(t, "EVT PLAYER DEATH ")
 	}
 }

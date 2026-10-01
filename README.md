@@ -84,7 +84,7 @@ go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
 - **並行モデル**: 接続ごとに1 goroutine + サーバー状態全体を単一の`sync.Mutex`で保護、という単純な方式。実装の正しさを優先した(`memo.md` 2章)。
 - **戦闘**: ATTACKは基本8〜14ダメージ・反撃6〜12ダメージのランダム。一部の敵は「正しいアイテム/達成済みクエスト」を持っていないとATTACKで即死する「神話ゲート」付き。HP0で運命の間にHP20でリスポーン。**生きている敵がいる部屋はMOVEで出ようとすると即死**(倒すかFLEEで振り切るまで封鎖)。
 - **クエスト**: `QUEST <npc>`で受注、TAKE/ATTACKの成否をサーバー側が自動で判定して進行・達成・報酬付与まで行う(完了報告コマンドは無し)。
-- **ワールド**: 40部屋・アイテム17種・NPC 40強・クエスト11種。アルゴナウタイ編はクレタ→イオルコスでループし、ハブ部屋は3分岐なので、「ループ+分岐、一直線不可」の要件を満たす。オデュッセイア編も単独で輪になっている(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)。冥界・カリュブディスの大渦・求婚者たちの広間は、そこから分かれる行き止まりの枝。
+- **ワールド**: 40部屋・アイテム17種・NPC 40強・クエスト11種。アルゴナウタイ編はクレタ→イオルコスでループし、ハブ部屋は3分岐なので、「ループ+分岐、一直線不可」の要件を満たす。オデュッセイア編も単独で輪になっている(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)。冥界と求婚者たちの広間は、そこから分かれる行き止まりの枝。さらに、史実に反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入るゲームオーバー部屋が6つある。
 - **多言語対応**: `LANG ja`をCONNECT前に送るとLOOK/TALK/QUESTのテキストが日本語になる。RFC規定のJSON構造・コマンド名は一切変更していないので、他チームのサーバー/クライアントとの相互接続には影響しない。詳細は`memo.md` 8章。
 
 ### ワールドの地図
@@ -138,6 +138,12 @@ flowchart TB
     ody_phaeacia["スケリエ、パイアケス人の地"]
     ody_ithaca_shore["イタケの岸辺"]
     ody_palace["求婚者たちの広間"]
+    ody_ismarus_feast["イスマロスの宴"]
+    ody_lotus_garden["蓮の園"]
+    ody_sealed_cave["ふさがれた洞窟"]
+    ody_laestrygonian_depths["港の奥"]
+    ody_pigsty["キルケーの豚小屋"]
+    ody_eternal_ogygia["果てしなきオギュギア"]
   end
   hall_of_fates <-->|西| argo_iolcus
   hall_of_fates <-->|東| ody_troy_shore
@@ -147,13 +153,16 @@ flowchart TB
   ody_troy_shore <-->|東| ody_cicones
   troy_ida <-->|東| troy_sparta
   argo_bebrycia <-->|東| argo_salmydessus
+  ody_cicones -->|北| ody_ismarus_feast
   ody_cicones <-->|東| ody_lotus
   troy_sparta <-->|東| troy_aulis
   argo_salmydessus <-->|東| argo_symplegades
   ody_lotus <-->|東| ody_cyclops
+  ody_lotus -->|北| ody_lotus_garden
   troy_aulis <-->|東| troy_camp
   argo_symplegades <-->|東| argo_colchis_shore
   ody_cyclops <-->|東| ody_aeolus
+  ody_cyclops -->|南| ody_sealed_cave
   troy_camp <-->|北| troy_achilles_tent
   troy_camp <-->|東| troy_plain
   argo_colchis_shore <-->|北| argo_court_aeetes
@@ -161,15 +170,17 @@ flowchart TB
   troy_plain <-->|東| troy_gate
   argo_court_aeetes <-->|東| argo_bull_field
   ody_laestrygonians <-->|東| ody_circe
+  ody_laestrygonians -->|北| ody_laestrygonian_depths
   troy_gate <-->|北| troy_city
   troy_gate <-->|南| troy_countryside
   troy_countryside -->|西| troy_camp
   argo_bull_field <-->|北| argo_grove
+  ody_circe -->|北| ody_pigsty
   ody_circe <-->|南| ody_sirens
   ody_circe <-->|東| ody_underworld
   troy_city <-->|東| troy_horse
   argo_grove <-->|東| argo_flight
-  ody_sirens <-->|南| ody_charybdis
+  ody_sirens -->|南| ody_charybdis
   ody_sirens <-->|東| ody_scylla
   troy_horse <-->|北| troy_fall
   argo_flight <-->|北| argo_return_sea
@@ -177,6 +188,7 @@ flowchart TB
   argo_return_sea <-->|東| argo_crete
   ody_thrinacia <-->|東| ody_calypso
   argo_crete -->|北| argo_iolcus
+  ody_calypso -->|南| ody_eternal_ogygia
   ody_calypso <-->|東| ody_phaeacia
   ody_phaeacia <-->|東| ody_ithaca_shore
   ody_ithaca_shore -->|東| hall_of_fates
@@ -186,7 +198,7 @@ flowchart TB
   classDef lethal fill:#c62828,color:#fff,stroke:#7f0000
   class hall_of_fates hub
   class ody_cicones,ody_cyclops,ody_sirens,ody_scylla hazard
-  class ody_charybdis lethal
+  class ody_charybdis,ody_ismarus_feast,ody_lotus_garden,ody_sealed_cave,ody_laestrygonian_depths,ody_pigsty,ody_eternal_ogygia lethal
 ```
 
 ## チーム分担
@@ -341,17 +353,18 @@ RFC §6.1.2 fixes only the `QUEST`/`QUESTS` request/response shapes and leaves o
 
 ## World Design
 
-- **Structure.** One shared hub room, the Hall of the Fates (`loc.hall_of_fates`), branches three ways into the Voyage of the Argonauts (12 rooms), the Iliad (11 rooms), and the Odyssey (17 rooms) — 40 rooms in total. The hub's own 3-way branch, plus the Argonauts arc looping back on itself (Crete → Iolcus), satisfies the "rooms form a loop and at least one branch, not a straight line" requirement. The Odyssey arc is also a loop on its own: heading east from the hub through every stop to the Shore of Ithaca, whose east exit leads back to the hub, makes a 14-room ring (hub included), with the Underworld, the Whirlpool of Charybdis and the Hall of the Suitors as dead-end branches off it.
+- **Structure.** One shared hub room, the Hall of the Fates (`loc.hall_of_fates`), branches three ways into the Voyage of the Argonauts (12 rooms), the Iliad (11 rooms), and the Odyssey (22 rooms) — 46 rooms in total. The hub's own 3-way branch, plus the Argonauts arc looping back on itself (Crete → Iolcus), satisfies the "rooms form a loop and at least one branch, not a straight line" requirement. The Odyssey arc is also a loop on its own: heading east from the hub through every stop to the Shore of Ithaca, whose east exit leads back to the hub, makes a 14-room ring (hub included), with the Underworld and the Hall of the Suitors as dead-end branches off it.
 - **NPCs.** All three required roles are represented throughout: `dialogue` (lore/flavor), `quest_giver`, and `enemy`. Well over 30 NPCs total.
 - **Items.** 17 obtainable items (plus 4 reward-only trophies), nearly all of them load-bearing for either a myth gate or a quest objective (e.g. the beeswax that protects against the Sirens, the moly root that protects against Circe).
 - **Quests.** 16 quests across the three arcs, every one a `collect_item` or `defeat_npc` objective (see "Quest System" for how progress/reward is handled).
 - **Tutorial / guide.** The Hall of the Fates contains the Moirai, an NPC flagged `"guide": true` in `data/world.json`. The first time a player ever connects, the server plays her dialogue (basic commands, the three ways out, quests, combat, what happens on death) as `EVT PLAYER GUIDE` lines; afterwards `TALK Moirai` replays it (the first line is the RFC `OK` response, the rest are `EVT PLAYER GUIDE`). Whether the intro was already shown is stored per player (`Player.IntroSeen`).
 - **Death messages.** Every way to die (counter-attack, unprepared myth gate on `ATTACK` or `TALK`, failed `FLEE`, leaving a room with a live enemy, lethal/item/crew hazards, the lotus, the cattle of Helios) sends the dying player an `EVT PLAYER DEATH` explaining the cause, and where they respawned (`notify.go`, `respawnPlayerLocked`).
 - **Room hazards** (`hazard.go`), separate from NPC combat, gate certain rooms on entry via `MOVE`:
-  - `lethal` — always fatal (the whirlpool of Charybdis: the myth gives no way to survive it).
+  - `lethal` — always fatal (the whirlpool of Charybdis: the myth gives no way to survive it; and the six "wrong turn" rooms below). When a player walks into one, the room's own description is sent first as an `EVT PLAYER DEATH` line (what happened to them), followed by the usual cause-and-respawn line.
   - `item_gate` — fatal without a specific item (the Sirens' rocks, without beeswax).
   - `crew_gate` — costs a fixed amount of crew on entry, and is fatal outright if the player doesn't have enough crew left to absorb the loss (Scylla, requiring `crew + 1 ≥ 7` to survive losing 6 crew — mirroring how Scylla takes exactly six of Odysseus's men but never the ship itself).
   - `crew_cost` — unconditionally costs a fixed amount of crew on entry, never fatal (the Cicones' counter-raid and Polyphemus's cave, both −2, matching each room's own description of losses that already happened before the player arrives).
+- **Wrong turns = game-over rooms** (Odyssey arc only). At six points where the myth has Odysseus choose, the exit that goes against the myth leads to a `lethal` dead-end room instead of the next stop: staying to feast at Ismarus (north from the Cicones), staying with the Lotus-Eaters (north from their land), stabbing the sleeping Polyphemus when no one can move the boulder (south from his cave), sailing into the Laestrygonians' inner harbor (north), drinking at Circe's table (north), and accepting Calypso's immortality (south). The canonical route is always the unbroken east–west road, so a wrong turn is a deliberate choice of direction, not a trap on the way. Where a live enemy still blocks the room (Polyphemus, the Laestrygonians) the player must first defeat or flee it, as with any other exit.
 - **Crew resource** (Odyssey arc only). The player is granted a crew of 12 (`Player.Crew`) the moment they first set foot in the Odyssey arc (`loc.ody_troy_shore`). It represents the companions accompanying Odysseus and is spent — not the player's own HP — by specific bad choices: entering the Cicones' land (−2) or Polyphemus's cave (−2), opening the bag of winds anywhere but Ithaca (−3), being attacked by the Laestrygonians (−8), and passing Scylla (−6, unavoidable). Eating the lotus fruit is *not* a crew cost — it's an instant kill (see "Combat System"'s myth gates, `applyTakeConsequencesLocked` in `odyssey.go`): the myth has whoever tastes it simply never choose to leave, which we judged closer to a death than a toll. Crew is never exposed in any RFC-defined JSON response (see "Protocol Implementation"); the player only learns about it through `EVT ROOM COMBAT` narration and their own play. Kept purely in `Player` (server-side, and persisted per-player like the rest of that struct).
 - **Circe/Sirens are engagement-gated, not entry-gated**, for one deliberate reason: `item.moly`, the item that protects against Circe, is located *inside* her own room. A room-entry hazard would kill the player before they could ever pick it up. So Circe's gate instead triggers on `TALK` (the moment the player actually engages her), which also better matches the myth — simply walking onto her island was never dangerous; drinking her cup was.
 
@@ -406,6 +419,12 @@ flowchart TB
     ody_phaeacia["Scheria, Land of the Phaeacians"]
     ody_ithaca_shore["Shore of Ithaca"]
     ody_palace["Hall of the Suitors"]
+    ody_ismarus_feast["The Feast at Ismarus"]
+    ody_lotus_garden["The Lotus Garden"]
+    ody_sealed_cave["The Sealed Cave"]
+    ody_laestrygonian_depths["The Inner Harbor"]
+    ody_pigsty["Circe's Pigsty"]
+    ody_eternal_ogygia["Eternal Ogygia"]
   end
   hall_of_fates <-->|W| argo_iolcus
   hall_of_fates <-->|E| ody_troy_shore
@@ -415,13 +434,16 @@ flowchart TB
   ody_troy_shore <-->|E| ody_cicones
   troy_ida <-->|E| troy_sparta
   argo_bebrycia <-->|E| argo_salmydessus
+  ody_cicones -->|N| ody_ismarus_feast
   ody_cicones <-->|E| ody_lotus
   troy_sparta <-->|E| troy_aulis
   argo_salmydessus <-->|E| argo_symplegades
   ody_lotus <-->|E| ody_cyclops
+  ody_lotus -->|N| ody_lotus_garden
   troy_aulis <-->|E| troy_camp
   argo_symplegades <-->|E| argo_colchis_shore
   ody_cyclops <-->|E| ody_aeolus
+  ody_cyclops -->|S| ody_sealed_cave
   troy_camp <-->|N| troy_achilles_tent
   troy_camp <-->|E| troy_plain
   argo_colchis_shore <-->|N| argo_court_aeetes
@@ -429,15 +451,17 @@ flowchart TB
   troy_plain <-->|E| troy_gate
   argo_court_aeetes <-->|E| argo_bull_field
   ody_laestrygonians <-->|E| ody_circe
+  ody_laestrygonians -->|N| ody_laestrygonian_depths
   troy_gate <-->|N| troy_city
   troy_gate <-->|S| troy_countryside
   troy_countryside -->|W| troy_camp
   argo_bull_field <-->|N| argo_grove
+  ody_circe -->|N| ody_pigsty
   ody_circe <-->|S| ody_sirens
   ody_circe <-->|E| ody_underworld
   troy_city <-->|E| troy_horse
   argo_grove <-->|E| argo_flight
-  ody_sirens <-->|S| ody_charybdis
+  ody_sirens -->|S| ody_charybdis
   ody_sirens <-->|E| ody_scylla
   troy_horse <-->|N| troy_fall
   argo_flight <-->|N| argo_return_sea
@@ -445,6 +469,7 @@ flowchart TB
   argo_return_sea <-->|E| argo_crete
   ody_thrinacia <-->|E| ody_calypso
   argo_crete -->|N| argo_iolcus
+  ody_calypso -->|S| ody_eternal_ogygia
   ody_calypso <-->|E| ody_phaeacia
   ody_phaeacia <-->|E| ody_ithaca_shore
   ody_ithaca_shore -->|E| hall_of_fates
@@ -454,7 +479,7 @@ flowchart TB
   classDef lethal fill:#c62828,color:#fff,stroke:#7f0000
   class hall_of_fates hub
   class ody_cicones,ody_cyclops,ody_sirens,ody_scylla hazard
-  class ody_charybdis lethal
+  class ody_charybdis,ody_ismarus_feast,ody_lotus_garden,ody_sealed_cave,ody_laestrygonian_depths,ody_pigsty,ody_eternal_ogygia lethal
 ```
 
 ## Server Logging
