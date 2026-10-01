@@ -79,6 +79,7 @@ func (ui *gui) build() {
 		container.NewTabItem(ui.tr("Around", "まわり"), container.NewVScroll(surroundings)),
 		container.NewTabItem(ui.tr("Inventory", "持ち物"), container.NewVScroll(ui.inventoryBox)),
 		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(ui.questBox)),
+		container.NewTabItem(ui.tr("Map", "地図"), ui.buildMapTab()),
 	)
 	ui.journal.OnSelected = func(item *container.TabItem) {
 		if !ui.connected {

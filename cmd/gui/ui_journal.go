@@ -46,6 +46,13 @@ func (ui *gui) showRoom(view lookView) {
 		ui.clearChoices()
 	}
 	ui.room = view
+	if view.Room.ID != "" {
+		if ui.visited == nil {
+			ui.visited = map[string]bool{}
+		}
+		ui.visited[view.Room.ID] = true
+	}
+	defer ui.refreshMap()
 	if ui.scene.Image == nil || previous.Room.ID != view.Room.ID || !slices.Equal(previous.NPCs, view.NPCs) {
 		ui.scene.Resource = nil
 		ui.scene.Image = composeScene(view.Room.ID, view.NPCs)

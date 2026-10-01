@@ -56,6 +56,9 @@ type gui struct {
 	combatHP         *widget.Label
 	combatBar        *statBar
 	fight            *fightState
+	visited          map[string]bool
+	lastArc          string
+	mapBox           *fyne.Container
 	crewBar          *statBar
 	crewLabel        *widget.Label
 	groupLabel       *widget.Label
@@ -261,6 +264,7 @@ func (ui *gui) disconnect() {
 	ui.hpLabel.SetText("HP: -")
 	ui.hpBar.Set(0, 1)
 	ui.showFight(nil)
+	ui.visited, ui.lastArc = nil, ""
 	ui.showState(stateView{})
 	ui.scene.Resource = nil
 	ui.scene.Image = loadArt("rooms", "unknown")
@@ -408,6 +412,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 		destination := strings.TrimPrefix(line, "OK room=")
 		ui.addStory(ui.tr("Moved to: ", "移動: ") + destination)
 		ui.showFight(nil)
+		ui.markVisited(destination)
 		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")
 		if room, ok := ui.catalog.gameOverRoom(destination); ok {
 			ui.showGameOver(destination, room)
