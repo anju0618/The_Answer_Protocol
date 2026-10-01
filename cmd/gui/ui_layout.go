@@ -65,7 +65,8 @@ func (ui *gui) build() {
 	ui.sceneMapBox = container.New(&mapLayout{})
 	ui.sceneMapPanel = framed(ui.tr("Map", "地図"), ui.mapView(ui.sceneMapBox))
 	ui.sceneMapPanel.Hide()
-	sceneVisual := container.NewScroll(container.New(&sceneVisualLayout{photos: ui.itemPhotoBox}, ui.scene, ui.flash, ui.photoStrip, ui.sceneMapPanel))
+	visualLayout := &sceneVisualLayout{photos: ui.itemPhotoBox}
+	sceneVisual := container.NewScroll(container.New(visualLayout, ui.scene, ui.flash, ui.photoStrip, ui.sceneMapPanel))
 	sceneVisual.Direction = container.ScrollNone
 	sceneFrame := canvas.NewRectangle(ink)
 	sceneFrame.StrokeColor = gold
@@ -80,12 +81,24 @@ func (ui *gui) build() {
 		journalSection(ui.tr("Items here", "落ちている道具"), ui.itemBox),
 		journalSection(ui.tr("Players here", "この部屋のプレイヤー"), ui.playerBox),
 	)
+	mapTab := container.NewTabItem(ui.tr("Map", "地図"), ui.buildMapTab())
 	ui.journal = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Around", "まわり"), container.NewVScroll(surroundings)),
 		container.NewTabItem(ui.tr("Inventory", "持ち物"), container.NewVScroll(ui.inventoryBox)),
 		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(textVBox(ui.questBox, ui.endingBox))),
-		container.NewTabItem(ui.tr("Map", "地図"), ui.buildMapTab()),
+		mapTab,
 	)
+	journal := ui.journal
+	visualLayout.onMapVisibility = func(visible bool) {
+		if visible && len(journal.Items) == 4 {
+			if journal.Selected() == mapTab {
+				journal.SelectIndex(0)
+			}
+			journal.Remove(mapTab)
+		} else if !visible && len(journal.Items) == 3 {
+			journal.Append(mapTab)
+		}
+	}
 	ui.journal.OnSelected = func(item *container.TabItem) {
 		if !ui.connected {
 			return
@@ -340,7 +353,10 @@ func textLineHeight() float32 {
 	return size.Height + 2*textTheme.Size(theme.SizeNameInnerPadding)
 }
 
-type sceneVisualLayout struct{ photos *fyne.Container }
+type sceneVisualLayout struct {
+	photos          *fyne.Container
+	onMapVisibility func(bool)
+}
 
 func (*sceneVisualLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(100, 100) }
 
@@ -361,6 +377,9 @@ func (l *sceneVisualLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) 
 		mapPanel.Resize(mapSize)
 	} else {
 		mapPanel.Hide()
+	}
+	if l.onMapVisibility != nil {
+		l.onMapVisibility(mapPanel.Visible())
 	}
 	if objects[2].Visible() {
 		thumbnail := fyne.NewSquareSize(min(104, max(48, inside.Height*0.3)))
