@@ -10,21 +10,19 @@
 
 ## Description
 
-**The Answer Protocol (TAP)** is a shared-world, multiplayer, text-based adventure (MUD): a single TCP server (`cmd/server`) plus a CLI client (`cmd/cli`), built strictly against the attached RFC (`rfc.tar.gz` / `protocol-rfc.html`) so that our server and client can interoperate with any other team's implementation of the same protocol.
+**The Answer Protocol (TAP)** is a multiplayer text adventure (MUD): one TCP server (`cmd/server`), a CLI client (`cmd/cli`) and a GUI client (`cmd/gui`, Fyne), built strictly against the RFC (`protocol-rfc.html`) so that they interoperate with any other team's implementation.
 
-The world is built from three Greek myths — the Voyage of the Argonauts, the Iliad, and the Odyssey — as three story arcs that share a single hub room (`loc.hall_of_fates`, the Hall of the Fates). All three arcs are open from the hub (see "World Design"). On top of that world, we designed an original combat and quest system around one idea, left deliberately undefined by the RFC (see "Combat System" below): **acting against the myth gets you killed.** For example, attacking Polyphemus without first taking the sharpened olive stake is an instant kill, not a normal fight.
+The world is three Greek myths (the Argonauts, the Iliad, the Odyssey) as three arcs around one hub, the Hall of the Fates. The RFC leaves combat open, so we built one idea on top of it: **acting against the myth gets you killed.** Attacking Polyphemus without the sharpened olive stake is an instant kill, not a fight.
 
-The mandatory part is implemented: the server (all RFC commands and events, plus our two documented extensions), a CLI client (`cmd/cli`), a GUI client (`cmd/gui`, built with the Fyne toolkit) and structured JSON logging (see "Server Logging"). Known limitations: a few GUI illustrations are still placeholders (for example the portrait of Athena).
+Known limitation: a few GUI illustrations are placeholders.
 
 ## Instructions
 
-The server listens on TCP port 4242 and speaks the line-oriented TAP protocol described in `protocol-rfc.html`. Any RFC-compliant client — ours or another team's — can connect to it, and our CLI client can connect to any RFC-compliant server.
-
-Our CLI client is a **raw protocol relay**: every line you type is sent to the server unmodified, and every line the server sends back is printed unmodified. We chose this over a "friendly commands translated to protocol" client because it keeps the client trivial and lets anyone see exactly what is going over the wire, which matters for debugging interop with other teams (see "Building and Running" for how to start it).
+The server listens on TCP port 4242 and speaks the line-based TAP protocol. The CLI is a **raw relay**: what you type is sent unchanged and what the server sends is printed unchanged, so you can see exactly what is on the wire. See "Building and Running" to start them.
 
 ### Command list
 
-All 15 RFC commands, plus our three additive extensions (`FLEE`, `DEFEND`, `LANG`, all marked below). Full request/response/error shapes are in `protocol-rfc.html` §5; this is a quick reference.
+All 15 RFC commands plus three additive extensions (`FLEE`, `DEFEND`, `LANG`). Exact shapes are in `protocol-rfc.html` §5.
 
 | Command | Syntax | What it does |
 |---|---|---|
@@ -47,135 +45,87 @@ All 15 RFC commands, plus our three additive extensions (`FLEE`, `DEFEND`, `LANG
 | `GROUP` | `GROUP CREATE` / `GROUP INVITE <name>` / `GROUP JOIN <leader>` / `GROUP LEAVE` | Party management for `CHAT GROUP`. |
 | `QUIT` | `QUIT` | Disconnect cleanly. |
 
-Minimal example session (after connecting):
-
 ```
 OK hello proto=1
 CONNECT alice
 OK connected
-LOOK
-OK {"room":{"id":"loc.hall_of_fates","name":"Hall of the Fates","description":"Outside time itself, the three Moirai spin, measure, and cut the thread of every hero's life. Three great tapestries hang before you, each depicting a different age of heroes.","exits":{"east":"loc.ody_troy_shore","north":"loc.troy_ida","west":"loc.argo_iolcus"}},"players":["alice"],"items":[],"npcs":[]}
 MOVE east
 OK room=loc.ody_troy_shore
 STATUS
 OK {"hp":100,"max_hp":100,"status":"healthy"}
-QUIT
-OK bye
 ```
 
-To play the Japanese-language version of the story, send `LANG ja` **before** `CONNECT` (it is rejected once you are connected as a player — language is chosen at the start of a session, not switched mid-game):
-
-```
-LANG ja
-OK lang=ja
-CONNECT alice
-OK connected
-LOOK
-OK {"room":{"id":"loc.hall_of_fates","name":"運命の間","description":"時そのものの外側で...","exits":{...}},...}
-```
-
-All 15 RFC commands work identically regardless of language; only story text (room/NPC/quest text) changes.
+For the Japanese story, send `LANG ja` **before** `CONNECT`. Only story text changes; commands are identical.
 
 ## Resources
 
-- The protocol specification: `protocol-rfc.html` (from `rfc.tar.gz`), the "42TAP" RFC supplied with the subject.
-- Go standard library only — `net`, `encoding/json`, `bufio`, `log`, `sync`, `math/rand/v2`, etc. `go.mod` declares no third-party dependencies.
-- **AI assistance**: Claude (Anthropic) was used throughout this project as a coding/design assistant, with all output reviewed, built, and tested by the team before committing. Specifically, AI assistance was used for: reading and summarizing the subject PDF and RFC into `TASKS.md` and `memo.md` at the start of the project; collaboratively designing the combat/quest/crew/myth-gate game systems described below; implementing the corresponding Go code (`combat.go`, `quest.go`, `hazard.go`, `odyssey.go`, `locale.go`) and its automated tests; authoring the Japanese localization text in `data/world.json`; and writing this README.
+- The "42TAP" RFC: `protocol-rfc.html`. Go standard library only (`go.mod` has no third-party dependencies except the GUI toolkit).
+- **AI assistance**: Claude (Anthropic) helped read the subject and RFC, design the combat/quest/hazard systems, write the corresponding Go code and tests, write the Japanese text in `data/world.json`, and write this README. The team reviewed, built and tested everything before committing.
 
 ## GUI client
 
-The GUI (`cmd/gui`, Fyne) is a window onto the same protocol; it sends exactly the commands a CLI player would. Features: coloured HP and crew bars; a colour-coded Adventure log (deaths red, quests gold, combat orange, endings purple, hints blue); a combat panel with the enemy's HP bar and Attack / Brace / Flee buttons; a minimap tab that draws the rooms you have visited and the unexplored exits next to them (hub in green, hazards orange, fatal rooms red); an endings gallery with the blessing each ending gives, plus how many fatal choices you have found (stored per player name on this computer); short screen flashes on damage, travel and death; mouse controls and a responsive layout.
+The GUI sends exactly the commands a CLI player would. It shows HP and crew bars, a colour-coded Adventure log, a combat panel (enemy HP, Attack / Brace / Flee), a minimap of visited rooms, an endings gallery (with blessings and fatal choices found), short screen flashes on damage, travel and death, and supports mouse and a responsive layout.
 
 ## Architecture
 
-- **Dispatch**: `cmd/server/server.go` maps each command name to a handler function (`commandHandlers map[string]commandHandler`). `main.go` calls `net.Listen("tcp", ":4242")` and spawns one goroutine per accepted connection (`go server.handleClient(conn)`); each connection's goroutine reads newline-delimited commands with `bufio.Scanner` and dispatches them in a loop, one at a time.
-- **Concurrency model**: goroutine-per-connection, with all shared game state (connected players, the world, groups) guarded by a single `sync.Mutex` (`Server.mu`). We picked this over an event-loop/epoll design because it is far simpler to reason about and to keep correct under the RFC's strict interop requirement (memo.md §2 "並行モデルの選択"); the tradeoff is that it will not scale to very high connection counts as gracefully as an async design would, which we judged acceptable for this project's scope. A second, separate mutex (`Server.ioMu`) serializes on-disk persistence (`playerdata.json`, item locations) so that disk I/O never blocks in-memory game state under `Server.mu`.
-- **Non-blocking broadcast**: each connection owns an asynchronous outbound write queue (`client_conn.go`, a buffered channel drained by a dedicated `writeLoop` goroutine). Handlers enqueue a response or event and return immediately; they never write to the socket while holding `Server.mu`. This means broadcasting an event to every player in a room is O(number of players) non-blocking enqueues rather than blocking network writes, and one slow/stalled client cannot stall the mutex for everyone else.
-- **Package layout**:
-  - `server.go` — command dispatch table, connection lifecycle, LOOK/MOVE/CONNECT/QUIT/TAKE/DROP/INVENTORY/TALK/STATUS
-  - `combat.go` — ATTACK/FLEE and the myth-gate/damage logic
-  - `quest.go` — QUEST/QUESTS and automatic objective tracking
-  - `hazard.go` — room-entry hazards (lethal / item-gated / crew-gated exits)
-  - `odyssey.go` — Odyssey-arc-specific item side effects (lotus fruit, bag of winds) and crew initialization
-  - `locale.go` — `LANG` command and `LocalizedText`/`roomView` localization plumbing
-  - `notify.go` — private per-player events (`EVT PLAYER ...`): death reasons, the Hall of the Fates guide, and quest notices
-  - `endings.go` — the three per-arc endings and the final ending (`Ending` in `data/world.json`, triggered by `TALK`)
-  - `hardcore.go` — the death penalty (lose your belongings) and the co-op rules (allies in the same `GROUP` and room)
-  - `flavor.go` — `EVT ROOM COMBAT` narration, expanded per recipient in that recipient's `LANG` language
-  - `chat.go` / `group.go` — CHAT (GLOBAL/ROOM/GROUP) and GROUP management
-  - `world.go` / `room.go` / `player.go` — the world data model, JSON loading, and validation
-  - `item_store.go` / `player_store.go` — on-disk persistence of item locations and player state
+- **Dispatch**: `server.go` maps each command to a handler. `main.go` listens on `:4242` and starts one goroutine per connection, which reads lines with `bufio.Scanner` and runs commands one at a time.
+- **Concurrency**: all shared game state is guarded by one `sync.Mutex` (`Server.mu`). We chose this over an event loop because it is much simpler to keep correct; it will not scale to huge player counts, which is fine for this project. A second mutex (`ioMu`) serializes disk writes so I/O never blocks game state.
+- **Non-blocking broadcast**: each connection has an outbound queue drained by its own `writeLoop`, so handlers never write to a socket while holding `Server.mu` and one slow client cannot stall the others.
+- **Files**: `combat.go` (ATTACK/FLEE/DEFEND), `quest.go`, `hazard.go` (room hazards), `odyssey.go` (Odyssey item effects and crew), `endings.go` (endings and blessings), `hardcore.go` (death penalty, co-op), `notify.go` (private `EVT PLAYER` events), `flavor.go` (combat narration), `locale.go` (`LANG`), `chat.go`/`group.go`, `world.go`/`room.go`/`player.go` (data model and validation), `item_store.go`/`player_store.go` (persistence).
 
 ## Protocol Implementation
 
-All 15 RFC commands are implemented: `CONNECT, LOOK, MOVE, CHAT, TAKE, DROP, INVENTORY, TALK, ATTACK, STATUS, QUEST, QUESTS, WHO, GROUP, QUIT`, with the response/error shapes and error codes defined in `protocol-rfc.html` §5. Input is validated for UTF-8 validity, control characters, and the 1024-byte practical line-length ceiling suggested by the RFC (`maxProtocolLineBytes`); TCP message splitting/coalescing is handled by buffering with `bufio.Scanner` rather than assuming one read equals one command.
+All 15 RFC commands are implemented with the RFC's response and error shapes. Input is checked for valid UTF-8, control characters and the 1024-byte line limit, and TCP splitting/coalescing is handled by buffering rather than assuming one read is one command.
 
-We added a small number of **additive** extensions. None of them change the shape or meaning of any RFC-defined command, response, or event, so an RFC-only client from another team continues to interoperate with our server without modification, and our client works against a plain RFC-only server (it simply never sends the extra commands):
+Our extensions are all **additive**: no RFC command, response or event changes, so RFC-only clients and servers still interoperate.
 
-- **`FLEE`** — a combat command with no arguments, retreating from the player's current fight. The RFC explicitly names `FLEE` as an example of a team-defined combat extension (§6.1.1).
-- **`DEFEND`** — a second combat command with no arguments: you brace instead of attacking. It answers `OK {"hp":<n>,"result":"braced"}`, deals no damage, and halves the next counter-attack (once; it also ends if you flee or die). It returns `ERR 407 NOT_IN_COMBAT` outside a fight. Like `FLEE`, it is additive: a client that never sends it is unaffected.
-- **`LANG <code>`** — must be sent before `CONNECT`; selects the language (`en`, the default, or `ja`) that this connection's story text (room/NPC/quest text) is returned in for the rest of the session. Sending it after `CONNECT` returns `ERR 400 BAD_REQUEST`, since language is a start-of-session choice, not a runtime setting. See "World Design" / `memo.md` §8 for the full localization design.
-- **`EVT ROOM COMBAT <text>`** — a new event *type*, not a new event *format*: the RFC's event grammar (`event-line = "EVT" SP event-type SP event-data LF`) does not close off the set of valid event-type tokens, so a well-behaved client that only recognizes the RFC's own event types (`ROOM PRESENCE ...`, `ROOM CHAT ...`, etc.) can safely ignore an unrecognized `COMBAT` type rather than fail to parse it. We use it to broadcast combat/hazard flavor text to everyone in the room.
-- **`EVT PLAYER <kind> <text>`** — a second new event type, sent to **one player only** (unlike `EVT ROOM COMBAT`, which goes to everyone in a room). It exists because a dying player is teleported back to the Hall of the Fates *before* the room broadcast is sent, so they never saw why they died. `<kind>` is `DEATH` (what killed you, what you lost, where you woke up and with how much HP), `ENDING` (the story endings and what is still missing for them), `TEAM` (an ally shared a kill with you), `GUIDE` (the Hall of the Fates tutorial, see "World Design"), `HINT` (the Moirai's hint about what last killed you, see "Endings, Difficulty and Co-op") or `QUEST` (a quest-giver is in the room / progress / completion, see "Quest System"). Text is in the language chosen with `LANG`. As with `COMBAT`, an RFC-only client can safely ignore the unknown `PLAYER` type.
-- **`ERR 407 NOT_IN_COMBAT`** — a new error code (the RFC defines up to `406`), returned by `FLEE` when the player isn't currently fighting anything.
-- **No new fields on any RFC-defined JSON response.** In particular, our internal `Crew` resource (see "World Design") is deliberately kept out of `STATUS`/`ATTACK`'s JSON bodies, even though the RFC does not explicitly forbid extra JSON keys — we didn't want to gamble on how strictly another team's JSON parser is written. It is only ever revealed as plain narrative text over `EVT ROOM COMBAT`.
+- **`FLEE`**: leave your current fight (the RFC names it as an example extension, §6.1.1).
+- **`DEFEND`**: brace instead of attacking. Answers `OK {"hp":<n>,"result":"braced"}`, deals no damage and halves the next counter-attack (once).
+- **`LANG <en|ja>`**: before `CONNECT` only; sets the story language. After `CONNECT` it returns `ERR 400`.
+- **`EVT ROOM COMBAT <text>`**: combat narration for everyone in the room.
+- **`EVT PLAYER <kind> <text>`**: a message to one player: `DEATH` (what killed you, what you lost), `ENDING`, `TEAM`, `GUIDE` (the Hall tutorial), `HINT` (see below) or `QUEST`. Clients that do not know it can ignore it.
+- **`ERR 407 NOT_IN_COMBAT`**: returned by `FLEE` and `DEFEND` outside a fight.
+- No new fields were added to any RFC JSON body; the internal crew count is only ever shown as narration.
 
 ## Combat System
 
-RFC §6.1.1 leaves damage calculation, turn/initiative handling, combat state transitions, and any additional commands entirely up to each team, while fixing only the `ATTACK`/`STATUS` request/response shapes. Our design axis for all of it is: **the world punishes acting against the myth**, not just raw stat-checking. Concretely:
+The RFC leaves damage, turns and extra commands to each team. Ours:
 
-- **Baseline numbers.** Players start at 100 HP (`STATUS`'s `max_hp`). A successful `ATTACK` deals a uniformly random 8–14 damage to the target; if the target survives, it counters for a uniformly random 6–12 damage back at the attacker. There is no explicit initiative system beyond "the attacker's `ATTACK` resolves, then the defender's counter resolves in the same round" — we judged a separate initiative roll unnecessary complexity for a text MUD at this scope.
-- **Myth gates.** Some `enemy`-role NPCs require the player to be holding a specific item (`myth_requirement_item` in `data/world.json`) or to have completed a specific quest (`myth_requirement_quest`) before `ATTACK` engages in ordinary combat at all; without it, `ATTACK` is an instant kill (`{"status":"dead", ...}`), and the player respawns exactly as on any other death. For example: Polyphemus requires the sharpened olive stake; Talos requires the `quest.golden_fleece` quest to be completed (Medea's magical aid); the suitors require Odysseus's strung bow. This mirrors how each of these fights is actually won in the myths — force alone never works.
-- **FLEE.** Each NPC declares whether fleeing from it is myth-accurate. Some (Polyphemus, the Laestrygonians) always let the player flee successfully, matching the myth. Most default to always failing (a counter-attack lands). Hector is a special case: `FLEE` against him succeeds exactly **once, ever** (tracked per-player, per-NPC, and it does *not* reset if you re-engage him later) — a nod to his three laps around Troy's walls before he finally turns to fight Achilles — and always fails after that.
-- **Unwinnable fights.** (Fixed: `FLEE` used to answer `ERR 407` unless a fight was already running, but `ATTACK` against an unwinnable enemy never starts one, so this room was a true softlock. `FLEE` now also works against the enemy blocking the current room.) The Laestrygonians can never be defeated by force: `ATTACK` against them never rolls damage at all and instead costs the player's crew (see "World Design"), while `FLEE` (the historically correct choice — only Odysseus's own ship escaped by anchoring outside the harbor) always succeeds. This uses the fight to spend the crew resource narratively instead of pretending it's a winnable stat check.
-- **Death and respawn.** Any death — ordinary attrition, a myth-gate instant kill, or a fatal room hazard — sets HP to 0 and respawns the player at the world's safe hub room (`loc.hall_of_fates`) with 20 HP, matching the subject's "HP 0 respawns in a safe zone, with reduced HP" requirement (`respawnPlayerLocked` in `combat.go`).
-- **Logging/broadcast.** Every `ATTACK`/`FLEE` resolution is broadcast to the room via `EVT ROOM COMBAT <flavor text>`, in addition to the structured response sent to the acting player.
-- **A live threat blocks the room, not just the fight.** Several room descriptions state outright that the enemy blocks passage — Amycus "blocks every crew that lands," Polyphemus's cave mouth is sealed by a boulder — but originally nothing stopped a player from just walking past a hostile NPC via `MOVE` without ever engaging it. We closed that: `MOVE` out of a room containing any live (`hp > 0`) `enemy`-role NPC the player hasn't yet defeated or successfully fled from is an instant kill (`blockingEnemyLocked` in `hazard.go`), consistent with every other myth gate in this design. A successful `FLEE` against a given NPC is remembered permanently per player (`Player.FledFrom`, keyed by NPC ID — not reset by leaving and re-entering), so once you've talked your way or run your way past something, it stays resolved. Because `Unwinnable` NPCs (the Laestrygonians) never reach 0 HP, `FLEE` is their *only* way out of the room; `TestNoEnemyIsBothUnwinnableAndUnfleeable` checks the whole roster so we can't accidentally ship an NPC that's both unwinnable and unfleeable (an unconditional softlock). Scylla was exactly this case during development — she had no `flee_accurate` set, which would have forced a fight the myth never asks for — so we gave her `flee_accurate: true`, matching how she's actually survived (you don't kill Scylla, you just get past her, at a cost already charged by the room's `crew_gate` hazard on the way in).
-
-- **DEFEND.** Plain `ATTACK` spam was the only choice in a fight, so we added a stance (see "Protocol Implementation"). It is a real trade-off, not a free heal: a round spent bracing deals no damage, and in exchange the next counter-attack costs half. It stacks with the ally and blessing reductions (the total is capped at 80%).
+- **Numbers.** 100 HP. A hit deals 8-14 damage; a surviving enemy counters for 7-14. Death respawns you in the Hall with 20 HP; HP regenerates 1 per 2 s.
+- **Myth gates.** Some enemies require a specific item or completed quest (`myth_requirement_*` in `data/world.json`). Without it, `ATTACK` is an instant kill (Polyphemus needs the olive stake, Talos needs Medea's help, the suitors need Odysseus's bow).
+- **FLEE.** Each enemy says whether fleeing is myth-accurate. Polyphemus and the Laestrygonians always allow it; most fail with a counter-attack; Hector can be fled from exactly once. A successful flee is remembered per player.
+- **Unwinnable enemies.** The Laestrygonians cannot be beaten: `ATTACK` only costs crew and `FLEE` always works, so there is no softlock (`TestNoEnemyIsBothUnwinnableAndUnfleeable`).
+- **A live enemy blocks the room.** `MOVE` out of a room with an enemy you have not beaten or fled from is an instant kill.
+- **DEFEND.** A round spent bracing deals no damage but halves the next counter. Total damage reduction (DEFEND + allies + blessing) is capped at 80%.
 
 ## Quest System
 
-RFC §6.1.2 fixes only the `QUEST`/`QUESTS` request/response shapes and leaves objective tracking, completion, rewards, and any additional commands up to each team. Our design:
-
-- `QUEST <npc>` looks up the quest offered by that NPC (`giver_npc_id` in `data/world.json`). The first time a player asks, the quest is marked `active` for that player; the RFC's own example response (`"status": "available"`) describes the offer itself, and is returned every time the quest hasn't been completed yet. Asking again after completion returns `ERR 406 NO_QUEST_AVAILABLE`.
-- **Progress is fully automatic**, not player-reported: a successful `TAKE` checks every one of the player's `active` quests with a `collect_item` objective for that item, and a winning `ATTACK` does the same for `defeat_npc` objectives. Reaching the objective's target count marks the quest `completed` and immediately heals the player by the quest's HP reward (capped at 100). We deliberately did **not** add a `COMPLETE_QUEST` command — nearly every quest in this world is already something the player does naturally in the course of surviving (e.g. defeating Polyphemus with the stake both wins that fight and completes the trapped sailor's quest), so a manual completion step would just be extra client-side bookkeeping for no real benefit.
-- `QUESTS` returns every quest the player has ever started (active or completed), each with `"progress": "<current>/<target>"`.
-- **Discoverability.** `LOOK`'s response only lists NPC IDs (its shape is fixed by the RFC), so a player could not tell who had a quest. The server therefore sends `EVT PLAYER QUEST` whenever the player connects to or enters a room containing a quest-giver whose quest they have not started ("X has a request for you. Type `QUEST X`"), and again after `TALK`ing to a quest-giver (the offer, or the current progress).
-- **Feedback.** Progress (`2/3`) and completion (with the HP reward) are announced with `EVT PLAYER QUEST`, so the player no longer has to run `QUESTS` to find out.
-- **Items picked up before accepting.** Progress used to be counted only at the moment of `TAKE`, so taking an item *before* asking for its quest made the quest impossible to finish. Accepting a `collect_item` quest now also counts an item already in the player's inventory.
-- Some quests are deliberately framed as traps rather than good advice — accepting Eurylochus's quest to slaughter the sacred cattle of Helios and doing so (`item.sacred_cattle`) kills the player instantly, matching the myth's own moral.
+- `QUEST <npc>` starts the NPC's quest; objectives are `collect_item` or `defeat_npc` and progress is **automatic** (no completion command). Completion heals you by the quest's reward. Progress you made before accepting also counts.
+- `QUESTS` lists every started quest as `"progress": "<current>/<target>"`.
+- Quest givers are announced with `EVT PLAYER QUEST` on entry and after `TALK`, since `LOOK` only lists NPC IDs.
+- Some quests are traps: the cattle of Helios quest kills you if you do what it asks.
 
 ## Endings, Difficulty and Co-op
 
-- **Three independent stories, three endings.** The Argonauts, Troy and the Odyssey never require anything from each other (`TestThreeArcsAreIndependent` checks every gate, quest and ending against the room prefix of what it needs). Each has a final person to `TALK` to, who checks what you carry and which quests you completed, then plays the ending as `EVT PLAYER ENDING` lines and hands over a trophy: King Pelias (bring the Golden Fleece, `ending.argo`, Laurel of the Argo), Aeneas at the burning of Troy (Trojan Horse and the four Troy quests, `ending.troy`, Ember of Troy), Penelope (Odysseus's Bow and the two Ithaca quests, `ending.odyssey`, Olive Branch of Ithaca). If something is missing they only refuse, and never list what is missing. After all three, the Moirai in the Hall of the Fates play the final ending (`ending.final`, Thread of Fate). No new command: it is `TALK`, and the RFC response shape is unchanged. Your key item is shown, not consumed.
-- **Why "not enough items" happened, and the fix.** Items were unique world instances and inventories are saved, so one player picking up and abandoning the key items (a real saved account held ten of them) made every other player's route unwinnable. Items needed by a quest, a myth gate or an ending are now `renewable`: they stay in their room and each player gets their own copy (players who already hold one don't see it in `LOOK`). A few decorative items (`item.hospitality_gift`, `item.dragons_teeth`, `item.strong_wine`, `item.lotus_fruit`) stay unique, so the subject's "TAKE removes the item from the room, DROP makes it available" behaviour is still there and tested.
-- **Enemies are per player.** Enemy HP lives in `Player.EnemyHP`, not in the shared NPC, so one player killing the Harpy no longer stops everybody else from fighting it or finishing a `defeat_npc` quest. Accepting a quest also counts progress you had already made (an item already in your inventory, an enemy already beaten), which used to be impossible to finish.
-- **Two more softlocks fixed.** HP never regenerated (after one death you were at 20 HP forever, and the Argonauts' mandatory fights alone cost more than 100 HP), so HP now regenerates slowly (1 HP per 2 s). The Odyssey crew (needed at Scylla) was granted only once, so it is now refilled every time you enter the Odyssey from the Hall.
-- **Brutal difficulty.** Death costs you every belonging except trophies: unique items go back to their home room, key-item copies vanish (fetch them again), and every enemy you wounded or escaped is reset. Enemy counter-attacks are 7-14 damage. The death message says only what killed you and what you lost: never what you were missing. Quest texts and death messages deliberately contain no hints, so what a myth gate wants has to be worked out from the myths. The one softening is opt-in: after a death, `TALK` to the Moirai once and she answers with a single vague line from the myth about what killed you (`EVT PLAYER HINT`, data in the `hints` object of `data/world.json`). It never names the item or the command, it is spent after one use, and a player who never asks never sees one.
-- **Co-op.** In the same `GROUP`, allies standing in the same room add +5 damage each (up to 3) and reduce each counter-attack by 20% each; a kill counts for every ally in the room (including `defeat_npc` quest progress); and if you die while an ally is in the room, they protect your belongings so you lose nothing. Combat narration is localized for each recipient.
-- **Blessings.** Each arc has a patron god, and clearing the arc earns that god's blessing for good (it is never lost on death). It is computed from the endings you have reached, so nothing extra is stored: **Athena** (Odyssey, `ending.odyssey`) cuts enemy counter-attacks by 20%, **Hera** (Argonauts, `ending.argo`) doubles your HP regeneration, **Apollo** (Iliad, `ending.troy`) adds 3 damage to every hit. Athena also stands on the Shore of Ithaca as a young shepherd and talks to you. The blessing is announced as an `EVT PLAYER ENDING` line when you first reach the ending. Blessings are defined in the `blessing` object of each ending in `data/world.json`.
+- **Endings.** Each arc has a final person to `TALK` to, who checks your items and completed quests, plays the ending and gives a trophy: Pelias (Argonauts), Aeneas (Troy), Penelope (Odyssey). After all three, the Moirai play the final ending. If something is missing they only refuse and never say what.
+- **Blessings.** Clearing an arc earns its god's blessing for good, even through death: **Athena** (Odyssey) cuts enemy counters by 20%, **Hera** (Argonauts) doubles HP regeneration, **Apollo** (Iliad) adds 3 damage per hit.
+- **Brutal difficulty.** Death costs every belonging except trophies and heals every enemy you wounded. Quest and death texts contain no hints. The one opt-in exception: after a death, `TALK` to the Moirai once for a single vague myth line about what killed you (`EVT PLAYER HINT`, data in `hints` in `data/world.json`).
+- **Shared world.** Items needed by a quest, gate or ending are `renewable` (each player gets a copy), and enemy HP is per player, so nobody can block anyone else.
+- **Co-op.** In the same `GROUP` and room, each ally adds +5 damage and cuts counters by 20% (up to 3 allies); kills count for everyone; and allies protect your belongings if you die.
 
 ## World Design
 
-- **Structure.** One shared hub room, the Hall of the Fates (`loc.hall_of_fates`), with three exits: west into the Voyage of the Argonauts (12 rooms), north into the Iliad (11 rooms) and east into the Odyssey (22 rooms, six of them game-over rooms). All 46 rooms are reachable. The Odyssey is a loop on its own: heading east from the hub through every stop to the Shore of Ithaca, whose east exit leads back to the hub, makes a 14-room ring (hub included), with the Underworld and the Hall of the Suitors as dead-end branches off it. That ring plus those branches satisfies the "rooms form a loop and at least one branch, not a straight line" requirement.
-- **NPCs.** All three required roles are represented throughout: `dialogue` (lore/flavor), `quest_giver`, and `enemy`. Well over 30 NPCs total.
-- **Items.** 17 obtainable items (plus 4 reward-only trophies), nearly all of them load-bearing for either a myth gate or a quest objective (e.g. the beeswax that protects against the Sirens, the moly root that protects against Circe).
-- **Quests.** 16 quests across the three arcs, every one a `collect_item` or `defeat_npc` objective (see "Quest System" for how progress/reward is handled).
-- **Tutorial / guide.** The Hall of the Fates contains the Moirai, an NPC flagged `"guide": true` in `data/world.json`. The first time a player ever connects, the server plays her dialogue (basic commands, the three ways out, quests, combat, what happens on death) as `EVT PLAYER GUIDE` lines; afterwards `TALK Moirai` replays it (the first line is the RFC `OK` response, the rest are `EVT PLAYER GUIDE`). Whether the intro was already shown is stored per player (`Player.IntroSeen`).
-- **Death messages.** Every way to die (counter-attack, unprepared myth gate on `ATTACK` or `TALK`, failed `FLEE`, leaving a room with a live enemy, lethal/item/crew hazards, the lotus, the cattle of Helios) sends the dying player an `EVT PLAYER DEATH` explaining the cause, and where they respawned (`notify.go`, `respawnPlayerLocked`).
-- **Room hazards** (`hazard.go`), separate from NPC combat, gate certain rooms on entry via `MOVE`:
-  - `lethal` — always fatal (the whirlpool of Charybdis: the myth gives no way to survive it; and the six "wrong turn" rooms below). When a player walks into one, the room's own description is sent first as an `EVT PLAYER DEATH` line (what happened to them), followed by the usual cause-and-respawn line.
-  - `item_gate` — fatal without a specific item (the Sirens' rocks, without beeswax).
-  - `crew_gate` — costs a fixed amount of crew on entry, and is fatal outright if the player doesn't have enough crew left to absorb the loss (Scylla, requiring `crew + 1 ≥ 7` to survive losing 6 crew — mirroring how Scylla takes exactly six of Odysseus's men but never the ship itself).
-  - `crew_cost` — unconditionally costs a fixed amount of crew on entry, never fatal (the Cicones' counter-raid and Polyphemus's cave, both −2, matching each room's own description of losses that already happened before the player arrives).
-- **Wrong turns = game-over rooms** (Odyssey arc only). At six points where the myth has Odysseus choose, the exit that goes against the myth leads to a `lethal` dead-end room instead of the next stop: staying to feast at Ismarus (north from the Cicones), staying with the Lotus-Eaters (north from their land), stabbing the sleeping Polyphemus when no one can move the boulder (south from his cave), sailing into the Laestrygonians' inner harbor (north), drinking at Circe's table (north), and accepting Calypso's immortality (south). The canonical route is always the unbroken east–west road, so a wrong turn is a deliberate choice of direction, not a trap on the way. Where a live enemy still blocks the room (Polyphemus, the Laestrygonians) the player must first defeat or flee it, as with any other exit.
-- **Crew resource** (Odyssey arc only). The player is granted a crew of 12 (`Player.Crew`) the moment they first set foot in the Odyssey arc (`loc.ody_troy_shore`). It represents the companions accompanying Odysseus and is spent — not the player's own HP — by specific bad choices: entering the Cicones' land (−2) or Polyphemus's cave (−2), opening the bag of winds anywhere but Ithaca (−3), being attacked by the Laestrygonians (−8), and passing Scylla (−6, unavoidable). Eating the lotus fruit is *not* a crew cost — it's an instant kill (see "Combat System"'s myth gates, `applyTakeConsequencesLocked` in `odyssey.go`): the myth has whoever tastes it simply never choose to leave, which we judged closer to a death than a toll. Crew is never exposed in any RFC-defined JSON response (see "Protocol Implementation"); the player only learns about it through `EVT ROOM COMBAT` narration and their own play. Kept purely in `Player` (server-side, and persisted per-player like the rest of that struct).
-- **Circe/Sirens are engagement-gated, not entry-gated**, for one deliberate reason: `item.moly`, the item that protects against Circe, is located *inside* her own room. A room-entry hazard would kill the player before they could ever pick it up. So Circe's gate instead triggers on `TALK` (the moment the player actually engages her), which also better matches the myth — simply walking onto her island was never dangerous; drinking her cup was.
+- **Structure.** The hub has three exits: west to the Argonauts (12 rooms), north to the Iliad (11 rooms), east to the Odyssey (22 rooms, six of them game-over rooms). The Odyssey forms a ring (hub, every stop, Ithaca, back to the hub) with two dead-end branches, so the world is not a straight line.
+- **NPCs, items, quests.** Over 30 NPCs with all three roles (`dialogue`, `quest_giver`, `enemy`); 17 obtainable items plus 4 trophies; 16 quests.
+- **Guide.** The Moirai in the Hall play a tutorial on first connect (`EVT PLAYER GUIDE`); `TALK` replays it.
+- **Hazards** (`hazard.go`) trigger on entering a room: `lethal` (always fatal), `item_gate` (fatal without an item, e.g. the Sirens without beeswax), `crew_gate` (costs crew, fatal if too few, e.g. Scylla) and `crew_cost` (costs crew, never fatal).
+- **Wrong turns.** At six points in the Odyssey the exit that goes against the myth leads to a `lethal` game-over room.
+- **Crew** (Odyssey only). You start with 12 companions, spent by bad choices (e.g. -6 at Scylla). It is never put in RFC JSON.
+- **Circe and the Sirens** trigger on engagement, not entry, because the moly that protects against Circe lies inside her room.
 
 ### Room map
 
-All 40 rooms and their exits, generated from `data/world.json`. The Argonauts and Iliad groups are connected to the hub by two-way roads (west and north). Each edge is labelled with the direction you take when moving from the upper room to the lower one (the way back is the opposite direction). `<-->` is a two-way connection; `-->` is one-way (Crete → Iolcus, Fields Beneath the Walls → Greek Camp, Shore of Ithaca → Hall of the Fates). Green is the hub, orange rooms have a hazard that costs crew or kills without the right item, and red rooms are always fatal.
+All rooms and exits, generated from `data/world.json`. `<-->` is two-way, `-->` one-way. Green is the hub, orange rooms have a hazard, red rooms are always fatal.
 
 ```mermaid
 flowchart TB
@@ -289,7 +239,7 @@ flowchart TB
 
 ## Server Logging
 
-Everything is logged as **structured JSON, one object per line**, with Go's standard `log/slog` (`cmd/server/logging.go`). Every record has a nanosecond-precision RFC 3339 `time`, a `level` (`INFO`, `WARN` or `ERROR`; `DEBUG` when enabled) and a `msg` naming the event type. Output goes to **stderr**; set `TAP_LOG_FILE=path` to also append the same records to a file, and `TAP_LOG_LEVEL=debug|info|warn|error` to change the threshold (`debug` also logs every `EVT` line sent). Logging is a synchronous write of a small JSON line, so it does not noticeably slow the server.
+Everything is logged as **structured JSON, one object per line** with `log/slog` (`cmd/server/logging.go`), to stderr. Set `TAP_LOG_FILE=path` to also write a file and `TAP_LOG_LEVEL=debug|info|warn|error` to filter.
 
 | What the subject requires | Event (`msg`) | Level | Main fields |
 | --- | --- | --- | --- |
@@ -301,7 +251,7 @@ Everything is logged as **structured JSON, one object per line**, with Go's stan
 | Abuse patterns | `abuse_command_flood`, `abuse_rapid_connections` | WARN | see below |
 | Failures | `save_player_failed`, `drop_item_failed`, `encode_response_failed`, ... | ERROR | `error` |
 
-**Abuse monitoring.** The server only observes and logs; it never disconnects anyone. A connection that sends more than 20 commands within one second produces `abuse_command_flood` (at most once per 5 seconds per connection). More than 8 connections from one IP within 10 seconds produces `abuse_rapid_connections` (at most once per 5 seconds per IP). To watch the server live, run `make run-server` and pipe it through a JSON tool, for example `make run-server 2>&1 | jq -c 'select(.level != "INFO")'` shows only warnings and errors, and `jq 'select(.player == "alice")'` follows one player.
+**Abuse monitoring** only logs, it never disconnects: more than 20 commands in one second gives `abuse_command_flood`; more than 8 connections from one IP in 10 seconds gives `abuse_rapid_connections`.
 
 ## Group Contributions
 
@@ -337,12 +287,12 @@ go vet ./... && gofmt -l .             # lint (gofmt prints nothing if all is fo
 ## Testing
 
 ```sh
-go test ./...                           # full suite (cli + server)
-go test -race ./cmd/server/...          # with the race detector
-go test ./cmd/server/... -run TestName -v   # a single test, verbose
+go test ./...                          # full suite
+go test -race ./cmd/server/...         # with the race detector
+go test ./cmd/server/... -run TestName -v
 ```
 
-The server package's test suite covers, among other things: the full connection/auth lifecycle and disconnect/reconnect persistence; every RFC command's success and error paths; TCP message splitting/coalescing; concurrent multi-client scenarios (room presence, chat scopes, groups); world-data validation (`TestLoadWorldData` loads the real `data/world.json`); and, specific to this project's combat/quest/localization design, integration tests that exercise every myth-gate NPC and room hazard **against the real `data/world.json`** (not just a synthetic test world) in both English and Japanese — `TestOdysseyArcAgainstRealWorldData`, `TestArgonautsAndTroyMythGatesAgainstRealWorldData`, and `TestJapaneseTranslationsAgainstRealWorldData`.
+The server tests cover the connection lifecycle and persistence, every RFC command's success and error paths, TCP splitting, concurrent clients, world-data validation, and every myth gate and hazard against the real `data/world.json` in English and Japanese. The GUI tests cover the layout, mouse controls, combat panel, map and gallery.
 
 ---
 
