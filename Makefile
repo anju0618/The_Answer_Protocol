@@ -33,7 +33,7 @@ run-client: ## Run the CLI client (ADDR=host:port to change the server)
 	$(GO) run ./cmd/cli $(ADDR)
 
 run-client-gui: ## Run the GUI client
-	$(GO) run ./cmd/gui
+	LANGUAGE=$$(printf '%s' "$$LANGUAGE" | sed 's/^:*//;s/:*$$//;s/::*/:/g') $(GO) run ./cmd/gui
 
 lint: ## Check formatting (gofmt) and run go vet
 	@unformatted="$$(gofmt -l cmd)"; \
