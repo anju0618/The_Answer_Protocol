@@ -91,15 +91,18 @@ func TestRealWorldQuestGiverAnnouncedOnEntry(t *testing.T) {
 	alice := startTestClient(t, server)
 	alice.connect(t, "alice")
 
-	if _, err := fmt.Fprintln(alice.conn, "MOVE west"); err != nil {
+	server.mu.Lock()
+	server.players["alice"].RoomID = "loc.ody_lotus"
+	server.mu.Unlock()
+	if _, err := fmt.Fprintln(alice.conn, "MOVE east"); err != nil {
 		t.Fatal(err)
 	}
 	line := alice.waitEvent(t, "EVT PLAYER QUEST ")
-	if !strings.Contains(line, "Tiphys") || !strings.Contains(line, "QUEST Tiphys") {
-		t.Fatalf("announcement = %q, want Tiphys and the QUEST command", line)
+	if !strings.Contains(line, "Trapped Sailor") || !strings.Contains(line, "QUEST Trapped Sailor") {
+		t.Fatalf("announcement = %q, want Trapped Sailor and the QUEST command", line)
 	}
-	data := alice.cmdJSON(t, "QUEST Tiphys")
-	if data["quest_id"] != "quest.amycus_bout" {
-		t.Fatalf("QUEST Tiphys = %v", data)
+	data := alice.cmdJSON(t, "QUEST Trapped Sailor")
+	if data["quest_id"] != "quest.blind_the_cyclops" {
+		t.Fatalf("QUEST Trapped Sailor = %v", data)
 	}
 }

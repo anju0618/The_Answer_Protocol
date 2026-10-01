@@ -137,7 +137,7 @@ func TestLogsWorldChangesAndQuestProgress(t *testing.T) {
 	w.teleport("loc.ody_cyclops")
 	w.client.run(t, "ATTACK npc.polyphemus")
 	w.teleport(server.world.StartRoomID)
-	w.do("MOVE west")
+	w.do("MOVE east")
 
 	records := logs.records(t)
 	for _, want := range []struct {
@@ -149,7 +149,7 @@ func TestLogsWorldChangesAndQuestProgress(t *testing.T) {
 		{"quest_completed", []any{"player", "alice", "quest", "quest.phineus_harpies"}},
 		{"npc_interaction", []any{"player", "alice", "npc", "npc.phineus"}},
 		{"player_died", []any{"player", "alice", "cause", "attack_unprepared"}},
-		{"player_moved", []any{"player", "alice", "to", "loc.argo_iolcus"}},
+		{"player_moved", []any{"player", "alice", "to", "loc.ody_troy_shore"}},
 	} {
 		if find(records, want.msg, want.attrs...) == nil {
 			t.Errorf("no %s log with %v", want.msg, want.attrs)

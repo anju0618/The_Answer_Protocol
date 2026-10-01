@@ -61,8 +61,7 @@ RFC 15コマンド + 独自拡張2つ(`FLEE`・`LANG`、下表に明記)。正�
 | `WHO` | `WHO` | 現在の接続プレイヤー数。 |
 | `GROUP` | `GROUP CREATE` / `GROUP INVITE <name>` / `GROUP JOIN <leader>` / `GROUP LEAVE` | `CHAT GROUP`用のグループ管理。 |
 | `QUIT` | `QUIT` | 正常に切断する。 |
-CHAT GLOBAL 死ね死ねchatGPTよりclaudeのほうが頭いい
-attack npc.polyphemus
+
 ## テストの実行
 
 ```sh
@@ -84,12 +83,12 @@ go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
 - **並行モデル**: 接続ごとに1 goroutine + サーバー状態全体を単一の`sync.Mutex`で保護、という単純な方式。実装の正しさを優先した(`memo.md` 2章)。
 - **戦闘**: ATTACKは基本8〜14ダメージ・反撃6〜12ダメージのランダム。一部の敵は「正しいアイテム/達成済みクエスト」を持っていないとATTACKで即死する「神話ゲート」付き。HP0で運命の間にHP20でリスポーン。**生きている敵がいる部屋はMOVEで出ようとすると即死**(倒すかFLEEで振り切るまで封鎖)。
 - **クエスト**: `QUEST <npc>`で受注、TAKE/ATTACKの成否をサーバー側が自動で判定して進行・達成・報酬付与まで行う(完了報告コマンドは無し)。
-- **ワールド**: 40部屋・アイテム17種・NPC 40強・クエスト11種。アルゴナウタイ編はクレタ→イオルコスでループし、ハブ部屋は3分岐なので、「ループ+分岐、一直線不可」の要件を満たす。オデュッセイア編も単独で輪になっている(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)。冥界と求婚者たちの広間は、そこから分かれる行き止まりの枝。さらに、史実に反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入るゲームオーバー部屋が6つある。
+- **ワールド**: 46部屋・アイテム21種(取得できるもの17種+記念品4種)・NPC 43・クエスト16種。ハブ(運命の間)からは東のオデュッセイア編(22部屋)にだけ行ける。アルゴナウタイ編(12部屋)とトロイア編(11部屋)のデータは残してあるが、そこへ続く出口は消してあり、今は行けない(到達できるのは23部屋)。オデュッセイア編は単独で輪になっていて(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)、冥界と求婚者たちの広間はそこから分かれる行き止まりの枝なので、「ループ+分岐、一直線不可」の要件を満たす。さらに、史実に反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入るゲームオーバー部屋が6つある。
 - **多言語対応**: `LANG ja`をCONNECT前に送るとLOOK/TALK/QUESTのテキストが日本語になる。RFC規定のJSON構造・コマンド名は一切変更していないので、他チームのサーバー/クライアントとの相互接続には影響しない。詳細は`memo.md` 8章。
 
 ### ワールドの地図
 
-全40部屋とその出口を `data/world.json` から生成した図。矢印の文字は、上の部屋から下の部屋へ進むときの方角(戻るときは逆方向)。`<-->` は往復できる道、`-->` は一方通行(クレタ→イオルコス、城壁の下の野→ギリシア軍の陣営、イタケの岸辺→運命の間)。緑がハブ、橙は仲間を失う/適切なアイテムが無いと死ぬ危険のある部屋、赤は入ると必ず死ぬ部屋。
+全40部屋とその出口を `data/world.json` から生成した図。アルゴナウタイ編とトロイア編も描いてあるが、ハブからそこへ入る出口は消してあり、入れない。そちらからハブへ戻る出口は残してあるので(ハブへ向かう一方通行の矢印)、すでに中にいた人が閉じ込められることはない。矢印の文字は、上の部屋から下の部屋へ進むときの方角(戻るときは逆方向)。`<-->` は往復できる道、`-->` は一方通行(クレタ→イオルコス、城壁の下の野→ギリシア軍の陣営、イタケの岸辺→運命の間)。緑がハブ、橙は仲間を失う/適切なアイテムが無いと死ぬ危険のある部屋、赤は入ると必ず死ぬ部屋。
 
 ```mermaid
 flowchart TB
@@ -145,9 +144,9 @@ flowchart TB
     ody_pigsty["キルケーの豚小屋"]
     ody_eternal_ogygia["果てしなきオギュギア"]
   end
-  hall_of_fates <-->|西| argo_iolcus
   hall_of_fates <-->|東| ody_troy_shore
-  hall_of_fates <-->|北| troy_ida
+  argo_iolcus -->|東| hall_of_fates
+  troy_ida -->|南| hall_of_fates
   argo_iolcus <-->|南| argo_bebrycia
   argo_iolcus <-->|北| argo_lemnos
   ody_troy_shore <-->|東| ody_cicones
@@ -353,7 +352,7 @@ RFC §6.1.2 fixes only the `QUEST`/`QUESTS` request/response shapes and leaves o
 
 ## World Design
 
-- **Structure.** One shared hub room, the Hall of the Fates (`loc.hall_of_fates`), branches three ways into the Voyage of the Argonauts (12 rooms), the Iliad (11 rooms), and the Odyssey (22 rooms) — 46 rooms in total. The hub's own 3-way branch, plus the Argonauts arc looping back on itself (Crete → Iolcus), satisfies the "rooms form a loop and at least one branch, not a straight line" requirement. The Odyssey arc is also a loop on its own: heading east from the hub through every stop to the Shore of Ithaca, whose east exit leads back to the hub, makes a 14-room ring (hub included), with the Underworld and the Hall of the Suitors as dead-end branches off it.
+- **Structure.** One shared hub room, the Hall of the Fates (`loc.hall_of_fates`), with a single exit east into the Odyssey (22 rooms, six of them game-over rooms). The Voyage of the Argonauts (12 rooms) and the Iliad (11 rooms) are still in `data/world.json` with their NPCs, quests and endings, but no exit leads to them any more, so they are currently unreachable (46 rooms in the data, 23 reachable). The Odyssey is a loop on its own: heading east from the hub through every stop to the Shore of Ithaca, whose east exit leads back to the hub, makes a 14-room ring (hub included), with the Underworld and the Hall of the Suitors as dead-end branches off it. That ring plus those branches satisfies the "rooms form a loop and at least one branch, not a straight line" requirement.
 - **NPCs.** All three required roles are represented throughout: `dialogue` (lore/flavor), `quest_giver`, and `enemy`. Well over 30 NPCs total.
 - **Items.** 17 obtainable items (plus 4 reward-only trophies), nearly all of them load-bearing for either a myth gate or a quest objective (e.g. the beeswax that protects against the Sirens, the moly root that protects against Circe).
 - **Quests.** 16 quests across the three arcs, every one a `collect_item` or `defeat_npc` objective (see "Quest System" for how progress/reward is handled).
@@ -370,7 +369,7 @@ RFC §6.1.2 fixes only the `QUEST`/`QUESTS` request/response shapes and leaves o
 
 ### Room map
 
-All 40 rooms and their exits, generated from `data/world.json`. Each edge is labelled with the direction you take when moving from the upper room to the lower one (the way back is the opposite direction). `<-->` is a two-way connection; `-->` is one-way (Crete → Iolcus, Fields Beneath the Walls → Greek Camp, Shore of Ithaca → Hall of the Fates). Green is the hub, orange rooms have a hazard that costs crew or kills without the right item, and red rooms are always fatal.
+All 40 rooms and their exits, generated from `data/world.json`. The Argonauts and Iliad groups are drawn too, but nothing leads into them: the hub's exits to them were removed for now. Their own exits back to the hub were kept (the one-way arrows into the hub), so a player who was already inside is not trapped. Each edge is labelled with the direction you take when moving from the upper room to the lower one (the way back is the opposite direction). `<-->` is a two-way connection; `-->` is one-way (Crete → Iolcus, Fields Beneath the Walls → Greek Camp, Shore of Ithaca → Hall of the Fates). Green is the hub, orange rooms have a hazard that costs crew or kills without the right item, and red rooms are always fatal.
 
 ```mermaid
 flowchart TB
@@ -426,9 +425,9 @@ flowchart TB
     ody_pigsty["Circe's Pigsty"]
     ody_eternal_ogygia["Eternal Ogygia"]
   end
-  hall_of_fates <-->|W| argo_iolcus
   hall_of_fates <-->|E| ody_troy_shore
-  hall_of_fates <-->|N| troy_ida
+  argo_iolcus -->|E| hall_of_fates
+  troy_ida -->|S| hall_of_fates
   argo_iolcus <-->|S| argo_bebrycia
   argo_iolcus <-->|N| argo_lemnos
   ody_troy_shore <-->|E| ody_cicones

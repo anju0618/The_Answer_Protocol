@@ -113,6 +113,10 @@ func (w *walker) room() string {
 
 func (w *walker) do(step string) {
 	w.t.Helper()
+	if roomID, ok := strings.CutPrefix(step, "teleport "); ok {
+		w.teleport(roomID)
+		return
+	}
 	if target, ok := strings.CutPrefix(step, "kill "); ok {
 		for i := 0; i < 60; i++ {
 			w.setHP(maxPlayerHP)
@@ -183,7 +187,7 @@ func (w *walker) reached(endingID string) bool {
 }
 
 var argoRoute = []string{
-	"MOVE west", "QUEST npc.tiphys", "MOVE south", "kill npc.amycus",
+	"teleport loc.argo_iolcus", "QUEST npc.tiphys", "MOVE south", "kill npc.amycus",
 	"MOVE east", "QUEST npc.phineus", "kill npc.harpy",
 	"MOVE east", "MOVE east", "MOVE north", "QUEST npc.aeetes", "TAKE item.medeas_ointment",
 	"MOVE east", "kill npc.khalkotauroi", "kill npc.earthborn",
@@ -193,7 +197,7 @@ var argoRoute = []string{
 }
 
 var troyRoute = []string{
-	"MOVE north", "MOVE east", "MOVE east", "QUEST npc.calchas", "TAKE item.aulis_offering",
+	"teleport loc.troy_ida", "MOVE east", "MOVE east", "QUEST npc.calchas", "TAKE item.aulis_offering",
 	"MOVE east", "QUEST npc.agamemnon", "MOVE north", "QUEST npc.achilles", "TAKE item.shield_of_achilles",
 	"MOVE south", "MOVE east", "MOVE east", "kill npc.hector",
 	"MOVE north", "QUEST npc.priam", "TAKE item.hectors_ransom",
