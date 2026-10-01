@@ -86,6 +86,7 @@ func TestJournalActionsUseIDsAndRevealInventory(t *testing.T) {
 		{ui.npcBox, "Talk", "TALK npc.test"},
 		{ui.npcBox, "Quest", "QUEST npc.test"},
 		{ui.npcBox, "Attack", "ATTACK npc.test"},
+		{ui.npcBox, "Flee", "FLEE"},
 		{ui.playerBox, "Invite", "GROUP INVITE bob"},
 	} {
 		test.Tap(findButton(t, action.box, action.label))

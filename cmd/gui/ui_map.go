@@ -215,11 +215,11 @@ func (ui *gui) buildMapTab() fyne.CanvasObject {
 		legendEntry(mapHazard, ui.tr("Hazard", "危険")),
 		legendEntry(mapLethal, ui.tr("Fatal", "即死")),
 	)
-	return container.NewBorder(nil, legend, nil, nil, ui.mapBox)
+	return container.NewVScroll(container.NewBorder(nil, legend, nil, nil, ui.mapBox))
 }
 
 func legendEntry(c color.Color, text string) fyne.CanvasObject {
 	swatch := canvas.NewRectangle(c)
 	swatch.SetMinSize(fyne.NewSize(theme.Padding()*2, theme.Padding()*2))
-	return container.NewHBox(swatch, compactLabel(text))
+	return container.NewBorder(nil, nil, container.NewCenter(swatch), nil, compactLabel(text))
 }
