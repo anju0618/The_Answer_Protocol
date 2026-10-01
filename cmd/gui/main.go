@@ -50,6 +50,8 @@ type gui struct {
 	roomCount        *widget.Label
 	totalCount       *widget.Label
 	hpLabel          *widget.Label
+	hpBar            *statBar
+	crewBar          *statBar
 	crewLabel        *widget.Label
 	groupLabel       *widget.Label
 	exitBox          *fyne.Container
@@ -252,6 +254,7 @@ func (ui *gui) disconnect() {
 	ui.roomCount.SetText(ui.tr("Here: -", "部屋: - 人"))
 	ui.totalCount.SetText(ui.tr("Online: -", "全体: - 人"))
 	ui.hpLabel.SetText("HP: -")
+	ui.hpBar.Set(0, 1)
 	ui.showState(stateView{})
 	ui.scene.Resource = nil
 	ui.scene.Image = loadArt("rooms", "unknown")
@@ -379,6 +382,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 			return
 		}
 		ui.hpLabel.SetText(fmt.Sprintf("HP: %d/%d", status.HP, status.MaxHP))
+		ui.hpBar.Set(status.HP, status.MaxHP)
 		if status.Status != "healthy" {
 			ui.hpLabel.SetText(ui.hpLabel.Text + " (" + ui.statusWord(status.Status) + ")")
 		}

@@ -200,12 +200,17 @@ func (ui *gui) scrollItemPhotos(delta float32) {
 	ui.itemPhotoScroll.ScrollToOffset(offset)
 }
 
+// startingCrew is the crew every player gets when entering the Odyssey (server side: 12).
+const startingCrew = 12
+
 func (ui *gui) showState(state stateView) {
 	ui.state = state
 	if state.CrewInitialized {
 		ui.crewLabel.SetText(fmt.Sprintf(ui.tr("Crew: %d", "仲間: %d 人"), state.Crew))
+		ui.crewBar.Set(state.Crew, max(startingCrew, state.Crew))
 	} else {
 		ui.crewLabel.SetText(ui.tr("Crew: -", "仲間: - 人"))
+		ui.crewBar.Set(0, startingCrew)
 	}
 	group := "-"
 	if state.Group != "" {
