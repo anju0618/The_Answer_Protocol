@@ -113,9 +113,8 @@ func (ui *gui) build() {
 	ui.logLabel = widget.NewLabel("")
 	ui.logLabel.Wrapping = fyne.TextWrapWord
 	ui.logScroll = container.NewVScroll(ui.logLabel)
-	ui.storyLabel = widget.NewLabel(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
-	ui.storyLabel.Wrapping = fyne.TextWrapWord
-	ui.storyScroll = container.NewVScroll(ui.storyLabel)
+	ui.storyText = newStoryText()
+	ui.storyScroll = container.NewVScroll(ui.storyText)
 	ui.messages = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Adventure", "ぼうけん"), ui.storyScroll),
 		container.NewTabItem(ui.tr("Chat", "チャット"), chatPane),
@@ -145,11 +144,17 @@ func (ui *gui) build() {
 		lines []string
 		label *widget.Label
 	}{
-		{ui.chatLines, ui.chatLabel}, {ui.storyLines, ui.storyLabel}, {ui.logLines, ui.logLabel},
+		{ui.chatLines, ui.chatLabel}, {ui.logLines, ui.logLabel},
 	} {
 		if len(saved.lines) > 0 {
 			saved.label.SetText(strings.Join(saved.lines, "\n"))
 		}
+	}
+	if len(ui.storyLines) > 0 {
+		ui.storyText.Segments = storySegments(ui.storyLines)
+		ui.storyText.Refresh()
+	} else {
+		ui.addStory(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
 	}
 }
 
@@ -191,9 +196,9 @@ func (*screenLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	if size.Width < 1000 {
 		statsHeight = 60 + gap
 	}
-	messagesHeight := min(float32(150), size.Height*0.18)
+	messagesHeight := min(float32(230), size.Height*0.26)
 	if size.Width < 960 {
-		messagesHeight = min(float32(120), size.Height*0.16)
+		messagesHeight = min(float32(170), size.Height*0.22)
 	}
 	playHeight := max(float32(0), size.Height-headerHeight-statsHeight-messagesHeight-3*gap)
 	y := float32(0)

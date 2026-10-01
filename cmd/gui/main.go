@@ -74,14 +74,14 @@ type gui struct {
 	chatScope        *widget.Select
 	chatEntry        *widget.Entry
 	chatLabel        *widget.Label
-	storyLabel       *widget.Label
+	storyText        *widget.RichText
 	logLabel         *widget.Label
 	chatScroll       *container.Scroll
 	storyScroll      *container.Scroll
 	logScroll        *container.Scroll
 	messages         *container.AppTabs
 	chatLines        []string
-	storyLines       []string
+	storyLines       []storyEntry
 	logLines         []string
 }
 
@@ -290,7 +290,7 @@ func (ui *gui) handleEvent(line string) {
 	if strings.HasPrefix(line, "EVT PLAYER ") {
 
 		kind, text, _ := strings.Cut(strings.TrimPrefix(line, "EVT PLAYER "), " ")
-		ui.addStory(text)
+		ui.addStoryKind(storyKindOf(kind), text)
 		switch kind {
 		case "DEATH":
 			ui.refresh("LOOK", "INVENTORY", "STATUS", "STATE")
@@ -310,7 +310,7 @@ func (ui *gui) handleEvent(line string) {
 		ui.send("LOOK")
 	}
 	if strings.HasPrefix(line, "EVT ROOM COMBAT ") {
-		ui.addStory(strings.TrimPrefix(line, "EVT ROOM COMBAT "))
+		ui.addStoryKind(storyCombat, strings.TrimPrefix(line, "EVT ROOM COMBAT "))
 		ui.send("LOOK")
 		ui.send("STATUS")
 		ui.refresh("STATE")
@@ -334,7 +334,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 			ui.addLog(ui.tr("Crew and online names are unavailable on this server.", "このサーバーでは仲間の人数と全体の名前一覧を取得できません。"))
 			return
 		}
-		ui.addStory(line)
+		ui.addStoryKind(storyError, line)
 		if command == "QUIT" {
 			ui.quitButton.Enable()
 			if ui.pollStop == nil && ui.client != nil {
@@ -518,12 +518,6 @@ func (ui *gui) addChat(line string) {
 	ui.chatLines = appendLine(ui.chatLines, line)
 	ui.chatLabel.SetText(strings.Join(ui.chatLines, "\n"))
 	ui.chatScroll.ScrollToBottom()
-}
-
-func (ui *gui) addStory(line string) {
-	ui.storyLines = appendLine(ui.storyLines, line)
-	ui.storyLabel.SetText(strings.Join(ui.storyLines, "\n"))
-	ui.storyScroll.ScrollToBottom()
 }
 
 func (ui *gui) addLog(line string) {
