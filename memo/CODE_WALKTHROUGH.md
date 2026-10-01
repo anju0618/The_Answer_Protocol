@@ -1446,7 +1446,7 @@ func remoteOf(conn net.Conn) string {
 
 - 相手のアドレス(`"192.168.1.5:50123"`)を文字列で返す。取れないときは空文字。
 
-# 第7章 `cmd/server/server.go`(840行)
+# 第7章 `cmd/server/server.go`(841行)
 
 **役割**:サーバー本体です。「サーバー全体の状態(`Server`)」「接続・退室の処理」「基本コマンド(CONNECT / LOOK / MOVE / WHO / QUIT / TAKE / DROP / INVENTORY / TALK / STATUS)」「接続ごとのメインループ(`handleClient`)」が入っています。
 
@@ -5023,7 +5023,7 @@ func runClient(conn clientConn, stdin io.Reader) {
 ## 15-0 GUIの全体像
 
 ```
-キーボード/ボタン
+マウスでボタン・対象を選択
    │ ui.send("MOVE north")
    ▼
 protocolClient.Send ──▶ [送信goroutine] ──▶ サーバー
@@ -5040,7 +5040,11 @@ protocolClient.Send ──▶ [送信goroutine] ──▶ サーバー
   3. `retro.go`:見た目(配色・フォント)
   4. `ui_locale.go`:言語切替
   5. `art_assets.go` / `item_photos.go`:画像
-  6. `main.go`:画面と操作の本体
+  6. `main.go`:接続・応答・イベントの処理
+  7. `ui_layout.go`:画面組み立てと幅に応じた配置
+  8. `ui_actions.go`:マウスでグループ・招待を選ぶ
+  9. `ui_journal.go`:まわり・持ち物・クエストの表示
+  10. `cmd/server/gui_state.go`:GUI向けSTATE拡張の応答
 
 ## 15-1 `protocol.go`(150行)— 通信層
 
@@ -5249,7 +5253,7 @@ func (client *protocolClient) readLoop() {
 - 分類した結果を `incoming` に送る。
 - ループが終わったら(サーバーが切れた)、理由を付けた**切断メッセージ**を送る。正常な切断はエラーが `nil` なので、 `io.EOF`(「終わり」を意味する標準のエラー)を入れる。
 
-## 15-2 `model.go`(133行)— 受け取るデータの型
+## 15-2 `model.go`(143行)— 受け取るデータの型
 
 ```go
 type roomView struct {
@@ -5272,6 +5276,14 @@ type statusView struct {
 	Status string `json:"status"`
 }
 
+type stateView struct {
+	Crew            int      `json:"crew"`
+	CrewInitialized bool     `json:"crew_initialized"`
+	Players         []string `json:"players"`
+	Group           string   `json:"group"`
+	Invitations     []string `json:"invitations"`
+}
+
 type questView struct {
 	QuestID  string `json:"quest_id"`
 	Status   string `json:"status"`
@@ -5279,7 +5291,8 @@ type questView struct {
 }
 ```
 
-- サーバーが返す JSON を受け取るための型。 `LOOK`、 `STATUS`、 `QUESTS` の応答に対応する。サーバー側で定義した形(第4章の `roomView` など)と同じ。
+- サーバーが返す JSON を受け取るための型。 `LOOK`、 `STATUS`、 `STATE`、 `QUESTS` の応答に対応する。サーバー側で定義した形(第4章の `roomView` など)と同じ。
+- `stateView`は追加コマンドSTATEの応答です。`CrewInitialized`で「仲間をまだ付与していない」と「残り0人」を区別し、`Players`と`Invitations`はマウスで選ぶグループ操作に使います。15-11でサーバー側の処理を説明します。
 - `json:` タグが応答のキーとフィールドを対応させる。たとえば `max_hp` は `MaxHP`、`quest_id` は `QuestID` に入る。
 
 ```go
@@ -5295,6 +5308,8 @@ func (name localizedName) get(locale string) string {
 type catalogEntry struct {
 	Name        localizedName `json:"name"`
 	Description localizedName `json:"description"`
+	Role        string        `json:"role"`
+	GiverNPCID  string        `json:"giver_npc_id"`
 	Hazard      *struct {
 		Type string `json:"type"`
 	} `json:"hazard"`
@@ -5309,6 +5324,7 @@ type worldCatalog struct {
 ```
 
 - `world.json` から**表示名・説明文・危険の種類**を読むための型。`Name` と `Description` は言語ごとの文章を持つ。`Hazard` は無名構造体へのポインタで、危険が設定されていない部屋では `nil` になる。
+- `Role`と`GiverNPCID`は、NPCの行に戦う・依頼のどのボタンを表示するかを決める情報です。
 - **JSONにあるキーのうち、構造体にあるものだけ**が読まれ、他は無視される。GUIは部屋・アイテム・NPC・クエストの辞書を使い、サーバーの戦闘処理などはここへ読み込まない。
 - GUIが表示名を取るのは、サーバーが返すのが**IDだけ**(`LOOK` の `items` は ID の配列)だから。
 - 部屋の情報は、出口の行き先を名前で表示する処理と、ゲームオーバー画面にも使う。
@@ -5473,7 +5489,7 @@ func sceneImage() *canvas.Image {
 
 - 部屋の絵を表示する画像部品。最初は「不明の部屋」の絵。 `FillMode = Contain`(枠に収まるように拡縮)。
 
-## 15-4 `ui_locale.go`(62行)— 言語切替と表示文
+## 15-4 `ui_locale.go`(69行)— 言語切替と表示文
 
 ```go
 func (ui *gui) tr(english, japanese string) string {
@@ -5496,23 +5512,36 @@ func (ui *gui) switchLocale(locale string) {
 	}
 	address := ui.hostEntry.Text
 	name := ui.nameEntry.Text
-	rawCommand := ui.rawEntry.Text
 	chatMessage := ui.chatEntry.Text
 	chatScope := ui.chatScope.Selected
 	messageTab := ui.messages.SelectedIndex()
+	journalTab := ui.journal.SelectedIndex()
+	room, inventory, quests, state := ui.room, ui.inventory, ui.quests, ui.state
+	ui.clearChoices()
 	ui.locale = locale
 	ui.build()
 	ui.hostEntry.SetText(address)
 	ui.nameEntry.SetText(name)
-	ui.rawEntry.SetText(rawCommand)
 	ui.chatEntry.SetText(chatMessage)
 	ui.chatScope.SetSelected(chatScope)
 	ui.messages.SelectIndex(messageTab)
-	...
+	ui.journal.SelectIndex(journalTab)
+	ui.showRoom(room)
+	ui.showInventory(inventory)
+	ui.showQuests(quests)
+	ui.showState(state)
+	if ui.client != nil {
+		ui.connectButton.Disable()
+		ui.settingsButton.Disable()
+		ui.languageSelect.Disable()
+		ui.statusLabel.SetText(ui.tr("Connecting...", "接続中..."))
+	}
+	ui.window.Canvas().Unfocus()
 }
 ```
 
 - 言語を変えると、**画面全体を作り直す**(`ui.build()`)。作り直すと入力欄の内容が消えるので、 **先に退避しておき、作り直した後に戻す**。
+- 接続先・名前・未送信のチャット・選択中のタブに加えて、部屋・持ち物・クエスト・仲間の表示データを保持します。ウインドウのサイズ変更では作り直さず、レイアウトだけが配置を変えます。
 - 同じ言語ならすぐ終了。 `ja` 以外は `en` 扱い。
 
 ### `exitLabel`— 方角と行き先の名前
@@ -5533,7 +5562,7 @@ func (ui *gui) exitLabel(direction, roomID string) string {
 
 - 日本語のときは、辞書にある方角を「北」「東」などへ変える。辞書に無い方角は受け取った文字列を使う。
 - `catalog.label("room", ...)` で行き先の表示名を取り、「東: トロイアの浜」のように組み立てる。名前が無ければ部屋IDを表示する。
-- MOVEの選択肢と、まわりの「出口」一覧の両方で使う。
+- まわりの「移動先」一覧で使う。ボタンの表示名は翻訳し、送信するMOVEには方角をそのまま使う。
 
 ### `statusWord`— HPとクエストの状態
 
@@ -5686,43 +5715,93 @@ func itemPhotoCard(id string) fyne.CanvasObject {
 
 - アイテムのIDから、 **金の枠付きの画像カード**(104×104)を作る。画像が無いアイテムは `nil`(カードを出さない)。
 
-## 15-7 `main.go`(908行)— 画面と操作の本体
+## 15-7 `main.go`(537行)— 接続と応答の処理
+
+画面の組み立ては15-8へ、グループ選択は15-9へ、一覧の表示は15-10へ分けています。ゲーム中の文字入力はチャットだけです。接続先と名前は接続設定の画面で入力します。
 
 ### 15-7-1 型の定義
+
+#### `menuChoice`
 
 ```go
 type menuChoice struct {
 	label   string
 	command string
-	prompt  string
+	action  string
 }
 ```
 
-- 番号で選ぶ選択肢の1項目。 `label` は表示、 `command` は選んだら送るコマンド、 `prompt` は(コマンドの途中までを入力欄に入れる場合の)書き出し。
+- `label`は表示文、`command`は送信する文字列、`action`は次の選択画面を開くための値です。
+
+#### `gui`
 
 ```go
 type gui struct {
-	window          fyne.Window
-	catalog         *worldCatalog
-	client          *protocolClient
-	pollStop        chan struct{}
-	dialing         bool
-	connected       bool
-	locale          string
-	room            lookView
-	inventory       []string
-	choices         []menuChoice
-	hostEntry       *widget.Entry
-	...
+	window           fyne.Window
+	catalog          *worldCatalog
+	client           *protocolClient
+	pollStop         chan struct{}
+	dialing          bool
+	connected        bool
+	locale           string
+	room             lookView
+	inventory        []string
+	choices          []menuChoice
+	state            stateView
+	stateUnavailable bool
+	quests           []questView
+	hostEntry        *widget.Entry
+	nameEntry        *widget.Entry
+	languageSelect   *widget.Select
+	connectButton    *widget.Button
+	quitButton       *widget.Button
+	settingsButton   *widget.Button
+	statusLabel      *widget.Label
+	roomTitle        *widget.Label
+	roomDesc         *widget.Label
+	scene            *canvas.Image
+	roomCount        *widget.Label
+	totalCount       *widget.Label
+	hpLabel          *widget.Label
+	crewLabel        *widget.Label
+	groupLabel       *widget.Label
+	exitBox          *fyne.Container
+	playerBox        *fyne.Container
+	itemBox          *fyne.Container
+	itemPhotoBox     *fyne.Container
+	itemPhotoScroll  *container.Scroll
+	photoStrip       *fyne.Container
+	npcBox           *fyne.Container
+	inventoryBox     *fyne.Container
+	questBox         *fyne.Container
+	choiceTitle      *widget.Label
+	choiceBox        *fyne.Container
+	choicePopup      *widget.PopUp
+	commandButtons   *fyne.Container
+	journal          *container.AppTabs
+	playArea         *fyne.Container
+	scenePanel       fyne.CanvasObject
+	detailPanel      fyne.CanvasObject
+	chatScope        *widget.Select
+	chatEntry        *widget.Entry
+	chatLabel        *widget.Label
+	storyLabel       *widget.Label
+	logLabel         *widget.Label
+	chatScroll       *container.Scroll
+	storyScroll      *container.Scroll
+	logScroll        *container.Scroll
+	messages         *container.AppTabs
+	chatLines        []string
+	storyLines       []string
+	logLines         []string
 }
 ```
 
-- **画面全体の状態と部品**をひとつにまとめた構造体。
-  - 状態:接続状態(`dialing` 接続試行中 / `connected` 接続済み)、言語、今の部屋、持ち物、選択肢のリスト。
-  - 部品:入力欄(`*widget.Entry`)、ラベル(`*widget.Label`)、ボタン、入れ物(`*fyne.Container`)、スクロール、タブ…(約40個)。
-- 全部を1つの構造体に入れると、どのメソッドからも `ui.hpLabel` のように使える。
+- 接続・表示データ・各部品をまとめます。`state`は仲間の人数・オンラインの名前・グループ・招待を保持し、`stateUnavailable`はSTATE拡張を使えないサーバーかを記録します。
 
-### 15-7-2 `main`
+### 15-7-2 `main`— 起動
+
+#### `main`
 
 ```go
 func main() {
@@ -5733,7 +5812,6 @@ func main() {
 	catalog, catalogErr := loadCatalog()
 	ui := &gui{window: window, catalog: catalog, locale: "en"}
 	ui.build()
-	window.Canvas().Focus(ui.nameEntry)
 	if catalogErr != nil {
 		ui.addLog(ui.tr("Could not load display names: ", "表示名データを読み込めません: ") + catalogErr.Error())
 	}
@@ -5748,362 +5826,11 @@ func main() {
 }
 ```
 
-- アプリを作り、 **自作のテーマ**(15-3)を設定し、ウィンドウ(1280×900)を作る。
-- `loadCatalog()`:表示名のデータを読む。失敗してもGUIは動かし、 **ログ欄にだけエラーを出す**。
-- `ui.build()`:画面を組み立てる(次節)。名前入力欄にフォーカス。
-- ウィンドウが閉じられたら、接続も閉じる(`SetOnClosed`)。
-- `time.AfterFunc(300ms, ...)`:300ミリ秒後に実行(起動直後のフォーカスを確実にするため)。
-- **`application.Run()`**:ここでGUIの**イベントループに入り、ウィンドウが閉じられるまで戻らない**。
+- アプリとウインドウ、配色を作り、カタログを読み込みます。`build`で部品を作った後に`Show`と`Run`で表示・イベント処理を始めます。ウインドウを閉じると接続も閉じます。
 
-### 15-7-3 `build`— 画面を組み立てる
+### 15-7-3 チャット入力
 
-長いので、部分に分けます。
-
-```go
-func (ui *gui) build() {
-	ui.hostEntry = widget.NewEntry()
-	ui.hostEntry.SetText("127.0.0.1:4242")
-	ui.hostEntry.SetPlaceHolder("host:port")
-	ui.hostEntry.OnSubmitted = func(string) { ui.window.Canvas().Focus(ui.nameEntry) }
-	ui.nameEntry = widget.NewEntry()
-	ui.nameEntry.SetPlaceHolder(ui.tr("player name", "プレイヤー名"))
-	ui.nameEntry.OnSubmitted = func(string) { ui.connect() }
-```
-
-- 入力欄(`Entry`)を作る。初期値や薄いヒント文(プレースホルダ)を設定。
-- `OnSubmitted`:Enterを押したときに実行する関数。サーバー欄でEnter → 名前欄へ、名前欄でEnter → 接続。
-- `func(string) { ... }`:引数を受け取るが使わない無名関数。
-
-```go
-	ui.languageSelect = widget.NewSelect([]string{"English", japaneseLanguageOption}, nil)
-	ui.languageSelect.SetSelected(ui.tr("English", japaneseLanguageOption))
-	ui.connectButton = widget.NewButton(ui.tr("Connect", "接続"), ui.connect)
-	ui.quitButton = widget.NewButton("QUIT", func() { ui.send("QUIT") })
-	ui.quitButton.Disable()
-	ui.statusLabel = widget.NewLabel(ui.tr("Not connected", "未接続"))
-	...
-```
-
-- 言語の選択、接続ボタン、QUITボタン(最初は押せない `Disable`)、状態バーのラベルなど。
-- `widget.NewButton(文字, 押されたときの関数)`:関数を値として渡す。
-
-```go
-	ui.rawEntry = widget.NewEntry()
-	ui.rawEntry.SetPlaceHolder(ui.tr("/ : RFC command", "/ : RFCコマンド"))
-	ui.rawEntry.OnSubmitted = func(line string) {
-		ui.send(strings.TrimSpace(line))
-		ui.rawEntry.SetText("")
-		ui.window.Canvas().Unfocus()
-	}
-	ui.chatScope = widget.NewSelect([]string{"GLOBAL", "ROOM", "GROUP"}, nil)
-	ui.chatScope.SetSelected("ROOM")
-	ui.chatEntry = widget.NewEntry()
-	...
-```
-
-- **生コマンド入力欄**(`/` キーで開く):RFCのコマンドをそのまま打って送れる。Enterで送信し、欄を空にしてフォーカスを外す。
-- チャット:範囲の選択(初期は `ROOM`)と本文の入力欄。
-
-```go
-	ui.scene = sceneImage()
-	photoViewport := container.NewGridWrap(fyne.NewSize(224, 112), ui.itemPhotoScroll)
-	titlePlate := canvas.NewRectangle(ink)
-	...
-	sceneVisual := container.NewStack(ui.scene, container.NewBorder(
-		titleBadge, container.NewPadded(photoViewport), nil, nil,
-	))
-	...
-	scene := container.NewStack(sceneFrame, container.NewPadded(sceneVisual))
-```
-
-- **部屋の絵(`scene`)の上に、部屋の名前の札とアイテムのカードを重ねる**。 `NewStack` で重ね、 `NewBorder` で上と下に配置している。
-
-```go
-	surroundings := container.NewAppTabs(
-		container.NewTabItem(ui.tr("Exits", "出口"), container.NewVScroll(ui.exitBox)),
-		container.NewTabItem(ui.tr("Players", "人"), container.NewVScroll(ui.playerBox)),
-		container.NewTabItem(ui.tr("Items", "道具"), container.NewVScroll(ui.itemBox)),
-		container.NewTabItem("NPC", container.NewVScroll(ui.npcBox)),
-	)
-```
-
-- 「まわり」のタブ:出口・人・道具・NPC。それぞれ縦スクロールできる入れ物。
-
-```go
-	ui.commandButtons = container.NewGridWithColumns(4,
-		ui.commandButton(ui.tr("L Look", "L 調べる"), func() { ui.send("LOOK") }),
-		ui.commandButton(ui.tr("M Move", "M 移動"), func() { ui.chooseAction("MOVE") }),
-		...
-	)
-```
-
-- **4列のボタンの表**。ボタンの文字の頭の1文字(L, M, T…)が**キーボードのショートカット**になっている。
-- `LOOK` / `INVENTORY` / `STATUS` などは**その場でコマンドを送る**。 `MOVE` / `TAKE` / `TALK` などは、対象を選ぶ必要があるので `chooseAction`(15-7-4)で番号付きの選択肢を出す。
-
-```go
-	choiceArea := container.NewBorder(ui.choiceTitle, nil, nil, nil, container.NewVScroll(ui.choiceBox))
-	commandTop := container.NewVBox(
-		widget.NewLabel(ui.tr("Arrows: move / Numbers: select / [ ]: item art", "矢印: 移動  /  数字: 対象を選択  /  [ ]: イラスト")),
-		ui.commandButtons, widget.NewSeparator(),
-	)
-	commandPane := framed(ui.tr("Commands", "コマンド"), container.NewBorder(commandTop, ui.rawEntry, nil, nil, choiceArea))
-	journal := container.NewAppTabs(
-		container.NewTabItem(ui.tr("Around", "まわり"), surroundings),
-		container.NewTabItem(ui.tr("Inventory", "もちもの"), container.NewVScroll(ui.inventoryBox)),
-		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(ui.questBox)),
-	)
-	right := container.NewVSplit(commandPane, framed(ui.tr("Journal", "記録"), journal))
-	right.Offset = 0.62
-	roomColumn := container.NewVSplit(scene, container.NewVScroll(ui.roomDesc))
-	roomColumn.Offset = 0.8
-	worldSplit := container.NewHSplit(roomColumn, right)
-	worldSplit.Offset = 0.61
-```
-
-- `choiceArea`に選択肢、`commandTop`に操作案内とコマンドボタンを置く。`commandPane`は、上に`commandTop`、下に生コマンド入力欄、中央に選択肢を配置する。
-- 画面の右側(コマンド+記録)を**上下に分割**(`NewVSplit`)。記録のタブには、まわり・持ち物・クエストがある。
-- 左側の`roomColumn`は、**部屋の絵と、その下の説明文**を上下に並べる。説明文は`NewVScroll`でスクロールできる。
-- 全体を左側の`roomColumn`と右側の`right`へ分割する(`NewHSplit`)。`Offset`は分割線の位置(0〜1)。右側は0.62、左側の絵は0.8、全体の左右は0.61を初期値にする。
-
-```go
-	ui.storyLabel = widget.NewLabel(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
-	ui.storyLabel.Wrapping = fyne.TextWrapWord
-	ui.storyScroll = container.NewVScroll(ui.storyLabel)
-	adventure := ui.storyScroll
-	ui.messages = container.NewAppTabs(
-		container.NewTabItem(ui.tr("Adventure", "ぼうけん"), adventure),
-		container.NewTabItem(ui.tr("Chat", "チャット"), chatPane),
-		container.NewTabItem(ui.tr("Log", "ログ"), ui.logScroll),
-	)
-	mainSplit := container.NewVSplit(worldSplit, framed(ui.tr("Messages", "ことば"), ui.messages))
-	mainSplit.Offset = 0.58
-```
-
-- 下部のメッセージ欄:「ぼうけん」(物語)、「チャット」、「ログ」の3つのタブ。「ぼうけん」は`storyScroll`を使い、部屋の説明文は絵の下に置く。
-- 上の部分とメッセージ欄を上下に分割する。`mainSplit.Offset = 0.58`で、下部の物語を読む領域を確保する。
-
-```go
-	header := container.NewVBox(
-		connectionRow, nameRow,
-		container.NewGridWithColumns(5, ui.statusLabel, ui.roomCount, ui.totalCount, ui.hpLabel, ui.groupLabel),
-	)
-	ui.window.SetContent(container.NewBorder(framed("THE ANSWER PROTOCOL", header), nil, nil, nil, mainSplit))
-	ui.bindKeyboard()
-	ui.languageSelect.OnChanged = func(selection string) {
-		if ui.client != nil || ui.connected || ui.dialing {
-			return
-		}
-		if selection == japaneseLanguageOption {
-			ui.switchLocale("ja")
-		} else {
-			ui.switchLocale("en")
-		}
-	}
-```
-
-- 上部のヘッダー(サーバー欄・名前欄・状態バー)と、残りの全体を `Border` で組み合わせ、**ウィンドウの中身(`SetContent`)として設定**する。
-- キーボード操作を登録(`bindKeyboard`)。
-- 言語の選択が変わったら切り替える。ただし **接続中・接続試行中は変えられない**(`LANG` は `CONNECT` の前にしか使えないため)。
-- `NewVBox` は縦並び、 `NewHBox` は横並びの入れ物。
-
-```go
-	if len(ui.chatLines) > 0 {
-		ui.chatLabel.SetText(strings.Join(ui.chatLines, "\n"))
-	}
-	if len(ui.storyLines) > 0 { ... }
-	if len(ui.logLines) > 0 { ... }
-}
-```
-
-- 言語切替で `build` をやり直したとき、**これまでのチャット・物語・ログの内容を復元**する。
-
-### 15-7-4 操作系
-
-```go
-func (ui *gui) commandButton(text string, action func()) *widget.Button {
-	return widget.NewButton(text, func() {
-		action()
-		if ui.window.Canvas().Focused() != ui.chatEntry && ui.window.Canvas().Focused() != ui.rawEntry {
-			ui.window.Canvas().Unfocus()
-		}
-	})
-}
-```
-
-- コマンドのボタンを作る。押したら `action` を実行し、 **入力欄にフォーカスが無ければフォーカスを外す**(フォーカスが残っていると、キーボードのショートカットが効かなくなるため)。
-
-```go
-func (ui *gui) focusChat() {
-	ui.messages.SelectIndex(1)
-	ui.window.Canvas().Focus(ui.chatEntry)
-}
-```
-
-- チャットのタブを開いて、入力欄にフォーカスする。
-
-#### `chooseAction`
-
-```go
-func (ui *gui) chooseAction(action string) {
-	if !ui.connected {
-		ui.addLog(ui.tr("Connect before sending commands", "接続後にコマンドを送信してください"))
-		return
-	}
-	var choices []menuChoice
-	switch action {
-	case "MOVE":
-		var directions []string
-		for direction := range ui.room.Room.Exits {
-			directions = append(directions, direction)
-		}
-		sort.Strings(directions)
-		for _, direction := range directions {
-			choices = append(choices, menuChoice{label: ui.exitLabel(direction, ui.room.Room.Exits[direction]), command: "MOVE " + direction})
-		}
-```
-
-- 「MOVE」を押したときの処理。**今の部屋の出口を、方角の順に並べ**、`exitLabel`で方角と行き先の名前を表示する。日本語なら「東: トロイアの浜」のようになる。選ぶとコマンド `"MOVE east"` を送る。
-
-```go
-	case "TAKE":
-		for _, id := range ui.room.Items {
-			choices = append(choices, menuChoice{label: ui.catalog.label("item", id, ui.locale), command: "TAKE " + id})
-		}
-	case "DROP":
-		for _, id := range ui.inventory { ... "DROP " + id ... }
-	case "TALK", "ATTACK", "QUEST":
-		for _, id := range ui.room.NPCs {
-			choices = append(choices, menuChoice{label: ui.catalog.label("npc", id, ui.locale), command: action + " " + id})
-		}
-	case "GROUP":
-		choices = []menuChoice{
-			{label: "CREATE", command: "GROUP CREATE"},
-			{label: ui.tr("INVITE player", "INVITE 名前"), prompt: "GROUP INVITE "},
-			{label: ui.tr("JOIN leader", "JOIN リーダー"), prompt: "GROUP JOIN "},
-			{label: "LEAVE", command: "GROUP LEAVE"},
-		}
-	}
-```
-
-- `TAKE`:部屋にあるアイテム、 `DROP`:持ち物、 `TALK` / `ATTACK` / `QUEST`:部屋のNPCが選択肢になる。
-- `GROUP`:4つの操作。 `INVITE` と `JOIN` は**名前の入力が必要**なので、 `command` ではなく `prompt` を持つ(入力欄に `GROUP INVITE ` まで入れて、続きを打ってもらう)。
-
-```go
-	ui.choices = choices
-	if len(choices) == 0 {
-		ui.choiceTitle.SetText(action + ui.tr(": no targets", ": 対象なし"))
-		setRows(ui.choiceBox, nil)
-		return
-	}
-	ui.choiceTitle.SetText(action + ui.tr(": select a number (Esc to cancel)", ": 数字を押す (Escで戻る)"))
-	var rows []fyne.CanvasObject
-	for index, choice := range choices {
-		if index >= 9 {
-			break
-		}
-		index := index
-		rows = append(rows, ui.commandButton(fmt.Sprintf("%d  %s", index+1, choice.label), func() { ui.runChoice(index) }))
-	}
-	if len(choices) > 9 {
-		rows = append(rows, widget.NewLabel(ui.tr("For targets 10+, type the command after /", "10件目以降は / でコマンドを直接入力")))
-	}
-	setRows(ui.choiceBox, rows)
-}
-```
-
-- 選択肢がなければ「対象なし」と表示。
-- あれば、 **最大9個まで番号付きのボタン**にする(キーボードの1〜9で選べる)。10個以上のときは、`/`で入力欄へ移り、`TAKE item.xxx`のようにコマンド全体を入力する。
-- **`index := index`**:ループ変数を、ボタンの関数(クロージャ)の中で**そのときの値のまま使う**ための書き方。(古いGoでは必須。Go 1.22以降は不要だが、害は無い。)
-
-```go
-func (ui *gui) runChoice(index int) {
-	if index < 0 || index >= len(ui.choices) {
-		return
-	}
-	choice := ui.choices[index]
-	if choice.prompt != "" {
-		ui.rawEntry.SetText(choice.prompt)
-		ui.window.Canvas().Focus(ui.rawEntry)
-		return
-	}
-	ui.send(choice.command)
-	ui.choices = nil
-	ui.choiceTitle.SetText(ui.tr("Choose a target by number", "番号で対象を選ぶ"))
-	setRows(ui.choiceBox, nil)
-}
-```
-
-- 選択肢を実行する。範囲外の番号は無視。
-- `prompt` 付きなら、入力欄にその続きを入れてフォーカスを移す。
-- そうでなければコマンドを送り、選択肢をクリアする。
-
-#### `bindKeyboard`
-
-```go
-func (ui *gui) bindKeyboard() {
-	ui.window.Canvas().SetOnTypedKey(func(event *fyne.KeyEvent) {
-		switch event.Name {
-		case fyne.KeyF1:
-			ui.chatScope.SetSelected("GLOBAL")
-		case fyne.KeyF2:
-			ui.chatScope.SetSelected("ROOM")
-		case fyne.KeyF3:
-			ui.chatScope.SetSelected("GROUP")
-		}
-		if ui.window.Canvas().Focused() != nil {
-			return
-		}
-		if event.Name == fyne.KeyEscape {
-			ui.choices = nil
-			...
-			return
-		}
-		directions := map[fyne.KeyName]string{fyne.KeyUp: "north", fyne.KeyDown: "south", fyne.KeyLeft: "west", fyne.KeyRight: "east"}
-		if direction, ok := directions[event.Name]; ok {
-			if _, exists := ui.room.Room.Exits[direction]; exists {
-				ui.send("MOVE " + direction)
-			}
-		}
-	})
-```
-
-- `SetOnTypedKey`:**特殊キー**(F1、Esc、矢印)が押されたときの処理。
-- F1〜F3:チャットの範囲を切り替える(入力欄にフォーカスがあっても効く)。
-- `Focused() != nil`(どこかの入力欄にフォーカスがある)なら、ここで終了:**入力中の文字に反応しない**ようにするため。
-- Esc:選択肢を解除。
-- 矢印キー:その方向の出口がある時だけ `MOVE` を送る(辞書を使って、キー→方角を引く)。
-
-```go
-	ui.window.Canvas().SetOnTypedRune(func(value rune) {
-		if ui.window.Canvas().Focused() != nil {
-			return
-		}
-		if value >= '1' && value <= '9' {
-			ui.runChoice(int(value - '1'))
-			return
-		}
-		switch unicode.ToUpper(value) {
-		case '[':
-			ui.scrollItemPhotos(-110)
-		case ']':
-			ui.scrollItemPhotos(110)
-		case 'L':
-			ui.send("LOOK")
-		case 'M':
-			ui.chooseAction("MOVE")
-		...
-		case '/':
-			ui.window.Canvas().Focus(ui.rawEntry)
-		case 'X':
-			ui.send("QUIT")
-		}
-	})
-}
-```
-
-- `SetOnTypedRune`:**文字キー**が押されたときの処理。 `rune` は1文字を表す型。
-- `'1'〜'9'`:選択肢の番号。 `value - '1'` は文字コードの引き算で、 `'1'` → 0、 `'2'` → 1 …と番号(添字)になる。
-- 文字を大文字にして、ショートカットを振り分ける:L=見る、M=移動、T=取る、D=置く、N=話す、A=攻撃、E=依頼、I=持ち物、S=状態、Q=依頼一覧、W=人数、G=グループ、F=逃げる、C=チャット、`/`=生コマンド入力、X=終了、`[` `]`=アイテム画像のスクロール。
+#### `sendChat`
 
 ```go
 func (ui *gui) sendChat() {
@@ -6117,138 +5844,11 @@ func (ui *gui) sendChat() {
 }
 ```
 
-- チャットを送る。空は送らない。送れたら入力欄を空にする。
+- 空のメッセージは送信しません。選んだGLOBAL/ROOM/GROUPとメッセージを組み立て、キューへの送信に成功したときだけ入力欄を空にします。
 
-### 15-7-5 接続 `connect`
+### 15-7-4 コマンド送信
 
-```go
-func (ui *gui) connect() {
-	if ui.dialing || ui.client != nil {
-		return
-	}
-	address := strings.TrimSpace(ui.hostEntry.Text)
-	name := strings.TrimSpace(ui.nameEntry.Text)
-	if address == "" || len(strings.Fields(name)) != 1 || strings.ContainsAny(name, "\r\n") {
-		ui.showMessage(ui.tr("Connect", "接続"), ui.tr("Enter the server host:port and a name without spaces.", "サーバーのhost:portと空白のない名前を入力してください。"))
-		return
-	}
-```
-
-- 接続中・接続試行中なら何もしない。
-- サーバーのアドレスが空、または **名前が空白を含む(単語が1つでない)**、または改行を含むなら、ポップアップでエラーを出して終了。
-
-```go
-	ui.connectButton.Disable()
-	ui.languageSelect.Disable()
-	ui.dialing = true
-	ui.statusLabel.SetText(ui.tr("Connecting...", "接続中..."))
-	ui.locale = "en"
-	if ui.languageSelect.Selected == japaneseLanguageOption {
-		ui.locale = "ja"
-	}
-```
-
-- ボタンを押せなくし、「接続中…」と表示。選択された言語を決める。
-
-```go
-	go func() {
-		conn, err := net.DialTimeout("tcp", address, 5*time.Second)
-		fyne.Do(func() {
-			ui.dialing = false
-			if err != nil {
-				ui.statusLabel.SetText(ui.tr("Connection failed", "接続失敗"))
-				ui.connectButton.Enable()
-				ui.languageSelect.Enable()
-				ui.addLog(ui.tr("Connection failed: ", "接続失敗: ") + err.Error())
-				return
-			}
-			ui.client = newProtocolClient(conn)
-			ui.window.Canvas().Unfocus()
-			ui.addLog(ui.tr("Connected to server: ", "接続: ") + address)
-			client := ui.client
-			go ui.receive(client)
-			if ui.locale == "ja" && !ui.sendHandshake("LANG ja") {
-				return
-			}
-			ui.sendHandshake("CONNECT " + name)
-		})
-	}()
-}
-```
-
-- **接続は別のgoroutineで行う**(`go func() {...}()`)。 接続に時間がかかっても、画面が固まらない。 `DialTimeout` で最大5秒。
-- 結果は `fyne.Do` で**画面のスレッドに戻して**処理する。
-- 失敗:「接続失敗」と表示し、ボタンを戻す。
-- 成功:通信クライアントを作り、受信を開始(`go ui.receive`)。 日本語なら先に **`LANG ja`** を送り、続けて **`CONNECT 名前`** を送る(`LANG` は `CONNECT` の前にしか使えないので、この順番)。
-
-```go
-func (ui *gui) sendHandshake(line string) bool {
-	if err := ui.client.Send(line); err != nil {
-		ui.addLog(ui.tr("Send failed: ", "送信失敗: ") + err.Error())
-		ui.disconnect()
-		return false
-	}
-	ui.addLog("> " + line)
-	return true
-}
-```
-
-- 接続直後の送信用。失敗したら切断処理を行う。 ログ欄には送ったコマンドを `> LANG ja` の形で記録する。
-
-### 15-7-6 受信とポーリング
-
-```go
-func (ui *gui) receive(client *protocolClient) {
-	for message := range client.incoming {
-		message := message
-		fyne.Do(func() {
-			if ui.client == client {
-				ui.handleMessage(message)
-			}
-		})
-	}
-}
-```
-
-- `for message := range client.incoming`:**チャネルを `range` で回す**と、メッセージが来るたびに1件ずつ取り出し、チャネルが閉じられたら終わる。
-- 受け取ったメッセージを、画面のスレッドで `handleMessage` に渡す。
-- `ui.client == client`:**古い接続の遅れて届いたメッセージを捨てる**(再接続したあとに前の接続のメッセージが来ても無視する)。
-
-```go
-func (ui *gui) poll(client *protocolClient, stop <-chan struct{}) {
-	ticker := time.NewTicker(4 * time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-			if client.canPoll() {
-				client.Send("LOOK")
-				client.Send("WHO")
-			}
-		case <-stop:
-			return
-		case <-client.done:
-			return
-		}
-	}
-}
-```
-
-- **4秒ごとに `LOOK` と `WHO` を自動で送る**。他の人の入退室や人数の変化を画面に反映するため。
-- `time.NewTicker(4秒)`:4秒ごとに `ticker.C` チャネルに値が届く。
-- 応答待ちが多いとき(`canPoll()` が `false`)は送らない。
-- `stop` または接続の終了で止まる。 `<-chan struct{}` は**受信専用**のチャネル。
-
-```go
-func (ui *gui) stopPolling() {
-	if ui.pollStop != nil {
-		close(ui.pollStop)
-		ui.pollStop = nil
-	}
-}
-```
-
-- 定期更新を止める。チャネルを閉じると、 `poll` の `<-stop` が選ばれて終了する。
+#### `send`
 
 ```go
 func (ui *gui) send(line string) bool {
@@ -6269,26 +5869,166 @@ func (ui *gui) send(line string) bool {
 }
 ```
 
-- **すべてのコマンド送信がここを通る**。接続していなければ警告。送ったらログ欄に記録。 `QUIT` なら定期更新を止めてボタンを無効にする。
+- 接続済みかを調べ、`protocolClient.Send`へ渡します。QUITを送れたら定期更新を止め、切断ボタンを無効にします。結果のboolは入力欄や選択画面を閉じてよいかの判定に使います。
+
+#### `refresh`
 
 ```go
-func (ui *gui) disconnect() {
-	ui.stopPolling()
-	if ui.client != nil {
-		ui.client.Close()
-		ui.client = nil
+func (ui *gui) refresh(commands ...string) {
+	for _, command := range commands {
+		if command == "STATE" && ui.stateUnavailable {
+			continue
+		}
+		ui.send(command)
 	}
-	ui.connected = false
-	ui.room = lookView{}
-	ui.inventory = nil
-	...
-	setRows(ui.questBox, nil)
 }
 ```
 
-- 切断したときの**後片付け**。通信を閉じ、状態を空に戻し、ボタンを元に戻し、ラベルを初期表示に戻し、一覧を空にする。長いが、やっていることは全部「初期状態に戻す」。
+- 指定されたコマンドを順番に送信します。STATE拡張を使えないサーバーにはSTATEを送りません。
 
-### 15-7-7 受け取ったメッセージの処理
+### 15-7-5 接続 `connect`
+
+#### `connect`
+
+```go
+func (ui *gui) connect() {
+	if ui.dialing || ui.client != nil {
+		return
+	}
+	address := strings.TrimSpace(ui.hostEntry.Text)
+	name := strings.TrimSpace(ui.nameEntry.Text)
+	if address == "" || len(strings.Fields(name)) != 1 || strings.ContainsAny(name, "\r\n") {
+		ui.showMessage(ui.tr("Connect", "接続"), ui.tr("Enter the server host:port and a name without spaces.", "サーバーのhost:portと空白のない名前を入力してください。"))
+		return
+	}
+	ui.connectButton.Disable()
+	ui.settingsButton.Disable()
+	ui.languageSelect.Disable()
+	ui.dialing = true
+	ui.statusLabel.SetText(ui.tr("Connecting...", "接続中..."))
+	ui.locale = "en"
+	if ui.languageSelect.Selected == japaneseLanguageOption {
+		ui.locale = "ja"
+	}
+	go func() {
+		conn, err := net.DialTimeout("tcp", address, 5*time.Second)
+		fyne.Do(func() {
+			ui.dialing = false
+			if err != nil {
+				ui.statusLabel.SetText(ui.tr("Connection failed", "接続失敗"))
+				ui.connectButton.Enable()
+				ui.settingsButton.Enable()
+				ui.languageSelect.Enable()
+				ui.addLog(ui.tr("Connection failed: ", "接続失敗: ") + err.Error())
+				return
+			}
+			ui.client = newProtocolClient(conn)
+			ui.window.Canvas().Unfocus()
+			ui.addLog(ui.tr("Connected to server: ", "接続: ") + address)
+			client := ui.client
+			go ui.receive(client)
+			if ui.locale == "ja" && !ui.sendHandshake("LANG ja") {
+				return
+			}
+			ui.sendHandshake("CONNECT " + name)
+		})
+	}()
+}
+```
+
+- 二重接続を防ぎ、空白なしの名前・接続先を検査します。接続・設定・言語の変更を無効にし、別goroutineで5秒のタイムアウト付きTCP接続を行います。画面更新は`fyne.Do`内で行います。日本語ならLANG ja、その後CONNECTを送ります。
+
+#### `sendHandshake`
+
+```go
+func (ui *gui) sendHandshake(line string) bool {
+	if err := ui.client.Send(line); err != nil {
+		ui.addLog(ui.tr("Send failed: ", "送信失敗: ") + err.Error())
+		ui.disconnect()
+		return false
+	}
+	ui.addLog("> " + line)
+	return true
+}
+```
+
+- まだCONNECT応答が来ていない段階で送るための関数です。送信キューへ追加できなければ切断し、成功した場合はログに記録します。
+
+### 15-7-6 受信と定期更新
+
+#### `receive`
+
+```go
+func (ui *gui) receive(client *protocolClient) {
+	for message := range client.incoming {
+		message := message
+		fyne.Do(func() {
+			if ui.client == client {
+				ui.handleMessage(message)
+			}
+		})
+	}
+}
+```
+
+- incomingチャネルを読み続けます。`fyne.Do`内で現在の接続と同じかを確認してから応答を処理するので、古い接続の通知が再接続後の画面を更新することを防ぎます。
+
+#### `poll`
+
+```go
+func (ui *gui) poll(client *protocolClient, stop <-chan struct{}) {
+	ticker := time.NewTicker(4 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			fyne.Do(func() {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				ui.pollOnce(client)
+			})
+		case <-stop:
+			return
+		case <-client.done:
+			return
+		}
+	}
+}
+```
+
+- 4秒ごとに、GUIのスレッド上で`pollOnce`を呼びます。停止チャネルか接続の終了が来れば戻り、tickerを止めます。
+
+#### `pollOnce`
+
+```go
+func (ui *gui) pollOnce(client *protocolClient) {
+	if ui.client == client && ui.connected && client.canPoll() {
+		ui.refresh("LOOK", "WHO", "STATUS", "STATE")
+	}
+}
+```
+
+- 現在の接続が接続済みで、待っている応答が多すぎなければLOOK・WHO・STATUS・STATEを更新します。待機中のHP回復と仲間の人数も画面に反映できます。
+
+#### `stopPolling`
+
+```go
+func (ui *gui) stopPolling() {
+	if ui.pollStop != nil {
+		close(ui.pollStop)
+		ui.pollStop = nil
+	}
+}
+```
+
+- 停止チャネルを閉じてnilに戻します。nilなら何もしないため、二重に閉じません。
+
+### 15-7-7 通知と応答の処理
+
+#### `handleMessage`
 
 ```go
 func (ui *gui) handleMessage(message serverMessage) {
@@ -6308,9 +6048,9 @@ func (ui *gui) handleMessage(message serverMessage) {
 }
 ```
 
-- 15-1-6で分類した種類で振り分ける。通知は `handleEvent`、応答は `handleResponse`。いずれもログ欄に記録する。
+- 受信メッセージの種類で振り分けます。切断は状態をリセット、EVTはhandleEvent、コマンドの返事はhandleResponseへ渡します。
 
-#### `handleEvent`— 通知を受けたとき
+#### `handleEvent`
 
 ```go
 func (ui *gui) handleEvent(line string) {
@@ -6319,35 +6059,22 @@ func (ui *gui) handleEvent(line string) {
 		ui.addChat("[" + parts[1] + "] " + parts[3] + ": " + parts[4])
 		return
 	}
-```
-
-- **チャット**:`EVT スコープ CHAT 送信者 本文`。 `strings.SplitN(line, " ", 5)` で**最大5つに分ける**(本文に空白があっても、5つ目に全部入る)。チャット欄に `[ROOM] alice: こんにちは` と追加。
-
-```go
 	if strings.HasPrefix(line, "EVT PLAYER ") {
 
 		kind, text, _ := strings.Cut(strings.TrimPrefix(line, "EVT PLAYER "), " ")
 		ui.addStory(text)
 		switch kind {
 		case "DEATH":
-			ui.refresh("LOOK", "INVENTORY", "STATUS")
+			ui.refresh("LOOK", "INVENTORY", "STATUS", "STATE")
 		case "QUEST":
 			ui.refresh("STATUS", "QUESTS")
 		case "ENDING":
 			ui.refresh("INVENTORY")
 		case "TEAM":
-			ui.refresh("STATUS", "QUESTS")
+			ui.refresh("STATUS", "QUESTS", "STATE")
 		}
 		return
 	}
-```
-
-- **個人向けの通知**:種別と文章に分け、文章を「ぼうけん」欄に追加。種別によって、**関連する情報を取り直す**:
-  - 死亡 → 部屋・持ち物・HPが変わった。
-  - クエスト・仲間 → HPと依頼の一覧が変わった。
-  - エンディング → 記念品が増えた。
-
-```go
 	if strings.HasPrefix(line, "EVT STATS players=") {
 		ui.setTotal(strings.TrimPrefix(line, "EVT STATS players="))
 	}
@@ -6358,21 +6085,33 @@ func (ui *gui) handleEvent(line string) {
 		ui.addStory(strings.TrimPrefix(line, "EVT ROOM COMBAT "))
 		ui.send("LOOK")
 		ui.send("STATUS")
+		ui.refresh("STATE")
 	}
 	if strings.HasPrefix(line, "EVT GROUP INVITE ") {
 		leader := strings.TrimPrefix(line, "EVT GROUP INVITE ")
-		ui.showMessage("GROUP INVITE", leader+ui.tr(" invited you. Choose G: JOIN.", " から招待されました。G : JOIN を選んでください。"))
+		if !slices.Contains(ui.state.Invitations, leader) {
+			ui.state.Invitations = append(ui.state.Invitations, leader)
+		}
+		ui.addStory(leader + ui.tr(" invited you. Open Group to accept.", " から招待されました。「グループ」から参加できます。"))
+	}
+	if strings.HasPrefix(line, "EVT GROUP JOIN ") || strings.HasPrefix(line, "EVT GROUP LEAVE ") {
+		ui.refresh("STATE")
 	}
 }
 ```
 
-- 人数の更新、部屋の入退室(`LOOK` で取り直す)、 **実況**(物語欄に追加し、 `LOOK` と `STATUS` を更新)、グループへの招待(ポップアップを出す)。
+- チャットはチャット欄へ、物語の通知は冒険欄へ追加します。死亡や戦闘などで関連する表示を再取得します。招待されたリーダー名は保存し、Groupの参加画面から選べるようにします。
 
-#### `handleResponse`— 応答を受けたとき
+#### `handleResponse`
 
 ```go
 func (ui *gui) handleResponse(command, request, line string) {
 	if strings.HasPrefix(line, "ERR ") {
+		if command == "STATE" && strings.HasPrefix(line, "ERR 400 ") {
+			ui.stateUnavailable = true
+			ui.addLog(ui.tr("Crew and online names are unavailable on this server.", "このサーバーでは仲間の人数と全体の名前一覧を取得できません。"))
+			return
+		}
 		ui.addStory(line)
 		if command == "QUIT" {
 			ui.quitButton.Enable()
@@ -6390,14 +6129,6 @@ func (ui *gui) handleResponse(command, request, line string) {
 		}
 		return
 	}
-```
-
-- **エラー応答**:物語欄に表示。コマンドごとの後始末:
-  - `QUIT` に失敗 → ボタンと定期更新を元に戻す。
-  - `LANG` に失敗(相手のサーバーが `LANG` に対応していない) → **英語に戻して続ける**(`LANG` は独自拡張なので、他チームのサーバーでは使えない)。
-  - `CONNECT` に失敗 → 切断。
-
-```go
 	switch command {
 	case "CONNECT":
 		ui.connected = true
@@ -6405,14 +6136,9 @@ func (ui *gui) handleResponse(command, request, line string) {
 		ui.quitButton.Enable()
 		ui.pollStop = make(chan struct{})
 		go ui.poll(ui.client, ui.pollStop)
-		for _, cmd := range []string{"LOOK", "INVENTORY", "STATUS", "QUESTS", "WHO"} {
+		for _, cmd := range []string{"LOOK", "INVENTORY", "STATUS", "QUESTS", "WHO", "STATE"} {
 			ui.send(cmd)
 		}
-```
-
-- **接続成功**:接続済みにし、定期更新を開始、 **初期表示に必要な5つのコマンドをまとめて送る**。
-
-```go
 	case "LOOK":
 		var view lookView
 		if err := decodeOK(line, &view); err != nil || view.Room.ID == "" {
@@ -6422,25 +6148,36 @@ func (ui *gui) handleResponse(command, request, line string) {
 		ui.showRoom(view)
 	case "INVENTORY":
 		var items []string
-		if err := decodeOK(line, &items); err != nil { ... return }
+		if err := decodeOK(line, &items); err != nil {
+			ui.addLog(ui.tr("Could not parse INVENTORY: ", "INVENTORYを解析できません: ") + err.Error())
+			return
+		}
 		ui.showInventory(items)
 	case "STATUS":
 		var status statusView
-		if err := decodeOK(line, &status); err != nil { ... return }
-		ui.hpLabel.SetText(fmt.Sprintf("HP: %d/%d (%s)", status.HP, status.MaxHP, ui.statusWord(status.Status)))
+		if err := decodeOK(line, &status); err != nil {
+			ui.addLog(ui.tr("Could not parse STATUS: ", "STATUSを解析できません: ") + err.Error())
+			return
+		}
+		ui.hpLabel.SetText(fmt.Sprintf("HP: %d/%d", status.HP, status.MaxHP))
+		if status.Status != "healthy" {
+			ui.hpLabel.SetText(ui.hpLabel.Text + " (" + ui.statusWord(status.Status) + ")")
+		}
+	case "STATE":
+		var state stateView
+		if err := decodeOK(line, &state); err != nil {
+			ui.addLog(err.Error())
+			return
+		}
+		ui.showState(state)
 	case "WHO":
 		if strings.HasPrefix(line, "OK players=") {
 			ui.setTotal(strings.TrimPrefix(line, "OK players="))
 		}
-```
-
-- 応答のJSONを15-2の `decodeOK` で型に入れ、対応する表示関数に渡す。解析に失敗したら、ログ欄にだけ書く(画面を壊さない)。
-
-```go
 	case "MOVE":
 		destination := strings.TrimPrefix(line, "OK room=")
 		ui.addStory(ui.tr("Moved to: ", "移動: ") + destination)
-		ui.refresh("LOOK", "STATUS", "QUESTS")
+		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")
 		if room, ok := ui.catalog.gameOverRoom(destination); ok {
 			ui.showGameOver(destination, room)
 		}
@@ -6451,27 +6188,17 @@ func (ui *gui) handleResponse(command, request, line string) {
 		} else {
 			ui.addStory(ui.tr("Dropped: ", "置いた: ") + ui.catalog.label("item", id, ui.locale))
 		}
-		ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS")
+		ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS", "STATE")
 	case "ATTACK", "FLEE":
 		ui.addStory(strings.TrimPrefix(line, "OK "))
-		ui.refresh("LOOK", "STATUS", "QUESTS")
+		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")
 	case "TALK":
 		words := strings.TrimPrefix(line, "OK ")
 		ui.addStory(words)
 		ui.showMessage("TALK", words)
 		if line == "OK dead" {
-			ui.refresh("LOOK", "STATUS")
+			ui.refresh("LOOK", "STATUS", "STATE")
 		}
-```
-
-- 行動した結果を物語欄に出し、 **変わった可能性のある情報を取り直す**(`refresh`):
-  - 移動 → 部屋・HP・依頼。移動先がカタログ上の即死部屋なら、`showGameOver`(15-7-8)でその部屋の絵と説明を表示する。
-  - 拾う/置く → 部屋・持ち物・HP・依頼。
-  - 攻撃/逃げる → 部屋・HP・依頼。
-  - 会話 → 台詞をポップアップ。 `OK dead`(会話で死んだ)なら部屋とHPを更新。
-- `strings.TrimPrefix(a, b)`:`a` の先頭が `b` ならそれを取る。 `TAKE` と `DROP` は応答の形が違う(`taken=` / `dropped=`)ので、2つとも取り除いてIDだけを残す。
-
-```go
 	case "QUEST":
 		words := strings.TrimPrefix(line, "OK ")
 		var quest struct {
@@ -6487,15 +6214,21 @@ func (ui *gui) handleResponse(command, request, line string) {
 		ui.refresh("QUESTS")
 	case "QUESTS":
 		var quests []questView
-		if err := decodeOK(line, &quests); err != nil { ... return }
+		if err := decodeOK(line, &quests); err != nil {
+			ui.addLog(ui.tr("Could not parse QUESTS: ", "QUESTSを解析できません: ") + err.Error())
+			return
+		}
 		ui.showQuests(quests)
 	case "GROUP":
 		ui.addStory(line)
 		if strings.HasPrefix(line, "OK group=") {
-			ui.groupLabel.SetText("Group: " + strings.TrimPrefix(line, "OK group="))
+			ui.state.Group = strings.TrimPrefix(line, "OK group=")
+			ui.state.Invitations = nil
 		} else if strings.EqualFold(request, "GROUP LEAVE") {
-			ui.groupLabel.SetText("Group: -")
+			ui.state.Group = ""
 		}
+		ui.showState(ui.state)
+		ui.refresh("STATE")
 	case "QUIT":
 		ui.addStory(ui.tr("Until our next journey.", "また旅を続けよう。"))
 		ui.disconnect()
@@ -6503,11 +6236,48 @@ func (ui *gui) handleResponse(command, request, line string) {
 }
 ```
 
-- `QUEST`:応答のJSONを解析して、 **クエスト名+説明+報酬**を整えてポップアップ。解析に失敗したら生の文を出す。
-- `GROUP`:グループIDを状態バーに表示。 `LEAVE` の応答は `OK` だけなので、 **元のリクエスト(`request`)が `GROUP LEAVE` だったか**で見分ける(15-1-6で `pending` から取った情報の使いどころ)。
-- `QUIT`:メッセージを出して切断処理。
+- ERRなら失敗として扱います。STATEへのERR 400は拡張非対応として記録し、以後はRFCコマンドで続けます。CONNECT成功後に各表示を取得し、LOOKは部屋、INVENTORYは持ち物、STATUSはHP、STATEは仲間とグループ、QUESTSは依頼一覧へ反映します。MOVEなどの操作成功後は関連情報を再取得します。QUITの失敗では接続を継続し、定期更新を再開します。
 
-### 15-7-8 表示関数
+### 15-7-8 表示の補助と切断
+
+#### `disconnect`
+
+```go
+func (ui *gui) disconnect() {
+	ui.stopPolling()
+	if ui.client != nil {
+		ui.client.Close()
+		ui.client = nil
+	}
+	ui.connected = false
+	ui.stateUnavailable = false
+	ui.state = stateView{}
+	ui.room = lookView{}
+	ui.inventory = nil
+	ui.quests = nil
+	ui.clearChoices()
+	ui.connectButton.Enable()
+	ui.settingsButton.Enable()
+	ui.quitButton.Disable()
+	ui.languageSelect.Enable()
+	ui.statusLabel.SetText(ui.tr("Not connected", "未接続"))
+	ui.roomCount.SetText(ui.tr("Here: -", "部屋: - 人"))
+	ui.totalCount.SetText(ui.tr("Online: -", "全体: - 人"))
+	ui.hpLabel.SetText("HP: -")
+	ui.showState(stateView{})
+	ui.scene.Resource = nil
+	ui.scene.Image = loadArt("rooms", "unknown")
+	ui.scene.Refresh()
+	ui.showItemPhotos(nil)
+	ui.showRoom(lookView{})
+	ui.showInventory(nil)
+	ui.showQuests(nil)
+}
+```
+
+- 定期更新と接続を閉じ、部屋・持ち物・クエスト・仲間・グループ・選択画面を初期状態へ戻します。名前と接続先、チャット・冒険・ログの履歴は次の接続でも使えます。
+
+#### `parseError`
 
 ```go
 func parseError(err error) string {
@@ -6516,120 +6286,24 @@ func parseError(err error) string {
 	}
 	return err.Error()
 }
+```
 
-func (ui *gui) refresh(commands ...string) {
-	for _, command := range commands {
-		ui.send(command)
-	}
-}
+- JSON解析に失敗した場合はそのエラーを返します。解析できても部屋IDが空の場合は、その状態を説明する文章を返します。
 
+#### `setTotal`
+
+```go
 func (ui *gui) setTotal(value string) {
 	number, err := strconv.Atoi(strings.TrimSpace(value))
 	if err == nil && number >= 0 {
-		ui.totalCount.SetText(fmt.Sprintf(ui.tr("Online players: %d", "全体: %d 人"), number))
+		ui.totalCount.SetText(fmt.Sprintf(ui.tr("Online: %d", "全体: %d 人"), number))
 	}
 }
 ```
 
-- `refresh`:コマンドを**まとめて送る**(可変長引数)。
-- `setTotal`:`strconv.Atoi` で文字列を整数に変換できて、0以上のときだけ表示(不正な値で画面が壊れないように)。
+- WHOやEVT STATSの数を読み、0以上なら人数表示を更新します。
 
-```go
-func (ui *gui) showRoom(view lookView) {
-	ui.room = view
-	ui.scene.Resource = nil
-	ui.scene.Image = composeScene(view.Room.ID, view.NPCs)
-	ui.scene.Refresh()
-	ui.showItemPhotos(view.Items)
-	ui.roomTitle.SetText(view.Room.Name)
-	ui.roomID.SetText(view.Room.ID)
-	ui.roomDesc.SetText(view.Room.Description)
-	ui.roomCount.SetText(fmt.Sprintf(ui.tr("Room players: %d", "部屋: %d 人"), len(view.Players)))
-	...
-```
-
-- `LOOK` の結果を画面に反映:
-  - 部屋の絵を `composeScene` で合成して差し替え(`Refresh()` で再描画)。
-  - 部屋の名前・ID・説明・部屋の人数を更新。
-
-```go
-	var exits []fyne.CanvasObject
-	directions := make([]string, 0, len(view.Room.Exits))
-	for direction := range view.Room.Exits {
-		directions = append(directions, direction)
-	}
-	sort.Strings(directions)
-	for _, direction := range directions {
-		destination := view.Room.Exits[direction]
-		exits = append(exits, widget.NewLabel(ui.exitLabel(direction, destination)))
-	}
-	setRows(ui.exitBox, exits)
-	var players []fyne.CanvasObject
-	for _, name := range view.Players {
-		players = append(players, widget.NewLabel(name))
-	}
-	setRows(ui.playerBox, players)
-	...
-```
-
-- 出口・人・アイテム・NPCを、それぞれラベルにして一覧の入れ物に入れ替える。出口は方角順に並べ、`exitLabel`で方角と行き先の名前を出す。アイテムとNPCは`catalog.label`で表示名を選ぶ。
-- 部屋IDは`ui.room`に保持し、`roomID`ラベルにも設定する。`build`では部屋の見出しに`roomTitle`を配置している。
-
-```go
-func (ui *gui) showItemPhotos(ids []string) {
-	photos := make([]fyne.CanvasObject, 0, len(ids))
-	for _, id := range ids {
-		if card := itemPhotoCard(id); card != nil {
-			photos = append(photos, card)
-		}
-	}
-	ui.itemPhotoBox.Objects = photos
-	ui.itemPhotoBox.Refresh()
-	if len(photos) == 0 {
-		ui.itemPhotoScroll.Hide()
-	} else {
-		ui.itemPhotoScroll.Show()
-	}
-	ui.itemPhotoScroll.ScrollToOffset(fyne.Position{})
-}
-
-func (ui *gui) scrollItemPhotos(delta float32) {
-	offset := ui.itemPhotoScroll.Offset
-	offset.X += delta
-	if offset.X < 0 {
-		offset.X = 0
-	}
-	ui.itemPhotoScroll.ScrollToOffset(offset)
-}
-```
-
-- アイテムの画像カードを並べる。画像が1枚も無ければスクロール部品ごと隠す。
-- `[` `]` キーでの横スクロール:現在位置に `delta` を足し、 **0より左には行かない**ようにする。
-
-```go
-func (ui *gui) showInventory(ids []string) {
-	ui.inventory = append([]string(nil), ids...)
-	...
-}
-
-func (ui *gui) showQuests(quests []questView) {
-	...
-		label := widget.NewLabel(ui.catalog.label("quest", quest.QuestID, ui.locale) + " - " + ui.statusWord(quest.Status) + " " + quest.Progress)
-	...
-}
-
-func setRows(box *fyne.Container, rows []fyne.CanvasObject) {
-	if len(rows) == 0 {
-		rows = []fyne.CanvasObject{widget.NewLabel("- ")}
-	}
-	box.Objects = rows
-	box.Refresh()
-}
-```
-
-- 持ち物は、 `DROP` の選択肢で使うために **コピーを `ui.inventory` に保存**する。
-- クエストは`名前 - active 2/3`の形で並べる。日本語では`statusWord`により`active`は「進行中」、`completed`は「達成」と表示する。
-- **`setRows`**:入れ物の中身を丸ごと差し替える共通部品。空なら `- ` を1つ入れて、空欄にならないようにする。 `box.Refresh()` で再描画。
+#### `showMessage`
 
 ```go
 func (ui *gui) showMessage(title, message string) {
@@ -6647,11 +6321,9 @@ func (ui *gui) showMessage(title, message string) {
 }
 ```
 
-- **ポップアップ**(会話、依頼、招待に使う)。
-- `var popup *widget.PopUp` を**先に宣言**してから、ボタンの関数の中で `popup.Hide()` を使う。(ボタンを作る時点では、まだポップアップ本体が無いが、押される時にはすでに代入済みなので動く。)
-- `NewModalPopUp`:他の操作を受け付けない(モーダル)ポップアップ。
+- TALKやQUESTなどの文章を、スクロールと閉じるボタンがあるモーダル画面へ表示します。
 
-#### `showGameOver`— 即死部屋の絵と説明文
+#### `showGameOver`
 
 ```go
 func (ui *gui) showGameOver(roomID string, room catalogEntry) {
@@ -6674,12 +6346,9 @@ func (ui *gui) showGameOver(roomID string, room catalogEntry) {
 }
 ```
 
-- `loadArt("rooms", roomID)`で死亡した部屋のPNGを選ぶ。`art_assets.go`の埋め込み画像を使い、見つからなければ`unknown.png`を使う。
-- `ImageFillContain`で絵の縦横比を保ち、最小サイズを480×288にする。部屋の元画像は960×576なので、同じ縦横比になる。
-- 見出しは「ゲームオーバー」と部屋の名前。説明文はローカルの`catalogEntry.Description`から、その言語の文章を選び、折り返して表示する。
-- 絵と説明文を縦に並べ、上に見出し、下に「運命の間へ戻る」ボタンを置く。540×520のモーダルとして表示し、ボタンにフォーカスを移す。
-- サーバーの`respawnPlayerLocked`は既に復活処理を済ませている。ボタンを押すと画面を閉じてフォーカスを外し、MOVE応答で送ったLOOKなどの結果を使って冒険を続ける。
-- この画面を開く条件は、`gameOverRoom`が移動先を`lethal`と判定すること。死亡通知の文章を表示する`handleEvent`とは別の処理として、MOVE応答から呼ぶ。
+- 即死部屋の背景・名前・説明文を表示します。戻るボタンは画面を閉じる操作です。サーバー側の死亡処理と復活は既に行われています。
+
+#### `addChat`
 
 ```go
 func (ui *gui) addChat(line string) {
@@ -6689,7 +6358,33 @@ func (ui *gui) addChat(line string) {
 }
 ```
 
-- `addStory`と`addLog`も、それぞれの行の記録・ラベル・スクロール部品に対して同じ流れで更新する。
+- 時刻付きの履歴を更新し、チャット欄の末尾へスクロールします。
+
+#### `addStory`
+
+```go
+func (ui *gui) addStory(line string) {
+	ui.storyLines = appendLine(ui.storyLines, line)
+	ui.storyLabel.SetText(strings.Join(ui.storyLines, "\n"))
+	ui.storyScroll.ScrollToBottom()
+}
+```
+
+- 時刻付きの履歴を更新し、冒険欄の末尾へスクロールします。
+
+#### `addLog`
+
+```go
+func (ui *gui) addLog(line string) {
+	ui.logLines = appendLine(ui.logLines, line)
+	ui.logLabel.SetText(strings.Join(ui.logLines, "\n"))
+	ui.logScroll.ScrollToBottom()
+}
+```
+
+- 時刻付きの履歴を更新し、通信ログ欄の末尾へスクロールします。
+
+#### `appendLine`
 
 ```go
 func appendLine(lines []string, line string) []string {
@@ -6701,9 +6396,807 @@ func appendLine(lines []string, line string) []string {
 }
 ```
 
-- チャット・物語・ログの3つの欄は、同じ作りの関数:行を足して、全行を改行でつないで表示し、一番下までスクロール。
-- `appendLine`:**時刻(`時:分:秒`)を頭に付けて**行を足し、 **300行を超えたら古い行を捨てる**(メモリが増え続けないように)。
-- `time.Now().Format("15:04:05")`:Goの時刻の書式は**「2006年1月2日 15時04分05秒」という特定の日時を見本として書く**独特の方式。 `15:04:05` で「時:分:秒」になる。
+- 現在時刻と文章を追加し、300行を超えたら古い行を取り除きます。
+
+## 15-8 `ui_layout.go`(250行)— 画面とウインドウサイズ
+
+### `build`
+
+```go
+func (ui *gui) build() {
+	ui.hostEntry = widget.NewEntry()
+	ui.hostEntry.SetText("127.0.0.1:4242")
+	ui.hostEntry.SetPlaceHolder("host:port")
+	ui.nameEntry = widget.NewEntry()
+	ui.nameEntry.SetPlaceHolder(ui.tr("player name", "プレイヤー名"))
+	ui.languageSelect = widget.NewSelect([]string{"English", japaneseLanguageOption}, nil)
+	ui.languageSelect.SetSelected(ui.tr("English", japaneseLanguageOption))
+	ui.connectButton = widget.NewButton(ui.tr("Connect", "接続"), func() {
+		if strings.TrimSpace(ui.nameEntry.Text) == "" {
+			ui.showConnectionSettings()
+		} else {
+			ui.connect()
+		}
+	})
+	ui.settingsButton = widget.NewButtonWithIcon("", theme.SettingsIcon(), ui.showConnectionSettings)
+	ui.quitButton = widget.NewButton(ui.tr("Disconnect", "切断"), func() { ui.send("QUIT") })
+	ui.quitButton.Disable()
+	ui.statusLabel = compactLabel(ui.tr("Not connected", "未接続"))
+	ui.roomCount = compactLabel(ui.tr("Here: -", "部屋: - 人"))
+	ui.totalCount = compactLabel(ui.tr("Online: -", "全体: - 人"))
+	ui.hpLabel = compactLabel("HP: -")
+	ui.crewLabel = compactLabel(ui.tr("Crew: -", "仲間: - 人"))
+	ui.groupLabel = compactLabel(ui.tr("Group: -", "グループ: -"))
+
+	ui.roomTitle = widget.NewLabelWithStyle(ui.tr("Your journey", "冒険の旅"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	ui.roomTitle.Truncation = fyne.TextTruncateEllipsis
+	ui.roomDesc = widget.NewLabel(ui.tr("Connect to begin your journey.", "接続して冒険を始めましょう。"))
+	ui.roomDesc.Wrapping = fyne.TextWrapWord
+	ui.exitBox = container.NewVBox()
+	ui.playerBox = container.NewVBox()
+	ui.itemBox = container.NewVBox()
+	ui.npcBox = container.NewVBox()
+	ui.inventoryBox = container.NewVBox()
+	ui.questBox = container.NewVBox()
+	ui.choiceTitle = widget.NewLabel("")
+	ui.choiceBox = container.NewVBox()
+	ui.itemPhotoBox = container.NewHBox()
+	ui.itemPhotoScroll = container.NewHScroll(ui.itemPhotoBox)
+	ui.itemPhotoScroll.Hide()
+	ui.scene = sceneImage()
+	photos := container.NewBorder(nil, nil,
+		widget.NewButtonWithIcon("", theme.NavigateBackIcon(), func() { ui.scrollItemPhotos(-110) }),
+		widget.NewButtonWithIcon("", theme.NavigateNextIcon(), func() { ui.scrollItemPhotos(110) }),
+		ui.itemPhotoScroll,
+	)
+	ui.photoStrip = container.NewGridWrap(fyne.NewSize(290, 112), photos)
+	ui.photoStrip.Hide()
+	photoOverlay := container.NewHBox(layout.NewSpacer(), ui.photoStrip)
+	sceneVisual := container.NewStack(ui.scene, container.NewBorder(nil, photoOverlay, nil, nil))
+	sceneFrame := canvas.NewRectangle(ink)
+	sceneFrame.StrokeColor = gold
+	sceneFrame.StrokeWidth = 1
+	visual := container.NewStack(sceneFrame, sceneVisual)
+	ui.scenePanel = container.NewBorder(ui.roomTitle, nil, nil, nil,
+		container.New(&sceneLayout{}, visual, container.NewVScroll(ui.roomDesc)))
+
+	surroundings := container.NewVBox(
+		journalSection(ui.tr("Paths", "移動先"), ui.exitBox),
+		journalSection(ui.tr("People & creatures", "人物・生きもの"), ui.npcBox),
+		journalSection(ui.tr("Items here", "落ちている道具"), ui.itemBox),
+		journalSection(ui.tr("Players here", "この部屋のプレイヤー"), ui.playerBox),
+	)
+	ui.journal = container.NewAppTabs(
+		container.NewTabItem(ui.tr("Around", "まわり"), container.NewVScroll(surroundings)),
+		container.NewTabItem(ui.tr("Inventory", "持ち物"), container.NewVScroll(ui.inventoryBox)),
+		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(ui.questBox)),
+	)
+	ui.journal.OnSelected = func(item *container.TabItem) {
+		if !ui.connected {
+			return
+		}
+		switch item {
+		case ui.journal.Items[1]:
+			ui.send("INVENTORY")
+		case ui.journal.Items[2]:
+			ui.send("QUESTS")
+		}
+	}
+	ui.commandButtons = container.NewGridWithColumns(4,
+		ui.commandButton(ui.tr("Refresh", "更新"), func() { ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS", "WHO", "STATE") }),
+		ui.commandButton(ui.tr("Group", "グループ"), func() { ui.chooseAction("GROUP") }),
+		ui.commandButton(ui.tr("Flee", "逃げる"), func() { ui.send("FLEE") }),
+		ui.commandButton(ui.tr("Chat", "チャット"), ui.focusChat),
+	)
+	ui.detailPanel = container.NewBorder(nil, ui.commandButtons, nil, nil, ui.journal)
+	ui.playArea = container.New(&adventureLayout{}, ui.scenePanel, ui.detailPanel)
+
+	ui.chatScope = widget.NewSelect([]string{"GLOBAL", "ROOM", "GROUP"}, nil)
+	ui.chatScope.SetSelected("ROOM")
+	ui.chatEntry = widget.NewEntry()
+	ui.chatEntry.SetPlaceHolder(ui.tr("Write a message…", "メッセージを入力…"))
+	ui.chatEntry.OnSubmitted = func(string) { ui.sendChat() }
+	ui.chatLabel = widget.NewLabel("")
+	ui.chatLabel.Wrapping = fyne.TextWrapWord
+	ui.chatScroll = container.NewVScroll(ui.chatLabel)
+	chatInput := container.NewBorder(nil, nil, ui.chatScope, widget.NewButton(ui.tr("Send", "送信"), ui.sendChat), ui.chatEntry)
+	chatPane := container.NewBorder(nil, chatInput, nil, nil, ui.chatScroll)
+	ui.logLabel = widget.NewLabel("")
+	ui.logLabel.Wrapping = fyne.TextWrapWord
+	ui.logScroll = container.NewVScroll(ui.logLabel)
+	ui.storyLabel = widget.NewLabel(ui.tr("The gods of Greece await you.", "ギリシアの神々があなたを待っている。"))
+	ui.storyLabel.Wrapping = fyne.TextWrapWord
+	ui.storyScroll = container.NewVScroll(ui.storyLabel)
+	ui.messages = container.NewAppTabs(
+		container.NewTabItem(ui.tr("Adventure", "ぼうけん"), ui.storyScroll),
+		container.NewTabItem(ui.tr("Chat", "チャット"), chatPane),
+		container.NewTabItem(ui.tr("Log", "ログ"), ui.logScroll),
+	)
+	brand := canvas.NewText("THE ANSWER PROTOCOL", gold)
+	brand.TextSize = 17
+	brand.TextStyle.Bold = true
+	header := container.NewBorder(nil, nil, brand,
+		container.NewHBox(ui.languageSelect, ui.settingsButton, ui.connectButton, ui.quitButton))
+	stats := container.New(&statsLayout{}, ui.hpLabel, ui.crewLabel, ui.groupLabel, ui.roomCount, ui.totalCount, ui.statusLabel)
+	ui.window.SetContent(container.NewPadded(container.New(&screenLayout{}, header, stats, ui.playArea, ui.messages)))
+	ui.languageSelect.OnChanged = func(selection string) {
+		if ui.client != nil || ui.connected || ui.dialing {
+			return
+		}
+		if selection == japaneseLanguageOption {
+			ui.switchLocale("ja")
+		} else {
+			ui.switchLocale("en")
+		}
+	}
+	ui.showRoom(lookView{})
+	ui.showInventory(nil)
+	ui.showQuests(nil)
+	for _, saved := range []struct {
+		lines []string
+		label *widget.Label
+	}{
+		{ui.chatLines, ui.chatLabel}, {ui.storyLines, ui.storyLabel}, {ui.logLines, ui.logLabel},
+	} {
+		if len(saved.lines) > 0 {
+			saved.label.SetText(strings.Join(saved.lines, "\n"))
+		}
+	}
+}
+```
+
+- 接続・状態・部屋の絵・まわり／持ち物／クエスト・冒険／チャット／ログを作ります。入れ子のタブとコマンド入力欄を廃止し、一覧の対象からボタンで操作する形です。持ち物・クエストのタブを選んだ際は対応する情報を取得します。アイテムの絵は左右のボタンでも送れます。
+
+### `compactLabel`
+
+```go
+func compactLabel(text string) *widget.Label {
+	label := widget.NewLabel(text)
+	label.Truncation = fyne.TextTruncateEllipsis
+	return label
+}
+```
+
+- 状態欄の文章が長い場合は省略記号を使い、狭いウインドウでも横にはみ出さないようにします。
+
+### `showConnectionSettings`
+
+```go
+func (ui *gui) showConnectionSettings() {
+	if ui.client != nil || ui.dialing {
+		return
+	}
+	var popup *widget.PopUp
+	closePopup := func() { popup.Hide(); ui.window.Canvas().Unfocus() }
+	connect := widget.NewButton(ui.tr("Connect", "接続"), func() { closePopup(); ui.connect() })
+	ui.nameEntry.OnSubmitted = func(string) { closePopup(); ui.connect() }
+	ui.hostEntry.OnSubmitted = func(string) { ui.window.Canvas().Focus(ui.nameEntry) }
+	content := container.NewVBox(
+		widget.NewLabelWithStyle(ui.tr("Connection settings", "接続設定"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
+		widget.NewLabel(ui.tr("Server", "接続先")), ui.hostEntry,
+		widget.NewLabel(ui.tr("Player name", "名前")), ui.nameEntry,
+		container.NewGridWithColumns(2, widget.NewButton(ui.tr("Cancel", "戻る"), closePopup), connect),
+	)
+	popup = widget.NewModalPopUp(container.NewPadded(content), ui.window.Canvas())
+	popup.Resize(fyne.NewSize(min(440, ui.window.Canvas().Size().Width-30), content.MinSize().Height+12))
+	popup.Show()
+	ui.window.Canvas().Focus(ui.nameEntry)
+}
+```
+
+- 接続先とプレイヤー名だけを入力する画面です。接続中や接続処理中には開きません。接続・戻るボタンのどちらでも閉じられます。
+
+### `screenLayout`
+
+```go
+type screenLayout struct{}
+```
+
+- ウインドウの中を見出し・状態・冒険領域・メッセージ欄へ分けます。幅に応じて状態を1行または2行へ並べ、メッセージ欄を控えめな高さにします。
+
+### `screenLayout.MinSize`
+
+```go
+func (*screenLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(560, 680) }
+```
+
+- レイアウト全体の最小サイズを返します。画面幅の切替では部品を再作成しません。
+
+### `screenLayout.Layout`
+
+```go
+func (*screenLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	gap := theme.Padding()
+	headerHeight := objects[0].MinSize().Height
+	statsHeight := float32(30)
+	if size.Width < 1000 {
+		statsHeight = 60 + gap
+	}
+	messagesHeight := min(float32(150), size.Height*0.18)
+	if size.Width < 960 {
+		messagesHeight = min(float32(120), size.Height*0.16)
+	}
+	playHeight := max(float32(0), size.Height-headerHeight-statsHeight-messagesHeight-3*gap)
+	y := float32(0)
+	for index, height := range []float32{headerHeight, statsHeight, playHeight, messagesHeight} {
+		objects[index].Move(fyne.NewPos(0, y))
+		objects[index].Resize(fyne.NewSize(size.Width, height))
+		y += height + gap
+	}
+}
+```
+
+- 部品の配置を決めます。Moveは位置、Resizeは大きさを設定します。
+
+### `statsLayout`
+
+```go
+type statsLayout struct{}
+```
+
+- 幅1000未満なら3列、それ以上なら6列です。状態の部品そのものは作り直しません。
+
+### `statsLayout.MinSize`
+
+```go
+func (*statsLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 30) }
+```
+
+- レイアウト全体の最小サイズを返します。画面幅の切替では部品を再作成しません。
+
+### `statsLayout.Layout`
+
+```go
+func (*statsLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	columns := 6
+	if size.Width < 1000 {
+		columns = 3
+	}
+	layout.NewGridLayoutWithColumns(columns).Layout(objects, size)
+}
+```
+
+- 部品の配置を決めます。Moveは位置、Resizeは大きさを設定します。
+
+### `adventureLayout`
+
+```go
+type adventureLayout struct{}
+```
+
+- 幅960以上なら絵と一覧を左右に並べ、一覧の幅は330にします。狭いときは絵を上、一覧を下へ配置し、一覧の高さを確保します。
+
+### `adventureLayout.MinSize`
+
+```go
+func (*adventureLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 400) }
+```
+
+- レイアウト全体の最小サイズを返します。画面幅の切替では部品を再作成しません。
+
+### `adventureLayout.Layout`
+
+```go
+func (*adventureLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	gap := theme.Padding()
+	if size.Width >= 960 {
+		sideWidth := float32(330)
+		objects[0].Move(fyne.NewPos(0, 0))
+		objects[0].Resize(fyne.NewSize(size.Width-sideWidth-gap, size.Height))
+		objects[1].Move(fyne.NewPos(size.Width-sideWidth, 0))
+		objects[1].Resize(fyne.NewSize(sideWidth, size.Height))
+		return
+	}
+	sceneHeight := min(size.Width*0.6+80, max(100, size.Height-190))
+	objects[0].Move(fyne.NewPos(0, 0))
+	objects[0].Resize(fyne.NewSize(size.Width, sceneHeight))
+	objects[1].Move(fyne.NewPos(0, sceneHeight+gap))
+	objects[1].Resize(fyne.NewSize(size.Width, max(0, size.Height-sceneHeight-gap)))
+}
+```
+
+- 部品の配置を決めます。Moveは位置、Resizeは大きさを設定します。
+
+### `sceneLayout`
+
+```go
+type sceneLayout struct{}
+```
+
+- 部屋の絵と説明文を上下に置きます。説明文はスクロールでき、絵に使う領域を広く残します。
+
+### `sceneLayout.MinSize`
+
+```go
+func (*sceneLayout) MinSize([]fyne.CanvasObject) fyne.Size { return fyne.NewSize(0, 100) }
+```
+
+- レイアウト全体の最小サイズを返します。画面幅の切替では部品を再作成しません。
+
+### `sceneLayout.Layout`
+
+```go
+func (*sceneLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	descriptionHeight := min(float32(62), size.Height*0.2)
+	artHeight := max(float32(0), size.Height-descriptionHeight-theme.Padding())
+	objects[0].Move(fyne.NewPos(0, 0))
+	objects[0].Resize(fyne.NewSize(size.Width, artHeight))
+	objects[1].Move(fyne.NewPos(0, artHeight+theme.Padding()))
+	objects[1].Resize(fyne.NewSize(size.Width, descriptionHeight))
+}
+```
+
+- 部品の配置を決めます。Moveは位置、Resizeは大きさを設定します。
+
+## 15-9 `ui_actions.go`(94行)— マウス操作とグループ
+
+### `commandButton`
+
+```go
+func (ui *gui) commandButton(text string, action func()) *widget.Button {
+	return widget.NewButton(text, func() {
+		action()
+		if ui.window.Canvas().Focused() != ui.chatEntry {
+			ui.window.Canvas().Unfocus()
+		}
+	})
+}
+```
+
+- クリックで渡された処理を実行します。チャットへフォーカスを移す操作以外では、入力欄のフォーカスを外します。
+
+### `focusChat`
+
+```go
+func (ui *gui) focusChat() {
+	ui.messages.SelectIndex(1)
+	ui.window.Canvas().Focus(ui.chatEntry)
+}
+```
+
+- チャットのタブを開いて入力欄へフォーカスを移します。送信は画面のボタンでもできます。
+
+### `chooseAction`
+
+```go
+func (ui *gui) chooseAction(action string) {
+	if !ui.connected {
+		ui.addLog(ui.tr("Connect before sending commands", "接続後に操作してください"))
+		return
+	}
+	ui.clearChoices()
+	var choices []menuChoice
+	title := ui.tr("Choose a target", "対象を選ぶ")
+	switch action {
+	case "GROUP":
+		title = ui.tr("Player group", "プレイヤーのグループ")
+		choices = []menuChoice{
+			{label: ui.tr("Create a group", "グループを作る"), command: "GROUP CREATE"},
+			{label: ui.tr("Invite a player", "プレイヤーを招待"), action: "INVITE"},
+			{label: ui.tr("Accept an invitation", "招待を受ける"), action: "JOIN"},
+			{label: ui.tr("Leave the group", "グループから抜ける"), command: "GROUP LEAVE"},
+		}
+	case "INVITE":
+		title = ui.tr("Invite a player", "招待するプレイヤー")
+		players := ui.state.Players
+		if ui.stateUnavailable || players == nil {
+			players = ui.room.Players
+		}
+		for _, name := range players {
+			if name != strings.TrimSpace(ui.nameEntry.Text) {
+				choices = append(choices, menuChoice{label: name, command: "GROUP INVITE " + name})
+			}
+		}
+	case "JOIN":
+		title = ui.tr("Accept an invitation", "参加するグループのリーダー")
+		for _, leader := range ui.state.Invitations {
+			choices = append(choices, menuChoice{label: leader, command: "GROUP JOIN " + leader})
+		}
+	}
+	ui.choices = choices
+	ui.choiceTitle.SetText(title)
+	var rows []fyne.CanvasObject
+	for index, choice := range choices {
+		rows = append(rows, ui.commandButton(choice.label, func() { ui.runChoice(index) }))
+	}
+	ui.setJournalRows(ui.choiceBox, rows, ui.tr("No available targets.", "選べる対象がありません。"))
+	cancel := widget.NewButton(ui.tr("Back", "戻る"), ui.clearChoices)
+	content := container.NewBorder(ui.choiceTitle, cancel, nil, nil, container.NewVScroll(ui.choiceBox))
+	ui.choicePopup = widget.NewModalPopUp(container.NewPadded(content), ui.window.Canvas())
+	ui.choicePopup.Resize(fyne.NewSize(min(480, ui.window.Canvas().Size().Width-40), min(440, ui.window.Canvas().Size().Height-60)))
+	ui.choicePopup.Show()
+}
+```
+
+- グループ作成・招待・参加・退出の選択画面を開きます。招待する相手はSTATEのオンライン一覧、参加先は受け取った招待から選びます。拡張非対応ではLOOKの同室プレイヤーとEVTの招待を利用します。選択肢は9件で切らず、全件をスクロールで選べます。
+
+### `runChoice`
+
+```go
+func (ui *gui) runChoice(index int) {
+	if index < 0 || index >= len(ui.choices) {
+		return
+	}
+	choice := ui.choices[index]
+	if choice.action != "" {
+		ui.chooseAction(choice.action)
+		return
+	}
+	if ui.send(choice.command) {
+		ui.clearChoices()
+	}
+}
+```
+
+- 範囲内の選択肢を確認し、次の選択画面を開くかコマンドを送信します。送信キューへ追加できた場合だけ選択画面を閉じます。
+
+### `clearChoices`
+
+```go
+func (ui *gui) clearChoices() {
+	if ui.choicePopup != nil {
+		ui.choicePopup.Hide()
+		ui.choicePopup = nil
+		ui.window.Canvas().Unfocus()
+	}
+	ui.choices = nil
+}
+```
+
+- 開いている選択画面を閉じ、古い選択肢を取り除きます。部屋変更と切断の際にも使います。
+
+## 15-10 `ui_journal.go`(215行)— まわり・持ち物・クエスト
+
+### `journalSection`
+
+```go
+func journalSection(title string, content fyne.CanvasObject) fyne.CanvasObject {
+	heading := canvas.NewText(title, gold)
+	heading.TextSize = 14
+	heading.TextStyle.Bold = true
+	return container.NewVBox(container.NewPadded(heading), content)
+}
+```
+
+- 一覧のまとまりに金色の小見出しを付けます。
+
+### `journalCard`
+
+```go
+func journalCard(content fyne.CanvasObject) fyne.CanvasObject {
+	background := canvas.NewRectangle(navy)
+	background.CornerRadius = 4
+	return container.NewStack(background, container.NewPadded(content))
+}
+```
+
+- 紺色の背景と内側の余白を作り、項目同士を見分けやすくします。
+
+### `journalName`
+
+```go
+func journalName(text string) *widget.Label {
+	label := widget.NewLabelWithStyle(text, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
+	label.Wrapping = fyne.TextWrapWord
+	return label
+}
+```
+
+- 名前は太字にし、幅に収まらなければ折り返します。
+
+### `journalRow`
+
+```go
+func journalRow(name string, action *widget.Button) fyne.CanvasObject {
+	if action == nil {
+		return journalCard(journalName(name))
+	}
+	return journalCard(container.NewBorder(nil, nil, nil, action, journalName(name)))
+}
+```
+
+- 名前と操作ボタンを1項目にまとめます。自分の名前など、操作ボタンが不要な行も作れます。
+
+### `showRoom`
+
+```go
+func (ui *gui) showRoom(view lookView) {
+	previous := ui.room
+	if previous.Room.ID != view.Room.ID {
+		ui.clearChoices()
+	}
+	ui.room = view
+	if ui.scene.Image == nil || previous.Room.ID != view.Room.ID || !slices.Equal(previous.NPCs, view.NPCs) {
+		ui.scene.Resource = nil
+		ui.scene.Image = composeScene(view.Room.ID, view.NPCs)
+		ui.scene.Refresh()
+	}
+	if previous.Room.ID != view.Room.ID || !slices.Equal(previous.Items, view.Items) {
+		ui.showItemPhotos(view.Items)
+	}
+	if view.Room.ID == "" {
+		ui.roomTitle.SetText(ui.tr("Your journey", "冒険の旅"))
+		ui.roomDesc.SetText(ui.tr("Connect to begin your journey.", "接続して冒険を始めましょう。"))
+	} else {
+		ui.roomTitle.SetText(view.Room.Name)
+		ui.roomDesc.SetText(view.Room.Description)
+		ui.roomCount.SetText(fmt.Sprintf(ui.tr("Here: %d", "部屋: %d 人"), len(view.Players)))
+	}
+	if view.Room.ID != "" && reflect.DeepEqual(previous, view) {
+		return
+	}
+	directions := make([]string, 0, len(view.Room.Exits))
+	for direction := range view.Room.Exits {
+		directions = append(directions, direction)
+	}
+	sort.Strings(directions)
+	var exits, players, items, npcs []fyne.CanvasObject
+	for _, direction := range directions {
+		exits = append(exits, journalRow(ui.exitLabel(direction, view.Room.Exits[direction]),
+			ui.commandButton(ui.tr("Go", "進む"), func() { ui.send("MOVE " + direction) })))
+	}
+	for _, id := range view.NPCs {
+		buttons := []fyne.CanvasObject{ui.commandButton(ui.tr("Talk", "話す"), func() { ui.send("TALK " + id) })}
+		known := ui.catalog != nil && ui.catalog.NPCs[id].Role != ""
+		if !known || ui.catalog.hasQuest(id) {
+			buttons = append(buttons, ui.commandButton(ui.tr("Quest", "依頼"), func() { ui.send("QUEST " + id) }))
+		}
+		if !known || ui.catalog.NPCs[id].Role == "enemy" {
+			buttons = append(buttons, ui.commandButton(ui.tr("Attack", "戦う"), func() { ui.send("ATTACK " + id) }))
+		}
+		actions := container.NewGridWithColumns(len(buttons), buttons...)
+		npcs = append(npcs, journalCard(container.NewVBox(journalName(ui.catalog.label("npc", id, ui.locale)), actions)))
+	}
+	for _, id := range view.Items {
+		items = append(items, ui.itemRow(id, "TAKE", ui.tr("Take", "取る")))
+	}
+	for _, name := range view.Players {
+		var invite *widget.Button
+		if name != strings.TrimSpace(ui.nameEntry.Text) {
+			invite = ui.commandButton(ui.tr("Invite", "招待"), func() { ui.send("GROUP INVITE " + name) })
+		}
+		players = append(players, journalRow(name, invite))
+	}
+	ui.setJournalRows(ui.exitBox, exits, ui.tr("No paths from here.", "移動先がありません。"))
+	ui.setJournalRows(ui.npcBox, npcs, ui.tr("No one to talk to here.", "話しかける相手はいません。"))
+	ui.setJournalRows(ui.itemBox, items, ui.tr("No items here.", "道具は落ちていません。"))
+	ui.setJournalRows(ui.playerBox, players, ui.tr("No players here.", "プレイヤーはいません。"))
+}
+```
+
+- 部屋IDが変われば古い選択画面を閉じます。部屋またはNPCが変わったときに背景を作り直し、道具が変わったときにアイテムの絵を更新します。移動先・NPC・道具・プレイヤーを操作ボタン付きで表示します。カタログで分かるNPCには対応する依頼・戦闘だけを表示し、未知のNPCでは各操作を残します。同じLOOKなら一覧やスクロール位置を保ちます。
+
+### `hasQuest`
+
+```go
+func (catalog *worldCatalog) hasQuest(npcID string) bool {
+	if catalog == nil {
+		return false
+	}
+	for _, quest := range catalog.Quests {
+		if quest.GiverNPCID == npcID {
+			return true
+		}
+	}
+	return false
+}
+```
+
+- カタログのgiver_npc_idを調べ、依頼を持つ人物かを判定します。
+
+### `itemRow`
+
+```go
+func (ui *gui) itemRow(id, command, text string) fyne.CanvasObject {
+	var picture fyne.CanvasObject
+	if data, err := itemPhotoAssets.ReadFile("assets/items/" + id + ".png"); err == nil {
+		image := canvas.NewImageFromResource(fyne.NewStaticResource(id+".png", data))
+		image.FillMode = canvas.ImageFillContain
+		picture = container.NewGridWrap(fyne.NewSize(44, 44), image)
+	}
+	button := ui.commandButton(text, func() { ui.send(command + " " + id) })
+	return journalCard(container.NewBorder(nil, nil, picture, button, journalName(ui.catalog.label("item", id, ui.locale))))
+}
+```
+
+- 道具の小さな絵・表示名・取る／置くボタンをまとめます。表示は名前、送信はIDを使います。
+
+### `showInventory`
+
+```go
+func (ui *gui) showInventory(ids []string) {
+	ui.inventory = append([]string(nil), ids...)
+	var rows []fyne.CanvasObject
+	if len(ids) > 0 {
+		rows = append(rows, widget.NewLabel(fmt.Sprintf(ui.tr("%d items carried", "持ち物 %d 個"), len(ids))))
+	}
+	for _, id := range ids {
+		rows = append(rows, ui.itemRow(id, "DROP", ui.tr("Drop", "置く")))
+	}
+	ui.setJournalRows(ui.inventoryBox, rows, ui.tr("Your bag is empty. Pick up items in Around.", "持ち物はありません。「まわり」から道具を拾えます。"))
+}
+```
+
+- 持ち物のコピーを保持し、個数・小さな絵・名前・置くボタンを表示します。空なら取得方法を案内します。
+
+### `showQuests`
+
+```go
+func (ui *gui) showQuests(quests []questView) {
+	ui.quests = append([]questView(nil), quests...)
+	var rows []fyne.CanvasObject
+	for _, quest := range quests {
+		name := journalName(ui.catalog.label("quest", quest.QuestID, ui.locale))
+		status := widget.NewLabel(ui.statusWord(quest.Status) + "  ·  " + quest.Progress)
+		content := container.NewVBox(name, status)
+		if ui.catalog != nil {
+			if description := ui.catalog.Quests[quest.QuestID].Description.get(ui.locale); description != "" {
+				label := widget.NewLabel(description)
+				label.Wrapping = fyne.TextWrapWord
+				content.Add(label)
+			}
+		}
+		current, goal, _ := strings.Cut(quest.Progress, "/")
+		progress, progressErr := strconv.Atoi(current)
+		target, targetErr := strconv.Atoi(goal)
+		if progressErr == nil && targetErr == nil && target > 0 {
+			bar := widget.NewProgressBar()
+			bar.SetValue(float64(progress) / float64(target))
+			content.Add(bar)
+		}
+		rows = append(rows, journalCard(content))
+	}
+	ui.setJournalRows(ui.questBox, rows, ui.tr("No quests yet. Ask people in Around for a quest.", "受けているクエストはありません。「まわり」の人物から依頼を受けられます。"))
+}
+```
+
+- 依頼名・状態・進捗・説明文を表示します。進捗がa/bの数値なら進捗バーも表示します。クエストの報酬やサーバー側の進行処理は変更しません。
+
+### `setJournalRows`
+
+```go
+func (ui *gui) setJournalRows(box *fyne.Container, rows []fyne.CanvasObject, empty string) {
+	if len(rows) == 0 {
+		label := widget.NewLabel(empty)
+		label.Wrapping = fyne.TextWrapWord
+		rows = []fyne.CanvasObject{container.NewPadded(label)}
+	}
+	box.Objects = rows
+	box.Refresh()
+}
+```
+
+- 項目が無い場合は、その欄に合う空状態の文章を表示します。
+
+### `showItemPhotos`
+
+```go
+func (ui *gui) showItemPhotos(ids []string) {
+	photos := make([]fyne.CanvasObject, 0, len(ids))
+	for _, id := range ids {
+		if card := itemPhotoCard(id); card != nil {
+			photos = append(photos, card)
+		}
+	}
+	ui.itemPhotoBox.Objects = photos
+	ui.itemPhotoBox.Refresh()
+	if len(photos) == 0 {
+		ui.itemPhotoScroll.Hide()
+		ui.photoStrip.Hide()
+	} else {
+		ui.itemPhotoScroll.Show()
+		ui.photoStrip.Show()
+	}
+	ui.itemPhotoScroll.ScrollToOffset(fyne.Position{})
+}
+```
+
+- 現在の部屋にあるアイテムの絵を並べます。絵が無ければ左右ボタンを含む欄を隠します。
+
+### `scrollItemPhotos`
+
+```go
+func (ui *gui) scrollItemPhotos(delta float32) {
+	offset := ui.itemPhotoScroll.Offset
+	offset.X = max(0, offset.X+delta)
+	ui.itemPhotoScroll.ScrollToOffset(offset)
+}
+```
+
+- 横方向のスクロール位置を増減し、0未満にはしません。
+
+### `showState`
+
+```go
+func (ui *gui) showState(state stateView) {
+	ui.state = state
+	if state.CrewInitialized {
+		ui.crewLabel.SetText(fmt.Sprintf(ui.tr("Crew: %d", "仲間: %d 人"), state.Crew))
+	} else {
+		ui.crewLabel.SetText(ui.tr("Crew: -", "仲間: - 人"))
+	}
+	group := "-"
+	if state.Group != "" {
+		group = state.Group
+	}
+	ui.groupLabel.SetText(ui.tr("Group: ", "グループ: ") + group)
+}
+```
+
+- STATE応答を保存し、仲間の人数とグループを更新します。crew_initializedがfalseなら未取得を表す「-」、trueで0なら「0人」です。
+
+## 15-11 `cmd/server/gui_state.go`— STATE拡張
+
+GUI上部の仲間表示とマウスによるグループ操作に使う、接続済みプレイヤー向けの追加コマンドです。RFCのSTATUS・LOOK・WHOの応答形式にはフィールドを足しません。STATEを送ったクライアントへだけ返します。
+
+```text
+STATE
+OK {"crew":8,"crew_initialized":true,"players":["alice","bob"],"group":"group.1","invitations":[]}
+```
+
+```go
+func handleState(s *Server, conn net.Conn, name *string, parts []string) bool {
+	if !requireExactArgs(conn, parts, 1) {
+		return false
+	}
+	if *name == "" {
+		fmt.Fprintln(conn, "ERR 400 BAD_REQUEST")
+		return false
+	}
+	s.mu.Lock()
+	player := s.players[*name]
+	if player == nil || player.exiting {
+		s.mu.Unlock()
+		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
+		return false
+	}
+	state := struct {
+		Crew            int      `json:"crew"`
+		CrewInitialized bool     `json:"crew_initialized"`
+		Players         []string `json:"players"`
+		Group           string   `json:"group"`
+		Invitations     []string `json:"invitations"`
+	}{
+		Crew: player.Crew, CrewInitialized: player.CrewInitialized,
+		Group: s.groupByPlayer[*name], Players: []string{}, Invitations: []string{},
+	}
+	for otherName, other := range s.players {
+		if !other.exiting {
+			state.Players = append(state.Players, otherName)
+		}
+	}
+	for _, group := range s.groups {
+		if _, invited := group.Invited[*name]; invited {
+			state.Invitations = append(state.Invitations, group.Leader)
+		}
+	}
+	sort.Strings(state.Players)
+	sort.Strings(state.Invitations)
+	data, err := json.Marshal(state)
+	if err != nil || len(data)+len("OK ") > maxProtocolLineBytes {
+		s.mu.Unlock()
+		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
+		return false
+	}
+	client := conn.(*serverClient)
+	response, err := client.enqueueResponse("OK " + string(data))
+	s.mu.Unlock()
+	if err != nil {
+		return true
+	}
+	return client.waitResponse(response) != nil
+}
+```
+
+- 引数はSTATEだけです。未接続・余分な引数にはERR 400、退出中や不正な状態にはERR 500を返します。
+- `s.mu`を保持し、Crewと初期化済みか、退出中でないオンラインの名前、自分のグループ、自分宛ての招待をコピーします。招待一覧には他人宛ての招待を含めません。
+- 名前と招待をソートし、空の一覧もJSONの`[]`として返します。応答の長さを検査し、送信キューへ追加してからロックを解除します。TCP書き込み完了を待つ間はロックを保持しません。
+- 拡張非対応のサーバーでSTATEがERR 400なら、GUIは再送を止めます。仲間は「-」表示となり、招待先は同じ部屋の人、参加先は受信した招待から選びます。RFCのゲーム操作とチャットは続けられます。
+
+### 関連テスト
+
+- `ui_mouse_test.go`:一覧からIDを送る操作、持ち物／クエストを開く操作、名前入力なしの招待／参加、10件目以降の対象、部屋変更での選択画面の破棄、0人と未取得の区別、非対応サーバー、HPの定期取得、大小のウインドウを確認します。
+- `gui_state_test.go`:自分宛ての招待だけが返ること、Crew・オンライン・グループの内容、STATUSとWHOの従来応答、TCP接続上の移動による12人から10人への変化を確認します。
 
 ---
 
