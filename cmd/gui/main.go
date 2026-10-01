@@ -57,6 +57,7 @@ type gui struct {
 	combatBar        *statBar
 	fight            *fightState
 	visited          map[string]bool
+	endingBox        *fyne.Container
 	flash            *canvas.Rectangle
 	flashAnim        *fyne.Animation
 	lastArc          string
@@ -419,6 +420,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 		ui.markVisited(destination)
 		ui.refresh("LOOK", "STATUS", "QUESTS", "STATE")
 		if room, ok := ui.catalog.gameOverRoom(destination); ok {
+			ui.recordFatalRoom(destination)
 			ui.showGameOver(destination, room)
 		}
 	case "TAKE", "DROP":

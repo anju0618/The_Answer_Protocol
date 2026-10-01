@@ -47,6 +47,7 @@ func (ui *gui) build() {
 	ui.npcBox = container.NewVBox()
 	ui.inventoryBox = container.NewVBox()
 	ui.questBox = container.NewVBox()
+	ui.endingBox = newEndingBox()
 	ui.choiceTitle = widget.NewLabel("")
 	ui.choiceBox = container.NewVBox()
 	ui.itemPhotoBox = container.NewHBox()
@@ -79,7 +80,7 @@ func (ui *gui) build() {
 	ui.journal = container.NewAppTabs(
 		container.NewTabItem(ui.tr("Around", "まわり"), container.NewVScroll(surroundings)),
 		container.NewTabItem(ui.tr("Inventory", "持ち物"), container.NewVScroll(ui.inventoryBox)),
-		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(ui.questBox)),
+		container.NewTabItem(ui.tr("Quests", "クエスト"), container.NewVScroll(container.NewVBox(ui.questBox, ui.endingBox))),
 		container.NewTabItem(ui.tr("Map", "地図"), ui.buildMapTab()),
 	)
 	ui.journal.OnSelected = func(item *container.TabItem) {
@@ -143,6 +144,7 @@ func (ui *gui) build() {
 	ui.showRoom(lookView{})
 	ui.showInventory(nil)
 	ui.showQuests(nil)
+	ui.showEndings()
 	for _, saved := range []struct {
 		lines []string
 		label *widget.Label
