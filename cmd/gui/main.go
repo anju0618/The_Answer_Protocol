@@ -62,6 +62,8 @@ type gui struct {
 	flashAnim        *fyne.Animation
 	lastArc          string
 	mapBox           *fyne.Container
+	sceneMapBox      *fyne.Container
+	sceneMapPanel    fyne.CanvasObject
 	crewBar          *statBar
 	crewLabel        *widget.Label
 	groupLabel       *widget.Label

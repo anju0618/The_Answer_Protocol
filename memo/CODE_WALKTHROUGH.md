@@ -5734,7 +5734,7 @@ func itemPhotoCard(id string) fyne.CanvasObject {
 
 - アイテムのIDから、 **金の枠付きの画像カード**(104×104)を作る。画像が無いアイテムは `nil`(カードを出さない)。
 
-## 15-7 `main.go`(567行)— 接続と応答の処理
+## 15-7 `main.go`(569行)— 接続と応答の処理
 
 画面の組み立ては15-8へ、グループ選択は15-9へ、一覧の表示は15-10へ分けています。ゲーム中の文字入力はチャットだけです。接続先と名前は接続設定の画面で入力します。
 
@@ -5794,6 +5794,8 @@ type gui struct {
 	flashAnim        *fyne.Animation
 	lastArc          string
 	mapBox           *fyne.Container
+	sceneMapBox      *fyne.Container
+	sceneMapPanel    fyne.CanvasObject
 	crewBar          *statBar
 	crewLabel        *widget.Label
 	groupLabel       *widget.Label
@@ -6449,7 +6451,7 @@ func appendLine(lines []string, line string) []string {
 
 - 現在時刻と文章を追加し、300行を超えたら古い行を取り除きます。
 
-## 15-8 `ui_layout.go`(365行)— 画面とウインドウサイズ
+## 15-8 `ui_layout.go`(379行)— 画面とウインドウサイズ
 
 ### `build`
 
@@ -6505,7 +6507,10 @@ func (ui *gui) build() {
 	ui.photoStrip = photos
 	ui.photoStrip.Hide()
 	ui.flash = newFlashLayer()
-	sceneVisual := container.NewScroll(container.New(&sceneVisualLayout{photos: ui.itemPhotoBox}, ui.scene, ui.flash, ui.photoStrip))
+	ui.sceneMapBox = container.New(&mapLayout{})
+	ui.sceneMapPanel = framed(ui.tr("Map", "地図"), ui.mapView(ui.sceneMapBox))
+	ui.sceneMapPanel.Hide()
+	sceneVisual := container.NewScroll(container.New(&sceneVisualLayout{photos: ui.itemPhotoBox}, ui.scene, ui.flash, ui.photoStrip, ui.sceneMapPanel))
 	sceneVisual.Direction = container.ScrollNone
 	sceneFrame := canvas.NewRectangle(ink)
 	sceneFrame.StrokeColor = gold
@@ -6947,6 +6952,17 @@ func (l *sceneVisualLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) 
 		layer.Move(fyne.NewPos(gap, gap))
 		layer.Resize(inside)
 	}
+	mapPanel := objects[3]
+	renderedWidth := min(inside.Width, inside.Height*float32(artWidth)/float32(artHeight))
+	leftSpace := (inside.Width - renderedWidth) / 2
+	mapSize := mapPanel.MinSize()
+	if leftSpace >= mapSize.Width+2*gap && inside.Height >= mapSize.Height {
+		mapPanel.Show()
+		mapPanel.Move(fyne.NewPos(gap+(leftSpace-mapSize.Width)/2, gap+(inside.Height-mapSize.Height)/2))
+		mapPanel.Resize(mapSize)
+	} else {
+		mapPanel.Hide()
+	}
 	if objects[2].Visible() {
 		thumbnail := fyne.NewSquareSize(min(104, max(48, inside.Height*0.3)))
 		for _, photo := range l.photos.Objects {
@@ -6965,6 +6981,8 @@ func (l *sceneVisualLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) 
 ```
 
 - 背景とフラッシュを枠から余白分だけ離します。アイテムは右下に置き、絵の高さに応じて48～104の正方形へ縮小・拡大します。アイテム欄の幅と高さも枠の内側へ収めます。
+
+- 横に広い画面では、縦横比を保って表示した絵の左に余白が生まれます。その余白に地図と余白分の幅・高さが収まる場合だけ、地図を常時表示します。絵の表示範囲を狭めたり、絵の上に地図を重ねたりはしません。
 
 ## 15-9 `ui_actions.go`(94行)— マウス操作とグループ
 
@@ -7083,7 +7101,7 @@ func (ui *gui) clearChoices() {
 
 - 開いている選択画面を閉じ、古い選択肢を取り除きます。部屋変更と切断の際にも使います。
 
-## 15-10 `ui_journal.go`(237行)— まわり・持ち物・クエスト
+## 15-10 `ui_journal.go`(238行)— まわり・持ち物・クエスト
 
 敵と未知のNPCでは「戦う／逃げる」を同じ行に表示し、会話・依頼とは別の行にします。文章を含むカードは`textVBox`で高さを測ります。アイテムの左右ボタンは現在のカード1枚と余白分だけスクロールします。
 
@@ -7212,8 +7230,11 @@ func (ui *gui) showRoom(view lookView) {
 	ui.setJournalRows(ui.npcBox, npcs, ui.tr("No one to talk to here.", "話しかける相手はいません。"))
 	ui.setJournalRows(ui.itemBox, items, ui.tr("No items here.", "道具は落ちていません。"))
 	ui.setJournalRows(ui.playerBox, players, ui.tr("No players here.", "プレイヤーはいません。"))
+	ui.journal.Items[0].Content.Refresh()
 }
 ```
+
+一覧の差し替えが終わったら、「まわり」全体のスクロール領域もRefreshします。子の一覧だけを更新すると、既に表示している親に古い高さが残り、接続直後の項目が重なることがありました。親まで更新することで、タブ切替やサイズ変更をしなくても初回のLOOKから正しい高さになります。
 
 - 部屋IDが変われば古い選択画面を閉じます。部屋またはNPCが変わったときに背景を作り直し、道具が変わったときにアイテムの絵を更新します。移動先・NPC・道具・プレイヤーを操作ボタン付きで表示します。カタログで分かるNPCには対応する依頼・戦闘だけを表示し、未知のNPCでは各操作を残します。同じLOOKなら一覧やスクロール位置を保ちます。
 
@@ -7468,12 +7489,16 @@ func handleState(s *Server, conn net.Conn, name *string, parts []string) bool {
 | `ui_combat.go` | 戦闘中の敵名・HP・「戦う／構える／逃げる」を表示し、ATTACK・DEFEND・FLEEの応答を反映する |
 | `ui_story.go` | 冒険の履歴を種類付きで保存し、種類別の色を使ったRichTextへ変換する |
 | `ui_effects.go` | 移動・被害・死亡時のフラッシュを作り、時間経過で透明にする |
-| `ui_map.go` | 訪れた部屋と接続関係、危険・即死等の凡例を表示する。狭い画面では地図と凡例全体をスクロールできる |
+| `ui_map.go` | 訪れた部屋と接続関係、危険・即死等の凡例を表示する。タブと絵の左の余白の2か所を、それぞれ独立した描画部品で更新する。狭い画面の地図タブは地図と凡例全体をスクロールできる |
 | `ui_endings.go` | 持ち物の記念品から取得したエンディングと祝福を表示し、設定へ記録した即死部屋の数も表示する |
 
 長い敵名、エンディングの祝福文にも`textVBox`を使います。地図の凡例は色見本以外へ残りの幅を割り当て、言語による文字幅の違いに対応します。
 
 `ui_overlap_test.go`は日本語・英語、文字サイズ15・22、画面の横並び・縦並びの切替で、文章・ボタンの重なりと画像の枠外表示を確認します。4種類の一覧、戦闘中のパネル、ゲームオーバー画面、アイテム画像の縮小と1枚ずつのスクロールも確認します。実際の部屋・NPC・クエストを使い、長い日本語名を追加して折り返しを検証します。
+
+`ui_initial_room_test.go`では、未接続の画面を表示し、英語から日本語へ切り替えた後に、最初の部屋を読み込みます。タブ切替・サイズ変更をしない状態の「まわり」の配置を検証し、その後タブを切り替えても一覧の高さが変わらないことを確認します。文字サイズ15・22、1280×900・640×900で確認します。
+
+`ui_map_test.go`では、1920×1080の広い画面の地図が絵の左の余白に収まること、画面を狭めると隠れること、2か所の地図が描画部品を共有せずに訪問済みの部屋を更新することを確認します。
 
 Fyneのテスト用ウインドウは実ウインドウの最小サイズ制約を自動では適用しないため、テスト側で現在の最小サイズ以上へ調整します。`TAP_GUI_PREVIEW_DIR`に既存の出力ディレクトリを指定すると、同じ検証画面をPNGへ保存できます。通常のテストではPNGをファイルへ書きません。これはFyneのテスト用Canvasでの確認であり、OSの実ウインドウの起動確認とは別です。
 
