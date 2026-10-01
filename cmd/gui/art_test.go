@@ -20,12 +20,8 @@ func TestArtCoversWorld(t *testing.T) {
 		t.Fatal(err)
 	}
 	var world struct {
-		Rooms map[string]struct {
-			Hazard *struct {
-				Type string `json:"type"`
-			} `json:"hazard"`
-		} `json:"rooms"`
-		NPCs map[string]json.RawMessage `json:"npcs"`
+		Rooms map[string]json.RawMessage `json:"rooms"`
+		NPCs  map[string]json.RawMessage `json:"npcs"`
 	}
 	if err := json.Unmarshal(data, &world); err != nil {
 		t.Fatal(err)
@@ -38,27 +34,17 @@ func TestArtCoversWorld(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// A lethal room kills on entry and the player is respawned at once, so the
-	// GUI never gets to show it; those rooms may have no art.
-	drawnRooms := 1
-	for _, room := range world.Rooms {
-		if room.Hazard == nil || room.Hazard.Type != "lethal" {
-			drawnRooms++
-		}
-	}
-	if len(roomFiles) < drawnRooms || len(roomFiles) > len(world.Rooms)+1 || len(npcFiles) != len(world.NPCs)+1 {
-		t.Fatalf("art coverage: %d room files (want %d to %d), %d/%d NPCs (including unknown fallbacks)", len(roomFiles), drawnRooms, len(world.Rooms)+1, len(npcFiles), len(world.NPCs)+1)
+	if len(roomFiles) != len(world.Rooms)+1 || len(npcFiles) != len(world.NPCs)+1 {
+		t.Fatalf("art coverage: %d/%d rooms, %d/%d NPCs (including unknown fallbacks)", len(roomFiles), len(world.Rooms)+1, len(npcFiles), len(world.NPCs)+1)
 	}
 	roomIDs := make([]string, 0, len(world.Rooms))
 	npcIDs := make([]string, 0, len(world.NPCs))
 	roomHashes := make(map[[32]byte]string)
 	spriteHashes := make(map[[32]byte]string)
-	for id, room := range world.Rooms {
+	for id := range world.Rooms {
 		data, err := artAssets.ReadFile("assets/rooms/" + id + ".png")
 		if err != nil {
-			if room.Hazard == nil || room.Hazard.Type != "lethal" {
-				t.Errorf("room %s has no art: %v", id, err)
-			}
+			t.Errorf("room %s has no art: %v", id, err)
 			continue
 		}
 		config, err := png.DecodeConfig(bytes.NewReader(data))
@@ -135,7 +121,8 @@ func TestUnknownRoomAndNPCUsePNGAssets(t *testing.T) {
 
 func previewArt(t *testing.T, rooms, npcs []string) {
 	if path := os.Getenv("TAP_ROOMS_PREVIEW"); path != "" {
-		contact := image.NewRGBA(image.Rect(0, 0, 5*artWidth, 8*artHeight))
+		rows := (len(rooms) + 4) / 5
+		contact := image.NewRGBA(image.Rect(0, 0, 5*artWidth, rows*artHeight))
 		for i, id := range rooms {
 			var occupants []string
 			if len(npcs) > 0 {
@@ -147,7 +134,8 @@ func previewArt(t *testing.T, rooms, npcs []string) {
 		writePreview(t, path, contact)
 	}
 	if path := os.Getenv("TAP_NPCS_PREVIEW"); path != "" {
-		contact := image.NewRGBA(image.Rect(0, 0, 8*80, 5*120))
+		rows := (len(npcs) + 7) / 8
+		contact := image.NewRGBA(image.Rect(0, 0, 8*80, rows*120))
 		draw.Draw(contact, contact.Bounds(), &image.Uniform{C: color.RGBA{R: 45, G: 61, B: 79, A: 255}}, image.Point{}, draw.Src)
 		for i, id := range npcs {
 			x, y := i%8*80+8, i/8*120+8
