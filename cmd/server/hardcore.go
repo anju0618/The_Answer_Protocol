@@ -62,42 +62,81 @@ func (s *Server) applyDeathPenaltyLocked(player *Player, name string) deathOutco
 		return outcomeKept
 	}
 
-	player.Inventory = kept
-	var returned []string
-	for _, itemID := range lost {
-		if !s.world.Items[itemID].Renewable {
-			returned = append(returned, itemID)
-		}
+	if err := s.returnItemsHomeLocked(name, lost); err != nil {
+		logger.Error("return_lost_items_failed", "player", name, "error", err.Error())
+		return outcomeNothingLost
 	}
-	s.returnItemsHomeLocked(name, returned)
+	player.Inventory = kept
 	return outcomeLost
 }
 
-func (s *Server) returnItemsHomeLocked(name string, itemIDs []string) {
+func (s *Server) returnItemsHomeLocked(name string, itemIDs []string) error {
 	if len(itemIDs) == 0 {
-		return
+		return nil
 	}
+	lost := make(map[string]bool, len(itemIDs))
+	returned := make(map[string]string)
 	for _, itemID := range itemIDs {
+		lost[itemID] = true
 		item := s.world.Items[itemID]
-		item.RoomID = item.HomeRoomID
-		if item.RoomID == "" {
-			item.RoomID = s.world.StartRoomID
+		if item.Renewable {
+			continue
 		}
-		delete(s.unsavedTakes[name], itemID)
+		roomID := item.HomeRoomID
+		if roomID == "" {
+			roomID = s.world.StartRoomID
+		}
+		returned[itemID] = roomID
 	}
+
 	s.ioMu.Lock()
 	defer s.ioMu.Unlock()
 	locations, err := s.loadItemLocations()
 	if err != nil {
-		logger.Error("return_lost_items_failed", "player", name, "error", err.Error())
-		return
+		return err
 	}
-	for _, itemID := range itemIDs {
-		locations[itemID] = s.world.Items[itemID].RoomID
+	previousLocations := make(map[string]string, len(locations))
+	for itemID, roomID := range locations {
+		previousLocations[itemID] = roomID
 	}
-	if err := s.writeItemLocations(locations); err != nil {
-		logger.Error("save_item_locations_failed", "player", name, "error", err.Error())
+	for itemID, roomID := range returned {
+		locations[itemID] = roomID
 	}
+	if len(returned) > 0 {
+		if err := s.writeItemLocations(locations); err != nil {
+			return err
+		}
+	}
+
+	// Remove the old saved ownership before another player can take these items.
+	// Keep the rest of the saved state rather than saving the pre-respawn HP and room.
+	players, err := s.loadPlayers()
+	if err == nil {
+		if saved := players[name]; saved != nil {
+			var inventory []string
+			for _, itemID := range saved.Inventory {
+				if !lost[itemID] {
+					inventory = append(inventory, itemID)
+				}
+			}
+			saved.Inventory = inventory
+			err = s.writePlayers(players)
+		}
+	}
+	if err != nil {
+		if len(returned) > 0 {
+			if rollbackErr := s.writeItemLocations(previousLocations); rollbackErr != nil {
+				logger.Error("restore_item_location_failed", "player", name, "error", rollbackErr.Error())
+			}
+		}
+		return err
+	}
+
+	for itemID, roomID := range returned {
+		s.world.Items[itemID].RoomID = roomID
+		delete(s.unsavedTakes[name], itemID)
+	}
+	return nil
 }
 
 func (s *Server) shareVictoryLocked(attacker string, allies []string, npcID string, npc *NPC) {
