@@ -28,6 +28,14 @@ type statusView struct {
 	Status string `json:"status"`
 }
 
+type stateView struct {
+	Crew            int      `json:"crew"`
+	CrewInitialized bool     `json:"crew_initialized"`
+	Players         []string `json:"players"`
+	Group           string   `json:"group"`
+	Invitations     []string `json:"invitations"`
+}
+
 type questView struct {
 	QuestID  string `json:"quest_id"`
 	Status   string `json:"status"`
@@ -46,6 +54,8 @@ func (name localizedName) get(locale string) string {
 type catalogEntry struct {
 	Name        localizedName `json:"name"`
 	Description localizedName `json:"description"`
+	Role        string        `json:"role"`
+	GiverNPCID  string        `json:"giver_npc_id"`
 	Hazard      *struct {
 		Type string `json:"type"`
 	} `json:"hazard"`

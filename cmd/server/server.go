@@ -229,6 +229,7 @@ var commandHandlers = map[string]commandHandler{
 	"ATTACK":    handleAttack,
 	"FLEE":      handleFlee,
 	"STATUS":    handleStatus,
+	"STATE":     handleState,
 	"QUEST":     handleQuest,
 	"QUESTS":    handleQuests,
 }
