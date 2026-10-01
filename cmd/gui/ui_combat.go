@@ -42,7 +42,7 @@ func (ui *gui) buildCombatPanel() {
 	frame := canvas.NewRectangle(ink)
 	frame.StrokeColor, _ = storyColor(colorStoryCombat)
 	frame.StrokeWidth = 2
-	inside := container.NewVBox(
+	inside := textVBox(
 		ui.combatName,
 		container.NewStack(ui.combatBar.box, ui.combatHP),
 		container.NewGridWithColumns(3, attack, defend, flee),

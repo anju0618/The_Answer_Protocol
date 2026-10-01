@@ -11,6 +11,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -18,7 +19,7 @@ func journalSection(title string, content fyne.CanvasObject) fyne.CanvasObject {
 	heading := canvas.NewText(title, gold)
 	heading.TextSize = 14
 	heading.TextStyle.Bold = true
-	return container.NewVBox(container.NewPadded(heading), content)
+	return textVBox(container.NewPadded(heading), content)
 }
 
 func journalCard(content fyne.CanvasObject) fyne.CanvasObject {
@@ -88,11 +89,15 @@ func (ui *gui) showRoom(view lookView) {
 		if !known || ui.catalog.hasQuest(id) {
 			buttons = append(buttons, ui.commandButton(ui.tr("Quest", "依頼"), func() { ui.send("QUEST " + id) }))
 		}
-		if !known || ui.catalog.NPCs[id].Role == "enemy" {
-			buttons = append(buttons, ui.commandButton(ui.tr("Attack", "戦う"), func() { ui.send("ATTACK " + id) }))
-		}
 		actions := container.NewGridWithColumns(len(buttons), buttons...)
-		npcs = append(npcs, journalCard(container.NewVBox(journalName(ui.catalog.label("npc", id, ui.locale)), actions)))
+		content := textVBox(journalName(ui.catalog.label("npc", id, ui.locale)), actions)
+		if !known || ui.catalog.NPCs[id].Role == "enemy" {
+			content.Add(container.NewGridWithColumns(2,
+				ui.commandButton(ui.tr("Attack", "戦う"), func() { ui.send("ATTACK " + id) }),
+				ui.commandButton(ui.tr("Flee", "逃げる"), func() { ui.send("FLEE") }),
+			))
+		}
+		npcs = append(npcs, journalCard(content))
 	}
 	for _, id := range view.Items {
 		items = append(items, ui.itemRow(id, "TAKE", ui.tr("Take", "取る")))
@@ -152,7 +157,7 @@ func (ui *gui) showQuests(quests []questView) {
 	for _, quest := range quests {
 		name := journalName(ui.catalog.label("quest", quest.QuestID, ui.locale))
 		status := widget.NewLabel(ui.statusWord(quest.Status) + "  ·  " + quest.Progress)
-		content := container.NewVBox(name, status)
+		content := textVBox(name, status)
 		if ui.catalog != nil {
 			if description := ui.catalog.Quests[quest.QuestID].Description.get(ui.locale); description != "" {
 				label := widget.NewLabel(description)
@@ -202,9 +207,13 @@ func (ui *gui) showItemPhotos(ids []string) {
 	ui.itemPhotoScroll.ScrollToOffset(fyne.Position{})
 }
 
-func (ui *gui) scrollItemPhotos(delta float32) {
+func (ui *gui) scrollItemPhotos(direction float32) {
+	if len(ui.itemPhotoBox.Objects) == 0 {
+		return
+	}
+	step := ui.itemPhotoBox.Objects[0].MinSize().Width + theme.Padding()
 	offset := ui.itemPhotoScroll.Offset
-	offset.X = max(0, offset.X+delta)
+	offset.X = max(0, offset.X+direction*step)
 	ui.itemPhotoScroll.ScrollToOffset(offset)
 }
 
