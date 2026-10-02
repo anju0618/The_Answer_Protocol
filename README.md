@@ -278,7 +278,25 @@ The automated tests cover the connection lifecycle and persistence, the success 
 
 # 日本語版
 
-## 動かし方
+英語セクションと同じ内容の日本語訳(課題が求める各項目の見出しは、括弧内の英語名と対応している)。冒頭の「This project has been created as part of the 42 curriculum by amakino, takawaka.」の行はページ先頭にある。
+
+## 概要(Description)
+
+**The Answer Protocol(TAP)** は、複数人で遊ぶテキストアドベンチャー(MUD)。TCPサーバー1つ(`cmd/server`)、CLIクライアント(`cmd/cli`)、GUIクライアント(`cmd/gui`、Fyne)があり、すべてGoで書いた。サーバーとクライアントはRFC 42TAP(`protocol-rfc.html`)に従うので、他のチームの実装とも通信できる。
+
+世界は3つのギリシア神話(アルゴ船の航海・イーリアス・オデュッセイア)で、1つの神話が1つの「編」になっていて、ハブの「運命の間」でつながっている。RFCは戦闘の中身を決めていないので、一つの考えを載せた。**神話に逆らうと殺される。** 研いだオリーブの杭なしでポリュペモスを攻撃すると、戦いにならず即死する。
+
+## 使い方(Instructions)
+
+Go 1.25以降が必要。リポジトリのルートで実行すること(サーバーは`data/world.json`を読み、`saves/`に書き込む)。GUIはLinuxではCコンパイラとOpenGL/X11の開発パッケージも必要(Fyneの要件)。全コマンドは[ビルドと実行](#ビルドと実行building-and-running)にある。
+
+```sh
+make run-server        # ターミナル1: サーバー(:4242)
+make run-client        # ターミナル2: CLIクライアント
+make run-client-gui    # またはGUIクライアント
+```
+
+直接実行する場合:
 
 ```sh
 # サーバー起動(ポート4242で待ち受け、Ctrl-Cで終了)
@@ -295,7 +313,7 @@ go run ./cmd/gui               # または make run-client-gui
 make build                     # bin/ にサーバー・CLI・GUIが出来る
 ```
 
-CLIは「生プロトコルをそのまま中継する」方針(打った行がそのままサーバーに送られ、サーバーの応答行がそのまま表示される)。最初のコマンドは必ず`CONNECT <name>`。日本語版で遊びたい場合は、`CONNECT`より前に`LANG ja`を送る。
+**CLIの方針.** CLIは「生プロトコルをそのまま中継する」方式(課題の方式1)。打った行がそのままサーバーに送られ、サーバーの応答行がそのまま表示されるので、通信の中身がそのまま見える。最初のコマンドは必ず`CONNECT <name>`。日本語版で遊びたい場合は、`CONNECT`より前に`LANG ja`を送る。
 
 ```
 $ go run ./cmd/cli
@@ -309,9 +327,9 @@ LOOK
 OK {"room":{...,"name":"運命の間",...}, ...}
 ```
 
-## コマンド一覧
+### コマンド一覧
 
-RFC 15コマンド + 独自拡張3つ(`FLEE`・`DEFEND`・`LANG`、下表に明記)。正式な仕様は`protocol-rfc.html` 5章、英語セクションの[Instructions](#instructions)も参照。
+RFCの15コマンド + 独自拡張3つ(`FLEE`・`DEFEND`・`LANG`、下表に明記)。正式な仕様は`protocol-rfc.html` 5章。
 
 | コマンド | 構文 | 内容 |
 |---|---|---|
@@ -334,36 +352,85 @@ RFC 15コマンド + 独自拡張3つ(`FLEE`・`DEFEND`・`LANG`、下表に明�
 | `GROUP` | `GROUP CREATE` / `GROUP INVITE <name>` / `GROUP JOIN <leader>` / `GROUP LEAVE` | `CHAT GROUP`用のグループ管理。 |
 | `QUIT` | `QUIT` | 正常に切断する。 |
 
-## テストの実行
+## 参考資料(Resources)
 
-```sh
-make lint             # gofmtとgo vet(何も出なければOK)
-make test             # go test ./...
-go test -race ./cmd/server/...
-```
+- RFC 42TAP(`protocol-rfc.html`)、[RFC 2119](https://www.rfc-editor.org/rfc/rfc2119)、[RFC 5234(ABNF)](https://www.rfc-editor.org/rfc/rfc5234)、[RFC 793(TCP)](https://www.rfc-editor.org/rfc/rfc793)、[RFC 3629(UTF-8)](https://www.rfc-editor.org/rfc/rfc3629)
+- Go: [Effective Go](https://go.dev/doc/effective_go)、[`net`](https://pkg.go.dev/net)、[`sync`](https://pkg.go.dev/sync)、[`log/slog`](https://pkg.go.dev/log/slog)、[`testing`](https://pkg.go.dev/testing)
+- GUIツールキット: [Fyne](https://docs.fyne.io/)。図: [Mermaid](https://mermaid.js.org/)。背景知識: [MUD(Wikipedia)](https://en.wikipedia.org/wiki/MUD)
+- **AIの使い方.** Claude Code(Anthropic)を使った。用途は、課題とRFCを読む、設計を相談する、ゲームシステム(戦闘・クエスト・ハザード・エンディング・ログ・多言語対応)のGoコードとテストを書いてレビューする、`data/world.json`の英日ストーリー文を書く、ドキュメント(このREADMEと`memo/CODE_WALKTHROUGH.md`)を書く、など。GUIのイラスト(部屋・NPC・アイテム・倒された敵)はtakawakaがCodexで生成した。コミットする前に全員で内容を確認し、ビルドとテストを通した。各自が、提出したコードを説明できる。
 
-特定のテストだけ実行したいとき:
-```sh
-go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
-```
+## アーキテクチャ(Architecture)
 
-複数人での動作・戦闘・クエストを手で確かめる手順は、英語セクションの[Testing](#testing)にある(CLIを2つ起動して、チャット・グループ・移動イベント・`QUEST Tiphys`→`ATTACK King Amycus`でのクエスト達成と最大HP上昇・切断時の後始末を確認する)。
+- **ディスパッチャー.** `server.go`にコマンド名からハンドラーへの表がある。`main.go`が`:4242`で待ち受け、接続ごとに1つのgoroutineが`bufio.Scanner`で行を読み、コマンドを1つずつ実行する。
+- **並行モデル.** ゲーム状態はすべて単一の`sync.Mutex`(`Server.mu`)で守る。イベントループにしなかったのは、正しさを保つのがずっと簡単だから。人数が非常に多いと伸びないが、この課題では問題ない。ディスクへの書き込みは別のmutexで順番に行う。
+- **ノンブロッキングのブロードキャスト.** 接続ごとに送信キューがあり、専用の`writeLoop`が送り出す。そのため、ロックを持ったままソケットに書き込むことはなく、遅い・死んだクライアントが他の人を止めることもない。切断時は、先にプレイヤーの状態を消してから、退出イベントを送る。
+- **データ.** ワールド(部屋・アイテム・NPC・クエスト・ヒント)は`data/world.json`にあり、起動時に検証する(出口や参照先がすべて存在すること)。プレイヤーの状態はJSONで`saves/`に保存する(課題では必須ではない)。
+- **ファイル**(`cmd/server`): `combat.go`、`quest.go`、`hazard.go`、`odyssey.go`、`endings.go`、`hardcore.go`、`item_effects.go`、`defeat.go`、`notify.go`、`flavor.go`、`locale.go`、`chat.go`、`group.go`、`world.go`、`room.go`、`player.go`、`item_store.go`、`player_store.go`、`logging.go`。全ファイルの解説は`memo/CODE_WALKTHROUGH.md`。
 
-## 各システムの概要
+## プロトコルの実装(Protocol Implementation)
 
-英語セクションの各見出し([Architecture](#architecture)、[Protocol Implementation](#protocol-implementation)、[Combat System](#combat-system)、[Quest System](#quest-system)、[World Design](#world-design)、[Server Logging](#server-logging))に詳しく書いてあるので、ここでは要点だけ:
+RFCの15コマンドとRFCのイベント(`EVT ROOM/GLOBAL/GROUP ...`、`EVT STATS players=<n>`)をすべて、RFCの応答・エラー形式で実装した。入力は、UTF-8として正しいか・制御文字がないか・1行1024バイト以内かを検査する。TCPでの分割・結合は、行をバッファに溜めて処理する。
 
-- **並行モデル**: 接続ごとに1 goroutine + サーバー状態全体を単一の`sync.Mutex`で保護、という単純な方式。実装の正しさを優先した。コード全体の解説は`memo/CODE_WALKTHROUGH.md`。
-- **戦闘**: ATTACKは基本8〜14ダメージ・反撃7〜14ダメージのランダム。一部の敵は「正しいアイテム/達成済みクエスト」を持っていないとATTACKで即死する「神話ゲート」付き。HP0で運命の間にHP20でリスポーン。**生きている敵がいる部屋はMOVEで出ようとすると即死**(倒すかFLEEで振り切るまで封鎖)。**DEFEND**で身構えると次の反撃が半分になる(1回限り)。死んだあとモイライに`TALK`すると、死因について神話にちなんだ控えめなヒントを1回だけくれる(`EVT PLAYER HINT`)。**祝福**: 各編をクリア(エンディング)すると、その編の神の祝福が永続で手に入る(死んでも消えない)。アテナ(オデュッセイア編)=敵の反撃-20%、ヘラ(アルゴ船編)=HP回復2倍、アポロン(トロイア編)=与ダメージ+3。
-- **敵以外への攻撃**: 一般人にもATTACKできる。反撃はしないが、HPを0にした瞬間に自分が死ぬ(ゲームオーバー扱い)。メデイア・キルケー・アテナ・モイライなど強いキャラ(`mighty`)は、攻撃すると一撃で殺される。
-- **倒した敵の表示と人物のセリフ**: 倒した敵はGUIで倒れた絵に変わる(`LOOK`の`defeated`)。その部屋の敵を全部倒すと、そこにいる人物が別のセリフを話す(`dialogue_cleared`)。死ぬと敵は元に戻る。
-- **クエスト**: `QUEST <npc>`で受注、TAKE/ATTACKの成否をサーバー側が自動で判定して進行・達成・報酬付与まで行う(完了報告コマンドは無し)。報酬は**最大HPの上昇**(報酬値の1/5、最低1)で、HPも全回復する。上がった最大HPは死んでも失わない。
-- **アイテムの効果**: 全アイテムに、持っている間だけ効く効果がある(与ダメージ・被ダメージ・回復速度・最大HP)。良い効果も悪い効果もある。祝福とは別の仕組みで、GUIの持ち物に緑(良)・赤(悪)で表示され、ⓘボタンで解説も読める。
-- **ワールド**: 47部屋・アイテム21種(取得できるもの17種+記念品4種)・NPC 44・クエスト16種。ハブ(運命の間)からは西のアルゴナウタイ編(12部屋)・北のトロイア編(11部屋)・東のオデュッセイア編(22部屋)の3編に行ける。オデュッセイア編は単独で輪になっていて(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)、冥界と求婚者たちの広間はそこから分かれる行き止まりの枝なので、「ループ+分岐、一直線不可」の要件を満たす。さらに、史実に反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入るゲームオーバー部屋が6つある。3編をクリアして最終エンディングを見ると、運命の間の南に隠し部屋「織られざる機」が開く。
-- **アイテムの扱い**: アイテム21種のうち、**一点物が4つ**(レムノスの織り布のマント・竜の歯・ロトスの実・薄めていない葡萄酒)。世界に1つしか無く、`TAKE` すると部屋から消えるので、他の人は取れない。`DROP` すると部屋に戻り、他の人が取れる。誰が持っているか・どこにあるかは保存され、サーバーを再起動しても残る。持ち主が死んでも失われず、**最初に置いてあった部屋に戻る**。一方、クエスト・関門・エンディングに必要な13種は`renewable`で、拾うと**自分用の複製**が手に入り、元は部屋に残る。1人が持ち去って、他の全員が先へ進めなくなるのを防ぐための意図的な設計(課題の「複製しない」から外れるのは、物語に必須のアイテムだけ)。アイテムはIDでも表示名でも指定でき、複数語の名前も使える。
-- **多言語対応**: `LANG ja`をCONNECT前に送るとLOOK/TALK/QUESTのテキストが日本語になる。RFC規定のコマンド名・基本のJSON構造は変更していない(独自の拡張と変更点は英語セクションの[Protocol Implementation](#protocol-implementation)の表にまとめた)。
+**拡張**(追加のみ。RFCだけに対応したクライアントは無視してよい):
 
-### ワールドの地図
+- `FLEE`、`DEFEND`(RFC 6.1.1に例として載っている名前)と`LANG <en|ja>`(`CONNECT`より前だけ。それ以外は`ERR 400`)。戦闘中でないときの`FLEE`/`DEFEND`は`ERR 407 NOT_IN_COMBAT`。
+- `EVT ROOM COMBAT <text>`(戦闘の実況)と`EVT PLAYER <kind> <text>`(本人だけへの通知。`kind`は`DEATH`・`ENDING`・`TEAM`・`GUIDE`・`HINT`・`QUEST`)。
+
+**RFC・課題との違いと、その理由**(すべて書いて理由を示す):
+
+| 場所 | RFC・課題の記述 | 実装 | 理由 |
+| --- | --- | --- | --- |
+| `ATTACK` | 「敵NPC」が対象。敵でないNPCには`405` | どのNPCも攻撃できる。一般人は反撃できないが、殺すと自分が死ぬ(`status: "murder"`)。神や魔女は一撃で自分を殺す(`"smitten"`)。`405`は、倒し終わった敵に対してだけ。ほかの`status`は`combat`・`victory`・`dead`・`overwhelmed`・`wounded` | 「神話に逆らうと殺される」という考えに合う |
+| `LOOK` | 項目は固定 | `defeated`配列(倒したNPC)を追加(空のときは省略)。ゲームをクリアすると`exits`に隠し出口が入る | クライアントが倒れた敵を描くため |
+| `QUEST` | `"reward"`は文字列(`"gold_coin"`) | `"reward"`は整数(最大HPの上昇量) | 報酬が最大HPだから |
+| `STATUS` | 例では`max_hp`が100 | `max_hp`は100から始まり、クエストと所持アイテムで増える | クエスト報酬の仕組み |
+| `WHO`、`TALK` | 課題V.5の例はJSONの本文 | RFCの本文に従い、`OK players=<n>`と`OK <dialogue>` | RFCが正式なプロトコルだから |
+
+## 戦闘システム(Combat System)
+
+- **数値.** HPは100で始まり、2秒ごとに1回復する。HPが0になると、運命の間にHP20でリスポーンする。最大HPはクエストで増え、死んでも失わない。
+- **ターンと先攻.** `ATTACK`1回が1ラウンドで、常にプレイヤーが先に動く。自分の攻撃が当たったあと、生き残った敵が同じラウンドで反撃する。`DEFEND`と`FLEE`もラウンドの行動。
+- **ダメージ.** 自分の攻撃 = 8〜14のランダム + 部屋にいる味方1人につき5(最大3人まで) + 祝福・アイテムの補正(最低1)。反撃 = 7〜14のランダムから、味方1人につき20%、祝福、所持アイテム、`DEFEND`(50%、1回限り)で減らす。減らせる合計は80%まで、悪いアイテムで増える分は最大50%、反撃は1未満にならない。
+- **神話ゲート.** 一部の敵は、アイテムか達成済みクエストが必要(データ上の`myth_requirement_*`)。持っていないと`ATTACK`は即死になる(ポリュペモスはオリーブの杭、タロスはメデイアの助け、求婚者たちはオデュッセウスの弓が必要)。
+- **FLEE.** 逃げることが神話に合うかどうかは敵ごとに決めてある。ポリュペモスとライストリュゴネスはいつでも逃げられる。たいていの敵は失敗して反撃される。ヘクトルからは一度だけ逃げられる。ライストリュゴネスは倒せない(`ATTACK`すると仲間を失うだけ)ので、詰みにはならない。
+- **生きている敵は部屋を塞ぐ.** 倒していない・逃げ切っていない敵がいる部屋から出ようとすると即死する。敵のHPはプレイヤーごとで、死ぬと倒した敵も元に戻る。
+- **敵以外への攻撃.** 一般人にもATTACKできる。反撃はしないが、HPを0にした瞬間に自分が死ぬ(ゲームオーバー扱い)。メデイア・キルケー・アテナ・モイライなど強いキャラ(`mighty`)は、攻撃すると一撃で殺される。どちらも「神話に逆らってはいけない」という設計の表れ。
+- **倒した敵の表示と人物のセリフ.** 倒した敵はGUIで倒れた絵に変わる(`LOOK`の`defeated`)。その部屋の敵を全部倒すと、そこにいる人物が別のセリフを話す(`dialogue_cleared`)。
+- **死亡ペナルティ.** 死ぬと、記念品以外の持ち物を失う(詳しくは[ワールド設計](#ワールド設計world-design)の「持ち主が死んだとき」)。同じ部屋にパーティの仲間がいれば何も失わない。死んだあとモイライに`TALK`すると、死因について神話にちなんだ控えめなヒントを1回だけくれる(`EVT PLAYER HINT`)。
+- **アイテムと祝福.** 全アイテムに、持っている間だけ効く効果がある(与ダメージ・被ダメージ・回復速度・最大HP。良い効果も悪い効果もある)。祝福とは別の仕組みで、GUIの持ち物に緑(良)・赤(悪)で表示され、ⓘボタンで解説も読める。各編をクリア(エンディング)すると、その編の神の祝福が永続で手に入る(死んでも消えない)。アテナ(オデュッセイア編)=敵の反撃-20%、ヘラ(アルゴ船編)=HP回復2倍、アポロン(トロイア編)=与ダメージ+3。
+- **ログと通知.** 戦闘の結果はすべてログに残り、`EVT ROOM COMBAT`で部屋にいる全員へ送られる。
+
+## クエストシステム(Quest System)
+
+- `QUEST <npc>`でそのNPCのクエストを受注する。目標は`collect_item`か`defeat_npc`で、進行は**自動**(完了報告コマンドは無い)。TAKE/ATTACKの成否をサーバー側が判定して、進行・達成・報酬付与まで行う。受注前に済ませた分も数える。`QUESTS`は受注済みの全クエストを`"progress": "<現在>/<目標>"`付きで一覧する。
+- **報酬.** クエストを達成すると、最大HPが報酬値の1/5(最低1)だけ上がり、HPも全回復する。上がった最大HPは死んでも失わない。
+- クエストを持つ人物は、その部屋に入ったとき・`TALK`したときに`EVT PLAYER QUEST`で名乗る(`LOOK`はNPCのIDしか出さないため)。部屋の敵を全部倒すと、そこの人物が新しいセリフを話す。
+- 罠のクエストもある。ヘリオスの牛のクエストは、頼まれたとおりにすると死ぬ。
+- **エンディング.** 各編には最後の人物(ペリアス・アイネイアス・ペネロペイア)がいて、アイテムとクエストを確認し、エンディングを見せ、記念品をくれる。3編すべてのあと、モイライが真のエンディングを見せ、運命の間の南に隠し部屋が開く。
+
+## ワールド設計(World Design)
+
+- **構成.** ハブ(運命の間)から、西にアルゴナウタイ編(12部屋)、北にトロイア編(11部屋)、東にオデュッセイア編(22部屋)へ行ける。どの編もハブに戻れるので、地図は輪でできている。オデュッセイア編は単独で輪になっていて(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)、冥界と求婚者たちの広間はそこから分かれる行き止まりの枝。「ループ+分岐、一直線不可」の要件を満たす。真のエンディングのあと、隠し出口から「織られざる機」へ行ける。全47部屋。
+- **NPC.** 44人で、役割は3つ: `dialogue`が16、`quest_giver`が16、`enemy`が12。運命の間のモイライは、最初の接続時にチュートリアルをする。
+- **ゲームオーバー部屋.** 史実に反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入る部屋が6つある。
+- **ハザード**は部屋に入ったときに発動する: `lethal`(必ず死ぬ)、`item_gate`(アイテムが無いと死ぬ)、`crew_gate`、`crew_cost`。オデュッセイア編の6か所では、神話に反する出口がゲームオーバー部屋につながる。
+- **アイテム.** アイテム21種は「一点物」「複製できる」「記念品」の3種類に分かれる。アイテムはIDでも表示名でも指定でき、複数語の名前も使える。
+  - **一点物(4つ)**: 世界に1つしか無い。
+    - 対象: レムノスの織り布のマント(レムノス島)・竜の歯(青銅の雄牛の野)・蜜のようなロトスの実(ロトパゴイの地)・薄めていない葡萄酒(ポリュペモスの洞窟)。
+    - `TAKE` すると部屋から消えるので、他の人は取れない。`DROP` するとその時いる部屋に置かれ、他の人が取れる。
+    - 誰が持っているか・どの部屋にあるかはディスクに保存され、サーバーを再起動しても変わらない。
+  - **持ち主が死んだとき**:
+    - 失う範囲: 記念品を除いた持ち物(一点物も複製できるアイテムも)がすべて手元から消える。残るのは記念品だけ。
+    - 一点物の戻り先: 最初に置いてあった部屋。`DROP` した部屋や死んだ場所ではない。例えば葡萄酒は、どこで死んでもポリュペモスの洞窟に戻る。戻った一点物は、また誰でも `TAKE` できる。
+    - 複製できるアイテム: 元は部屋に残っているので、持ち主の手元から消えるだけ(取り直せる)。
+    - 保存: 戻した場所と持ち物の変更はディスクに保存される。保存に失敗したときは、持ち物を失わせない。
+    - 例外: 同じ部屋に同じパーティの仲間がいると、仲間が持ち物を守ってくれて何も失わない(一点物もそのまま手元に残る)。ソロの場合や、仲間が別の部屋にいる場合は守られない。
+    - 死んだとき届く `EVT PLAYER DEATH` のメッセージの末尾に、結果が付く。失ったときは「記念品を除いて、持ち物はすべて失われた。必要なものは取り直そう。」、守られたときは「仲間が持ち物を守ってくれたので、何も失わずに済んだ。」。
+  - **複製できるアイテム(13種)**: クエスト・関門・エンディングに必要なもの(`renewable`)。拾うと**自分用の複製**が手に入り、元は部屋に残る。1人が持ち去って、他の全員が先へ進めなくなるのを防ぐための意図的な設計(課題の「複製しない」から外れるのは、物語に必須のアイテムだけ)。
+  - **記念品(4種)**: エンディングの報酬でしか手に入らない(`reward_only`)。死んでも失わない。
+- **多言語対応.** `LANG ja`をCONNECT前に送るとLOOK/TALK/QUESTのテキストが日本語になる。RFC規定のコマンド名・基本のJSON構造は変更していない(独自の拡張と変更点は[プロトコルの実装](#プロトコルの実装protocol-implementation)の表にまとめた)。
+
+### 部屋の地図
 
 全47部屋とその出口を `data/world.json` から生成した図。アルゴナウタイ編・トロイア編・オデュッセイア編のどれも、ハブとの間を往復できる道でつながっている。矢印の文字は、上の部屋から下の部屋へ進むときの方角(戻るときは逆方向)。`<-->` は往復できる道、`-->` は一方通行(クレタ→イオルコス、城壁の下の野→ギリシア軍の陣営、イタケの岸辺→運命の間、トロイア炎上→運命の間)、点線は最終エンディングのあとに開く道。緑がハブ、橙は仲間を失う/適切なアイテムが無いと死ぬ危険のある部屋、赤は入ると必ず死ぬ部屋。
 
@@ -480,7 +547,60 @@ flowchart TB
   class ody_charybdis,ody_ismarus_feast,ody_lotus_garden,ody_sealed_cave,ody_laestrygonian_depths,ody_pigsty,ody_eternal_ogygia lethal
 ```
 
-## チーム分担
+## サーバーログ(Server Logging)
+
+すべてのログは`log/slog`による**構造化JSON(1行に1オブジェクト)**で、時刻(精度の高いもの)とレベル(INFO・WARN・ERROR)が付く(`cmd/server/logging.go`)。出力先はstderr。`TAP_LOG_FILE=パス`を指定するとファイルにも書く。`TAP_LOG_LEVEL=debug|info|warn|error`で絞り込める。
+
+| 課題の要件 | イベント(`msg`) | レベル | 主なフィールド |
+| --- | --- | --- | --- |
+| 接続・切断とIP | `connection_open`、`connection_close`、`player_quit` | INFO | `remote`(`ip:port`)、`player`、`duration_ms` |
+| すべてのコマンド | `command` | INFO | `remote`、`player`、`command`、`args` |
+| すべての応答とエラーコード | `response`、`error_response` | INFO / WARN | `line`、`code`。バイトを書き込む場所(`writeLoop`)で記録するので漏れない |
+| ワールド状態の変化 | `item_taken`、`item_dropped`、`player_moved`、`npc_interaction`、`combat_attack`、`combat_flee`、`player_died` | INFO | `player`、`item` / `npc` / `room`、`damage`、HP、死因`cause` |
+| クエスト | `quest_accepted`、`quest_progress`、`quest_completed`、`ending_reached` | INFO | `quest`、`progress`、`target`、`max_hp_gain` |
+| 不正利用のパターン | `abuse_command_flood`、`abuse_rapid_connections` | WARN | 下記 |
+| 失敗 | `save_player_failed`、`encode_response_failed`など | ERROR | `error` |
+
+**監視のしかた.** ログをファイルに書き、絞り込んで見る。例: `TAP_LOG_FILE=server.log make run-server`で起動し、`grep '"level":"WARN"' server.log`。不正利用は記録するだけで、罰は与えない。1秒に20コマンドを超えると`abuse_command_flood`、同じIPから10秒に8接続を超えると`abuse_rapid_connections`が出る。ログは1イベント1行で、単一のロガーを通して書くので、ゲームの処理を遅くしない。
+
+## チーム分担(Group Contributions)
 
 - **takawaka**: プロジェクトの土台、サーバーの中核(TCP受付・行単位ディスパッチ、CONNECT/LOOK/MOVE)、非同期送信キュー、CHATとGROUP、アイテム・プレイヤーの永続化、サーバーのテスト、**CLIクライアント**、**GUIクライアント**の土台(通信・状態モデル、日本語フォント、描画、マウス操作、レスポンシブなレイアウト)、**イラスト**(部屋・NPC・アイテム・ゲームオーバー部屋・倒された敵)、GUIとサーバーの不具合修正
 - **amakino**: 課題とRFCの分析、**ワールド・ストーリー設計**(3編・英日2言語・`data/world.json`)、**ゲームシステム**(戦闘ATTACK/FLEE/DEFEND、クエスト、ハザード、クルー、神話ゲート、エンディングと祝福、死亡ペナルティと協力、ヒント、`LANG`による多言語対応、アイテム効果、隠し部屋)、**構造化ログ**、**Makefile**、GUIの機能(HPバー・色分けログ・戦闘パネル・ミニマップ・演出・エンディング図鑑・アイテム解説)、結合テスト、READMEと`memo/`
+
+## ビルドと実行(Building and Running)
+
+`Makefile`ですべてをまとめている(`make help`でターゲット一覧)。リポジトリのルートで実行する。
+
+| ターゲット | 内容 |
+| --- | --- |
+| `make install` | Goモジュールの依存をダウンロード |
+| `make build` | サーバー・CLI・GUIを`bin/`にコンパイル |
+| `make run-server` | サーバーを`:4242`で起動 |
+| `make run-client` | CLIクライアントを起動(別のサーバーなら`make run-client ADDR=host:port`) |
+| `make run-client-gui` | GUIクライアントを起動 |
+| `make lint` | `gofmt`が必要なファイルがあれば失敗、そのあと`go vet ./...` |
+| `make test` | 自動テストをすべて実行 |
+| `make clean` | `bin/`を削除(`saves/`は残す) |
+
+`make`なしの場合: `go run ./cmd/server`、`go run ./cmd/cli 127.0.0.1:4242`、`go run ./cmd/gui`、`go vet ./... && gofmt -l .`。
+
+## テスト(Testing)
+
+```sh
+make lint                       # gofmtとgo vet(何も出なければOK)
+make test                       # go test ./...(サーバー・CLI・GUI)
+go test -race ./cmd/server/...  # データ競合検出つき
+go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v   # 特定のテストだけ
+```
+
+自動テストがカバーするもの: 接続のライフサイクルと永続化、全コマンドの成功・エラー経路、TCPの分割、複数クライアントの同時接続、ワールドの検証、そして実際の`data/world.json`に対するすべての神話ゲートとハザード(英語・日本語)。
+
+**手動テスト(マルチプレイ・戦闘・クエスト)**(サーバー1つ、`make run-client`のターミナル2つ):
+
+1. ターミナルAで`CONNECT alice`、ターミナルBで`CONNECT bob`。両方に`EVT STATS players=2`が届く。`CHAT GLOBAL hello`が両方に届き、`WHO`は`OK players=2`を返す。
+2. alice: `GROUP CREATE`、`GROUP INVITE bob`。bob: `GROUP JOIN alice`。`CHAT GROUP hi`で、両方に`EVT GROUP ...`が届く。
+3. alice: `MOVE west`。bobに`EVT ROOM PRESENCE LEAVE alice`が届く。イオルコスの港で、aliceにクエストの知らせが出る。
+4. **クエストと戦闘.** alice: `QUEST Tiphys`、`MOVE south`、`ATTACK King Amycus`を`"status":"victory"`になるまで繰り返す(自分の攻撃は8〜14、反撃は7〜14。`STATUS`でHPを見られる)。クエストは自動で達成され、`STATUS`が`"max_hp":103`になる。`QUESTS`では`completed`になり、さらに`ATTACK King Amycus`すると`ERR 405 NPC_NOT_HOSTILE`が返る。
+5. bobのターミナルを閉じる(Ctrl-C)。aliceに`EVT GROUP LEAVE bob`と`EVT STATS players=1`が届く。サーバーは、退出イベントを送る前にプレイヤーの状態を保存して消す。
+6. 境界ケース: `FROB`は`ERR 400 BAD_REQUEST`、`MOVE up`は`ERR 301 NO_EXIT`、いないNPCへの`ATTACK`は`ERR 404 NPC_NOT_FOUND`。
