@@ -7257,9 +7257,9 @@ func (ui *gui) showRoom(view lookView) {
 		ui.visited[view.Room.ID] = true
 	}
 	defer ui.refreshMap()
-	if ui.scene.Image == nil || previous.Room.ID != view.Room.ID || !slices.Equal(previous.NPCs, view.NPCs) {
+	if ui.scene.Image == nil || previous.Room.ID != view.Room.ID || !slices.Equal(previous.NPCs, view.NPCs) || !slices.Equal(previous.Defeated, view.Defeated) {
 		ui.scene.Resource = nil
-		ui.scene.Image = composeScene(view.Room.ID, view.NPCs)
+		ui.scene.Image = composeScene(view.Room.ID, view.NPCs, view.Defeated)
 		ui.scene.Refresh()
 	}
 	if previous.Room.ID != view.Room.ID || !slices.Equal(previous.Items, view.Items) {
@@ -7322,7 +7322,7 @@ func (ui *gui) showRoom(view lookView) {
 
 一覧の差し替えが終わったら、「まわり」全体のスクロール領域もRefreshします。子の一覧だけを更新すると、既に表示している親に古い高さが残り、接続直後の項目が重なることがありました。親まで更新することで、タブ切替やサイズ変更をしなくても初回のLOOKから正しい高さになります。
 
-- 部屋IDが変われば古い選択画面を閉じます。部屋またはNPCが変わったときに背景を作り直し、道具が変わったときにアイテムの絵を更新します。移動先・NPC・道具・プレイヤーを操作ボタン付きで表示します。カタログで分かるNPCには対応する依頼・戦闘だけを表示し、未知のNPCでは各操作を残します。同じLOOKなら一覧やスクロール位置を保ちます。
+- 部屋IDが変われば古い選択画面を閉じます。部屋・NPC・倒されたNPCの一覧が変わったときに背景を作り直し、道具が変わったときにアイテムの絵を更新します。倒された敵の専用画像は`assets/npcs_defeated/<NPC ID>.png`から読み込みます。同じ部屋で敵を倒した直後にも表示が切り替わります。移動先・NPC・道具・プレイヤーを操作ボタン付きで表示します。カタログで分かるNPCには対応する依頼・戦闘だけを表示し、未知のNPCでは各操作を残します。同じLOOKなら一覧やスクロール位置を保ちます。
 
 ### `hasQuest`
 
