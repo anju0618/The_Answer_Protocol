@@ -335,7 +335,9 @@ func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 		Players []string `json:"players"`
 		Items   []string `json:"items"`
 		NPCs    []string `json:"npcs"`
-	}{room, players, items, npcs})
+		// Defeated lists the NPCs here this player has beaten; it is left out when there are none.
+		Defeated []string `json:"defeated,omitempty"`
+	}{room, players, items, npcs, s.defeatedNPCsLocked(player, roomID)})
 	if err != nil {
 		s.mu.Unlock()
 		logger.Error("encode_response_failed", "command", "LOOK", "error", err.Error())
@@ -715,8 +717,8 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 
 	dialogue := ""
-	if len(npc.Dialogue) > 0 {
-		dialogue = npc.Dialogue[0].Get(locale)
+	if lines := s.dialogueFor(player, npcID, npc); len(lines) > 0 {
+		dialogue = lines[0].Get(locale)
 	}
 	if dialogue == "" || strings.TrimSpace(dialogue) == "" || !utf8.ValidString(dialogue) ||
 		strings.IndexFunc(dialogue, unicode.IsControl) >= 0 || len("OK ")+len(dialogue) > maxProtocolLineBytes {

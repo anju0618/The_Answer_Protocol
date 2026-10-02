@@ -26,6 +26,7 @@ type NPC struct {
 	RoomID               string          `json:"room_id"`
 	HP                   int             `json:"hp"`
 	Dialogue             []LocalizedText `json:"dialogue"`
+	DialogueCleared      []LocalizedText `json:"dialogue_cleared,omitempty"` // said instead once the room's enemies are beaten
 	MythRequirementItem  string          `json:"myth_requirement_item,omitempty"`
 	MythRequirementQuest string          `json:"myth_requirement_quest,omitempty"`
 	FleeAccurate         bool            `json:"flee_accurate,omitempty"`

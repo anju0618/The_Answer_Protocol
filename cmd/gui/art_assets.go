@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"image/draw"
 	"image/png"
+	"slices"
 	"strings"
 
 	xdraw "golang.org/x/image/draw"
@@ -19,7 +20,7 @@ const (
 	spriteHeight = 312
 )
 
-//go:embed assets/rooms/*.png assets/npcs/*.png
+//go:embed assets/rooms/*.png assets/npcs/*.png assets/npcs_defeated
 var artAssets embed.FS
 
 func loadArt(kind, id string) image.Image {
@@ -40,7 +41,33 @@ func loadArt(kind, id string) image.Image {
 	return img
 }
 
-func composeScene(roomID string, npcs []string) *image.RGBA {
+// defeatedSprite is how a beaten enemy looks: hand-drawn art from assets/npcs_defeated if there is any,
+// otherwise the standing sprite darkened and knocked onto its back.
+func defeatedSprite(id string) image.Image {
+	if data, err := artAssets.ReadFile("assets/npcs_defeated/" + id + ".png"); err == nil {
+		if img, err := png.Decode(bytes.NewReader(data)); err == nil {
+			return img
+		}
+	}
+	standing := loadArt("npcs", id)
+	if standing == nil {
+		return nil
+	}
+	bounds := standing.Bounds()
+	// Turn 90 degrees clockwise: the old top (the head) ends up on the right.
+	lying := image.NewNRGBA(image.Rect(0, 0, bounds.Dy(), bounds.Dx()))
+	for y := 0; y < bounds.Dy(); y++ {
+		for x := 0; x < bounds.Dx(); x++ {
+			c := color.NRGBAModel.Convert(standing.At(bounds.Min.X+x, bounds.Min.Y+y)).(color.NRGBA)
+			grey := uint8((int(c.R)*3 + int(c.G)*6 + int(c.B)) / 10 * 55 / 100)
+			lying.SetNRGBA(bounds.Dy()-1-y, x, color.NRGBA{R: grey + 12, G: grey, B: grey, A: c.A})
+		}
+	}
+	return lying
+}
+
+// composeScene paints the room and the NPCs in it; defeated NPCs are drawn lying down.
+func composeScene(roomID string, npcs, defeated []string) *image.RGBA {
 	background := image.NewRGBA(image.Rect(0, 0, artWidth, artHeight))
 	if room := loadArt("rooms", roomID); room != nil {
 		if room.Bounds().Dx() == artWidth && room.Bounds().Dy() == artHeight {
@@ -72,11 +99,22 @@ func composeScene(roomID string, npcs []string) *image.RGBA {
 		y := artHeight - height - 21
 		shadow := &image.Uniform{C: color.NRGBA{R: 6, G: 15, B: 32, A: 125}}
 		draw.Draw(background, image.Rect(x+21, artHeight-45, x+width-21, artHeight-30), shadow, image.Point{}, draw.Over)
-		sprite := loadArt("npcs", id)
+		dest := image.Rect(x, y, x+width, y+height)
+		var sprite image.Image
+		if slices.Contains(defeated, id) {
+			sprite = defeatedSprite(id)
+			if sprite != nil {
+				// A body lying down is wider than a person standing, and rests on the floor.
+				lyingWidth := width * 3 / 2
+				lyingHeight := lyingWidth * sprite.Bounds().Dy() / sprite.Bounds().Dx()
+				dest = image.Rect(x-(lyingWidth-width)/2, artHeight-lyingHeight-27, x+(lyingWidth+width)/2, artHeight-27)
+			}
+		} else {
+			sprite = loadArt("npcs", id)
+		}
 		if sprite == nil {
 			continue
 		}
-		dest := image.Rect(x, y, x+width, y+height)
 		if sprite.Bounds().Dx() == width && sprite.Bounds().Dy() == height {
 			draw.Draw(background, dest, sprite, sprite.Bounds().Min, draw.Over)
 		} else {

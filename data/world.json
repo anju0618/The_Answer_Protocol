@@ -1154,6 +1154,12 @@
           "en": "Drive off the Harpies that torment me, and I will tell you how to pass the Clashing Rocks.",
           "ja": "私を苦しめるハルピュイアを追い払ってくれれば、衝突する岩の通り方を教えよう。"
         }
+      ],
+      "dialogue_cleared": [
+        {
+          "en": "The Harpies are gone. For the first time in years, nothing is snatched from my table. As I promised: loose a dove at the Clashing Rocks, and row with all your strength the instant they part.",
+          "ja": "ハルピュイアは去った。何年ぶりだろう、食卓から何も奪われないのは。約束どおり教えよう――衝突する岩の前で鳩を放ち、岩が開いた瞬間に全力で漕ぐのだ。"
+        }
       ]
     },
     "npc.harpy": {
@@ -1250,6 +1256,12 @@
         {
           "en": "Take this draught — it will close the dragon's eyes. Know that in helping you, I betray my own father.",
           "ja": "この薬を持っていって――竜の目を閉じさせるものです。あなたを助けることで、私は自分の父を裏切るのだと知っておいてください。"
+        }
+      ],
+      "dialogue_cleared": [
+        {
+          "en": "The dragon sleeps at last. Stealing my father's treasure is a sin I will carry, and still I do not regret it. Take the Fleece to your ship, quickly, before dawn.",
+          "ja": "竜はようやく眠った。父の宝を奪うという罪は、私が背負いましょう。それでも後悔はしていません。さあ、羊毛皮を船へ――夜が明ける前に。"
         }
       ]
     },
@@ -1447,6 +1459,12 @@
           "en": "I watch my two husbands from these walls — the one I left, and the one who dies defending the roof that hides me.",
           "ja": "この城壁から、私の二人の夫を見つめている――一人は私が去った夫、もう一人は私を匿う屋根を守って死んでいく夫。"
         }
+      ],
+      "dialogue_cleared": [
+        {
+          "en": "Hector has fallen. In all those years he never once blamed me, and that is the hardest thing to bear.",
+          "ja": "ヘクトールは倒れた。あの方は何年たっても、一度も私を責めなかった……それがいちばん、つらい。"
+        }
       ]
     },
     "npc.priam": {
@@ -1611,6 +1629,12 @@
         {
           "en": "Blind the beast before he eats us all one by one — he has already crushed two of our friends against these stones!",
           "ja": "一人ずつ食われる前に、あの獣の目を潰してくれ――もう二人も、この岩に叩きつけられて死んだんだ!"
+        }
+      ],
+      "dialogue_cleared": [
+        {
+          "en": "The monster is down... we will not be eaten any more? Thank you, friend of Nobody. I will remember this cave for the rest of my life, and I will not miss it.",
+          "ja": "あの化け物が、倒れた……? もう誰も食われなくていいんだな。ありがとう、「誰でもない者」の仲間よ。この洞窟のことは一生忘れない。二度と戻りたくはないがね。"
         }
       ]
     },
@@ -1947,6 +1971,12 @@
         {
           "en": "Twenty years I have waited. Only one man alive could string that bow.",
           "ja": "二十年、私は待ち続けました。あの弓を張ることができたのは、ただ一人だけでした。"
+        }
+      ],
+      "dialogue_cleared": [
+        {
+          "en": "The hall is quiet. For the first time in twenty years, it is quiet. You bent that bow the way he did, and it frightens me how much I want to believe it.",
+          "ja": "広間が、静かです。二十年ぶりに、静か。あなたはあの人と同じ手つきで弓を引いた。それを信じたくてたまらない自分が、少し怖いのです。"
         }
       ],
       "ending": {

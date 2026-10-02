@@ -20,6 +20,8 @@ type lookView struct {
 	Players []string `json:"players"`
 	Items   []string `json:"items"`
 	NPCs    []string `json:"npcs"`
+	// Defeated is the NPCs in the room this player has beaten (drawn lying down).
+	Defeated []string `json:"defeated"`
 }
 
 type statusView struct {

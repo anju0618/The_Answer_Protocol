@@ -56,7 +56,7 @@ func (ui *gui) showRoom(view lookView) {
 	defer ui.refreshMap()
 	if ui.scene.Image == nil || previous.Room.ID != view.Room.ID || !slices.Equal(previous.NPCs, view.NPCs) {
 		ui.scene.Resource = nil
-		ui.scene.Image = composeScene(view.Room.ID, view.NPCs)
+		ui.scene.Image = composeScene(view.Room.ID, view.NPCs, view.Defeated)
 		ui.scene.Refresh()
 	}
 	if previous.Room.ID != view.Room.ID || !slices.Equal(previous.Items, view.Items) {
