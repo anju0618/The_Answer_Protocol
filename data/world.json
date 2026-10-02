@@ -15,6 +15,26 @@
         "west": "loc.argo_iolcus",
         "north": "loc.troy_ida",
         "east": "loc.ody_troy_shore"
+      },
+      "secret_exits": {
+        "south": {
+          "room": "loc.unwoven_loom",
+          "requires_endings": ["ending.final"]
+        }
+      }
+    },
+    "loc.unwoven_loom": {
+      "id": "loc.unwoven_loom",
+      "name": {
+        "en": "The Unwoven Loom",
+        "ja": "織られざる機"
+      },
+      "description": {
+        "en": "Behind the three tapestries stands a loom no one has ever used. The warp is strung, but the weft hangs loose, waiting. The Moirai say it was kept for the one who finished all three tales and still asked what came next.",
+        "ja": "三枚のタペストリーの裏に、誰も使ったことのない機(はた)がある。経糸は張られているが、緯糸は垂れたまま待っている。モイライいわく、これは三つの物語を終えてなお「その次は?」と問う者のために取っておかれたものだという。"
+      },
+      "exits": {
+        "north": "loc.hall_of_fates"
       }
     },
     "loc.argo_iolcus": {

@@ -106,6 +106,14 @@ func (w *World) validate() error {
 				return fmt.Errorf("room %q exit %q points to unknown room %q", id, dir, dest)
 			}
 		}
+		for dir, secret := range room.SecretExits {
+			if w.Rooms[secret.Room] == nil {
+				return fmt.Errorf("room %q secret exit %q points to unknown room %q", id, dir, secret.Room)
+			}
+			if _, clash := room.Exits[dir]; clash {
+				return fmt.Errorf("room %q secret exit %q duplicates a normal exit", id, dir)
+			}
+		}
 		if h := room.Hazard; h != nil {
 			switch h.Type {
 			case "lethal":

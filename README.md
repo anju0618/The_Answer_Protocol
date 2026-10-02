@@ -130,6 +130,7 @@ All rooms and exits, generated from `data/world.json`. `<-->` is two-way, `-->` 
 ```mermaid
 flowchart TB
   hall_of_fates["Hall of the Fates"]
+  unwoven_loom["The Unwoven Loom"]
   subgraph argo_arc["Voyage of the Argonauts"]
     argo_iolcus["Harbor of Iolcus"]
     argo_lemnos["Island of Lemnos"]
@@ -184,6 +185,7 @@ flowchart TB
   hall_of_fates <-->|E| ody_troy_shore
   hall_of_fates <-->|W| argo_iolcus
   hall_of_fates <-->|N| troy_ida
+  hall_of_fates <-.->|S: after The Answer| unwoven_loom
   argo_iolcus <-->|S| argo_bebrycia
   argo_iolcus <-->|N| argo_lemnos
   ody_troy_shore <-->|E| ody_cicones
@@ -385,6 +387,7 @@ go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
 ```mermaid
 flowchart TB
   hall_of_fates["運命の間"]
+  unwoven_loom["織られざる機"]
   subgraph argo_arc["アルゴ船の航海"]
     argo_iolcus["イオルコスの港"]
     argo_lemnos["レムノス島"]
@@ -439,6 +442,7 @@ flowchart TB
   hall_of_fates <-->|東| ody_troy_shore
   argo_iolcus -->|東| hall_of_fates
   troy_ida -->|南| hall_of_fates
+  hall_of_fates <-.->|南: 「答え」の後| unwoven_loom
   argo_iolcus <-->|南| argo_bebrycia
   argo_iolcus <-->|北| argo_lemnos
   ody_troy_shore <-->|東| ody_cicones

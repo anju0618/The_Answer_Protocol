@@ -307,6 +307,7 @@ func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	roomID := player.RoomID
 	room := newRoomView(s.world.Rooms[roomID], clientLocale(conn))
+	room.Exits = s.world.Rooms[roomID].exitsFor(player)
 
 	players := make([]string, 0)
 	for playerName, other := range s.players {
@@ -377,7 +378,7 @@ func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	destination, ok := room.Exits[strings.ToLower(parts[1])]
+	destination, ok := room.exitsFor(player)[strings.ToLower(parts[1])]
 	if !ok {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 301 NO_EXIT")
