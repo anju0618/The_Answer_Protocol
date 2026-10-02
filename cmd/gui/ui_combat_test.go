@@ -1,10 +1,35 @@
 package main
 
 import (
+	"crypto/sha256"
+	"image"
 	"testing"
 
 	"fyne.io/fyne/v2/test"
 )
+
+func TestDefeatedEnemyImageUpdatesWithoutLeavingRoom(t *testing.T) {
+	ui := newCombatTestUI(t)
+	look := lookView{Room: roomView{ID: "loc.argo_salmydessus", Name: "Salmydessus"}, NPCs: []string{"npc.harpy"}}
+	ui.showRoom(look)
+	standing := sha256.Sum256(ui.scene.Image.(*image.RGBA).Pix)
+	ui.handleResponse("ATTACK", "ATTACK npc.harpy", `OK {"attacker_hp":90,"target_hp":0,"damage":28,"status":"victory"}`)
+	look.Defeated = []string{"npc.harpy"}
+	ui.showRoom(look)
+	defeated := sha256.Sum256(ui.scene.Image.(*image.RGBA).Pix)
+	if defeated == standing {
+		t.Fatal("victory did not update the room image to the defeated enemy")
+	}
+	ui.showRoom(look)
+	if sha256.Sum256(ui.scene.Image.(*image.RGBA).Pix) != defeated {
+		t.Fatal("an unchanged LOOK changed the defeated enemy image")
+	}
+	look.Defeated = nil
+	ui.showRoom(look)
+	if sha256.Sum256(ui.scene.Image.(*image.RGBA).Pix) != standing {
+		t.Fatal("the living enemy image was not restored when the defeated state cleared")
+	}
+}
 
 func newCombatTestUI(t *testing.T) *gui {
 	t.Helper()
