@@ -119,8 +119,6 @@ func TestQuestsInvalidStateDoesNotBlockOtherPlayers(t *testing.T) {
 	}
 	done := make(chan any, 1)
 	go func() {
-		// A regression can panic while holding the lock. Isolate this handler
-		// from handleClient's saving defer so the test reports it without hanging.
 		defer func() {
 			done <- recover()
 			client.Close()
@@ -172,8 +170,6 @@ func TestConnectStartsRegenForSavedPlayer(t *testing.T) {
 			t.Fatalf("connection %d: regen start = %v, want within [%v, %v]", connection, started, before, after)
 		}
 		initialHP := player.HP
-		// Advance the clock from the connection's real baseline without sleeping
-		// or issuing an update that could initialize a missing baseline.
 		player.regenLocked(started.Add(regenInterval), 0, maxPlayerHP)
 		gotHP := player.HP
 		server.mu.Unlock()

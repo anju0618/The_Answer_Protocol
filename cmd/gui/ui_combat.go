@@ -11,7 +11,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// attackView is the JSON body of "OK {...}" after ATTACK.
 type attackView struct {
 	AttackerHP int    `json:"attacker_hp"`
 	TargetHP   int    `json:"target_hp"`
@@ -19,14 +18,12 @@ type attackView struct {
 	Status     string `json:"status"`
 }
 
-// fightState is the fight we are in right now (nil when not fighting).
 type fightState struct {
 	npcID string
 	hp    int
 	maxHP int
 }
 
-// buildCombatPanel makes the (initially hidden) panel shown above the command buttons during a fight.
 func (ui *gui) buildCombatPanel() {
 	ui.combatName = widget.NewLabelWithStyle("", fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	ui.combatName.Truncation = fyne.TextTruncateEllipsis
@@ -51,7 +48,6 @@ func (ui *gui) buildCombatPanel() {
 	ui.combatPanel.Hide()
 }
 
-// showFight updates and shows the panel for the current fight, or hides it when fight is nil.
 func (ui *gui) showFight(fight *fightState) {
 	ui.fight = fight
 	if fight == nil {
@@ -64,8 +60,6 @@ func (ui *gui) showFight(fight *fightState) {
 	ui.combatPanel.Show()
 }
 
-// handleAttack turns the ATTACK response into a readable story line and updates the fight panel.
-// It returns false when the response is not the expected JSON, so the caller can fall back to the raw text.
 func (ui *gui) handleAttack(request, line string) bool {
 	var result attackView
 	if decodeOK(line, &result) != nil || result.Status == "" {
@@ -81,7 +75,7 @@ func (ui *gui) handleAttack(request, line string) bool {
 		}
 		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You hit %s for %d damage. (%d HP left)", "%s に %d ダメージ!(残りHP %d)"), enemy, result.Damage, result.TargetHP))
 		ui.showFight(&fightState{npcID: npcID, hp: result.TargetHP, maxHP: maxHP})
-		ui.flashScene(flashHurt, 350*time.Millisecond) // the enemy survived, so it hit back
+		ui.flashScene(flashHurt, 350*time.Millisecond)
 	case "victory":
 		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("Victory! %s is defeated.", "勝利!%s を倒した。"), enemy))
 		ui.showFight(nil)
@@ -89,7 +83,6 @@ func (ui *gui) handleAttack(request, line string) bool {
 		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("%s struck you down.", "%s にやられた。"), enemy))
 		ui.showFight(nil)
 	case "wounded":
-		// An ordinary person cannot fight back, so there is no fight panel, only the hit.
 		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You strike %s for %d damage. (%d HP left)", "%s に %d ダメージを与えた。(残りHP %d)"), enemy, result.Damage, result.TargetHP))
 	case "murder":
 		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You killed %s. The Fates cut your thread.", "%s を手にかけた。運命の女神たちがあなたの糸を断ち切った。"), enemy))
@@ -106,7 +99,6 @@ func (ui *gui) handleAttack(request, line string) bool {
 	return true
 }
 
-// handleFlee reports the FLEE result; a successful flight ends the fight.
 func (ui *gui) handleFlee(line string) bool {
 	var result struct {
 		Result string `json:"result"`
@@ -123,7 +115,6 @@ func (ui *gui) handleFlee(line string) bool {
 	return true
 }
 
-// maxHP is the enemy's full HP from data/world.json (or fallback when the catalog does not know it).
 func (catalog *worldCatalog) maxHP(npcID string, fallback int) int {
 	if catalog != nil {
 		if hp := catalog.NPCs[npcID].HP; hp > 0 {
@@ -133,7 +124,6 @@ func (catalog *worldCatalog) maxHP(npcID string, fallback int) int {
 	return fallback
 }
 
-// handleDefend reports a DEFEND stance: no damage dealt, the next counter-attack is halved.
 func (ui *gui) handleDefend(line string) bool {
 	var result struct {
 		Result string `json:"result"`

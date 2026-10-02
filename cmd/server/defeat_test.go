@@ -53,7 +53,6 @@ func TestDefeatIsForgottenOnDeath(t *testing.T) {
 	}
 }
 
-// cmdRaw sends a command and returns the first non-event response line.
 func (client *testClient) cmdRaw(t *testing.T, command string) string {
 	t.Helper()
 	if _, err := fmt.Fprintln(client.conn, command); err != nil {

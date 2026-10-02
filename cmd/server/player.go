@@ -10,7 +10,7 @@ type PlayerQuest struct {
 type Player struct {
 	Name             string                  `json:"name"`
 	HP               int                     `json:"hp"`
-	MaxHPBonus       int                     `json:"max_hp_bonus,omitempty"` // earned from quests; kept after death
+	MaxHPBonus       int                     `json:"max_hp_bonus,omitempty"`
 	RoomID           string                  `json:"room_id"`
 	Inventory        []string                `json:"inventory"`
 	Crew             int                     `json:"crew,omitempty"`
@@ -23,7 +23,7 @@ type Player struct {
 	Endings          map[string]bool         `json:"endings,omitempty"`
 	EnemyHP          map[string]int          `json:"enemy_hp,omitempty"`
 	lastRegen        time.Time
-	guarding         bool // braced with DEFEND: the next counter-attack is halved (not saved)
+	guarding         bool
 	exiting          bool
 }
 
@@ -72,10 +72,9 @@ const (
 	regenAmount   = 1
 )
 
-// regenLocked heals over time up to maxHP; bonus is extra HP per tick (Hera's blessing, items), possibly negative.
 func (p *Player) regenLocked(now time.Time, bonus, maxHP int) {
 	if p.HP > maxHP {
-		p.HP = maxHP // an item that raised max HP was dropped
+		p.HP = maxHP
 	}
 	if p.HP >= maxHP || p.lastRegen.IsZero() {
 		p.lastRegen = now

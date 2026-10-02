@@ -331,11 +331,10 @@ func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 	sort.Strings(items)
 	sort.Strings(npcs)
 	data, err := json.Marshal(struct {
-		Room    roomView `json:"room"`
-		Players []string `json:"players"`
-		Items   []string `json:"items"`
-		NPCs    []string `json:"npcs"`
-		// Defeated lists the NPCs here this player has beaten; it is left out when there are none.
+		Room     roomView `json:"room"`
+		Players  []string `json:"players"`
+		Items    []string `json:"items"`
+		NPCs     []string `json:"npcs"`
 		Defeated []string `json:"defeated,omitempty"`
 	}{room, players, items, npcs, s.defeatedNPCsLocked(player, roomID)})
 	if err != nil {

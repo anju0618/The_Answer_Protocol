@@ -153,7 +153,6 @@ func TestDeathPersistenceFailureKeepsBelongings(t *testing.T) {
 				t.Fatalf("failed death persistence changed saved inventory or progress: %+v", players["alice"])
 			}
 
-			// Even if item-location rollback fails, the saved owner must hide the item.
 			if err := server.writeItemLocations(map[string]string{"item.sword": "loc.start"}); err != nil {
 				t.Fatal(err)
 			}

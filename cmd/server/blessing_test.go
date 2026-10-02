@@ -15,12 +15,12 @@ func TestBlessingsFollowReachedEndings(t *testing.T) {
 			t.Fatalf("%s before any ending = %d, want 0", effect, got)
 		}
 	}
-	player.Endings["ending.odyssey"] = true // Athena
+	player.Endings["ending.odyssey"] = true
 	if got := server.blessingTotalLocked(player, blessingCounterReduction); got != 20 {
 		t.Fatalf("Athena's counter reduction = %d, want 20", got)
 	}
-	player.Endings["ending.argo"] = true // Hera
-	player.Endings["ending.troy"] = true // Apollo
+	player.Endings["ending.argo"] = true
+	player.Endings["ending.troy"] = true
 	if server.blessingTotalLocked(player, blessingRegenBonus) != 1 || server.blessingTotalLocked(player, blessingDamageBonus) != 3 {
 		t.Fatal("Hera and Apollo blessings are missing")
 	}

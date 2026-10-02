@@ -108,8 +108,6 @@ func (s *Server) returnItemsHomeLocked(name string, itemIDs []string) error {
 		}
 	}
 
-	// Remove the old saved ownership before another player can take these items.
-	// Keep the rest of the saved state rather than saving the pre-respawn HP and room.
 	players, err := s.loadPlayers()
 	if err == nil {
 		if saved := players[name]; saved != nil {

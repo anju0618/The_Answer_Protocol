@@ -6,8 +6,6 @@ import (
 	"strings"
 )
 
-// Blessing is a permanent boon from the god of an arc, earned by reaching that arc's ending.
-// It is derived from the endings a player has reached, so nothing extra is stored on the player.
 type Blessing struct {
 	God         LocalizedText `json:"god"`
 	Name        LocalizedText `json:"name"`
@@ -17,11 +15,11 @@ type Blessing struct {
 }
 
 const (
-	blessingCounterReduction = "counter_reduction" // enemy counter-attacks hurt Value% less
-	blessingRegenBonus       = "regen_bonus"       // Value extra HP every regen tick
-	blessingDamageBonus      = "damage_bonus"      // Value extra damage on every hit
-	maxCounterIncrease       = 50                  // bad items never make counter-attacks hurt more than 50% extra
-	maxCounterReduction      = 80                  // allies (3 x 20%) plus a blessing never reach 100%
+	blessingCounterReduction = "counter_reduction"
+	blessingRegenBonus       = "regen_bonus"
+	blessingDamageBonus      = "damage_bonus"
+	maxCounterIncrease       = 50
+	maxCounterReduction      = 80
 )
 
 type Ending struct {
@@ -139,7 +137,6 @@ func (s *Server) missingForEndingLocked(player *Player, e *Ending, locale string
 	return missing
 }
 
-// blessingTotalLocked adds up one effect over every blessing the player has earned.
 func (s *Server) blessingTotalLocked(player *Player, effect string) int {
 	if s.world == nil {
 		return 0

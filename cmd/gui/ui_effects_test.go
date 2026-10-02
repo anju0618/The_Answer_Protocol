@@ -6,7 +6,7 @@ import (
 )
 
 func TestFlashSceneStartsAnimationAndToleratesMissingLayer(t *testing.T) {
-	(&gui{}).flashScene(flashHurt, time.Millisecond) // before build(): must not panic
+	(&gui{}).flashScene(flashHurt, time.Millisecond)
 
 	ui := newCombatTestUI(t)
 	ui.flashScene(flashHurt, 50*time.Millisecond)

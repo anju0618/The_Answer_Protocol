@@ -12,10 +12,8 @@ var randDamage = func(min, max int) int {
 	return min + rand.IntN(max-min+1)
 }
 
-// guardReductionPercent is how much a DEFEND stance cuts the next counter-attack.
 const guardReductionPercent = 50
 
-// takeGuard returns the extra reduction from a DEFEND stance and ends the stance: it covers one counter only.
 func takeGuard(player *Player) int {
 	if !player.guarding {
 		return 0
@@ -24,8 +22,6 @@ func takeGuard(player *Player) int {
 	return guardReductionPercent
 }
 
-// reduceCounter lowers a counter-attack by percent (capped), never below 1 damage.
-// A negative percent (a bad item) makes the counter-attack hurt more, up to maxCounterIncrease.
 func reduceCounter(counter, percent int) int {
 	percent = max(-maxCounterIncrease, min(percent, maxCounterReduction))
 	if percent == 0 {
@@ -34,8 +30,6 @@ func reduceCounter(counter, percent int) int {
 	return max(1, counter*(100-percent)/100)
 }
 
-// respawnPlayerLocked kills the player and sends them back to the hub.
-// subject is the ID of the NPC, room or item that caused the death; the Moirai can later turn it into a hint.
 func (s *Server) respawnPlayerLocked(player *Player, name, cause, subject string, args ...any) {
 	player.LastDeathSubject = subject
 	outcome := s.applyDeathPenaltyLocked(player, name)
@@ -123,13 +117,11 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		result = combatResult{0, enemyHP, 0, "dead"}
 
 	case npc.Role != "enemy" && (npc.Mighty || npc.Guide):
-		// Gods, sorcerers and the like answer a blow with death before it lands.
 		s.respawnPlayerLocked(player, *name, "attack_mighty", npcID, npc.Name.Get(locale))
 		event = flavor{key: "attack_mighty", player: *name, npc: npc}
 		result = combatResult{0, enemyHP, 0, "smitten"}
 
 	case npc.Role != "enemy":
-		// An ordinary person cannot fight back, but killing them ends the game for you.
 		damage := max(1, randDamage(combatMinDamage, combatMaxDamage)+s.effectTotalLocked(player, blessingDamageBonus))
 		enemyHP = max(0, enemyHP-damage)
 		player.setEnemyHP(npcID, enemyHP)
@@ -275,8 +267,6 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 	return client.waitResponse(response) != nil
 }
 
-// handleDefend is a custom, additive command (like FLEE): brace instead of attacking.
-// You deal no damage, but the next counter-attack against you is halved. Only valid during a fight.
 func handleDefend(s *Server, conn net.Conn, name *string, parts []string) bool {
 	if !requireExactArgs(conn, parts, 1) {
 		return false

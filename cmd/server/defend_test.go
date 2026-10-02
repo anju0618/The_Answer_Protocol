@@ -20,7 +20,7 @@ func TestDefendNeedsAFightAndHalvesTheNextCounter(t *testing.T) {
 	randDamage = func(min, max int) int { return 10 }
 	defer func() { randDamage = old }()
 
-	alice.cmdJSON(t, "ATTACK npc.brute") // 10 damage back at us
+	alice.cmdJSON(t, "ATTACK npc.brute")
 	server.mu.Lock()
 	afterPlain := server.players["alice"].HP
 	server.mu.Unlock()
@@ -29,7 +29,7 @@ func TestDefendNeedsAFightAndHalvesTheNextCounter(t *testing.T) {
 	if braced["result"] != "braced" || braced["hp"] != float64(afterPlain) {
 		t.Fatalf("DEFEND = %v, want braced with unchanged hp %d", braced, afterPlain)
 	}
-	alice.cmdJSON(t, "ATTACK npc.brute") // the counter is halved: 10 -> 5
+	alice.cmdJSON(t, "ATTACK npc.brute")
 	server.mu.Lock()
 	afterGuarded := server.players["alice"].HP
 	guarding := server.players["alice"].guarding
@@ -40,7 +40,7 @@ func TestDefendNeedsAFightAndHalvesTheNextCounter(t *testing.T) {
 	if guarding {
 		t.Fatal("the stance must end after one counter-attack")
 	}
-	alice.cmdJSON(t, "ATTACK npc.brute") // back to the full 10
+	alice.cmdJSON(t, "ATTACK npc.brute")
 	server.mu.Lock()
 	defer server.mu.Unlock()
 	if got := server.players["alice"].HP; got != afterGuarded-10 {

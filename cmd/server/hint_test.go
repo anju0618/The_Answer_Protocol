@@ -22,7 +22,6 @@ func TestRealWorldHintsAreWellFormed(t *testing.T) {
 			}
 		}
 	}
-	// Every Odyssey game-over room and myth-gated enemy should have a hint.
 	for id, room := range world.Rooms {
 		if strings.HasPrefix(id, "loc.ody_") && room.Hazard != nil && room.Hazard.Type != "crew_cost" {
 			if _, ok := world.Hints[id]; !ok {
@@ -57,7 +56,7 @@ func TestMoiraiGivesOneHintAboutTheLastDeath(t *testing.T) {
 	if strings.Contains(death, "olive") {
 		t.Fatalf("the death message itself must not hint: %q", death)
 	}
-	alice.waitEvent(t, "OK ") // the ATTACK response; the server waits for it to be read
+	alice.waitEvent(t, "OK ")
 
 	if _, err := fmt.Fprintln(alice.conn, "TALK npc.moirai"); err != nil {
 		t.Fatal(err)
@@ -67,7 +66,6 @@ func TestMoiraiGivesOneHintAboutTheLastDeath(t *testing.T) {
 		t.Fatalf("hint = %q, want it to point at the olive stake", hint)
 	}
 
-	// The hint is spent: talking again gives only the usual guide lines.
 	server.mu.Lock()
 	remaining := server.players["alice"].LastDeathSubject
 	server.mu.Unlock()

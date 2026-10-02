@@ -16,11 +16,10 @@ type roomView struct {
 }
 
 type lookView struct {
-	Room    roomView `json:"room"`
-	Players []string `json:"players"`
-	Items   []string `json:"items"`
-	NPCs    []string `json:"npcs"`
-	// Defeated is the NPCs in the room this player has beaten (drawn lying down).
+	Room     roomView `json:"room"`
+	Players  []string `json:"players"`
+	Items    []string `json:"items"`
+	NPCs     []string `json:"npcs"`
 	Defeated []string `json:"defeated"`
 }
 

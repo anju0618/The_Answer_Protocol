@@ -8,14 +8,11 @@ import (
 	"fyne.io/fyne/v2/canvas"
 )
 
-// itemEffect is one effect of a carried item, as written in data/world.json.
 type itemEffect struct {
 	Effect string `json:"effect"`
 	Value  int    `json:"value"`
 }
 
-// effectLine words one effect, e.g. "与ダメージ +3" or "被ダメージ +10%". Positive Value is always the good direction,
-// so the counter_reduction number is flipped when it is shown (reducing damage taken by 10% reads "-10%").
 func (ui *gui) effectLine(e itemEffect) string {
 	switch e.Effect {
 	case "damage_bonus":
@@ -30,7 +27,6 @@ func (ui *gui) effectLine(e itemEffect) string {
 	return ""
 }
 
-// itemEffectLines shows an item's effects while it is carried: green when helpful, red when harmful.
 func (ui *gui) itemEffectLines(id string) []fyne.CanvasObject {
 	if ui.catalog == nil {
 		return nil

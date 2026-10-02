@@ -146,7 +146,7 @@ func TestMapShowsVisitedRoomsAndTheirNeighbours(t *testing.T) {
 
 	ui.markVisited(hubRoomID)
 	hubOnly := len(ui.mapBox.Objects)
-	if hubOnly != 3 { // hub + the unknown room east of it (2 cells), joined by 1 line
+	if hubOnly != 3 {
 		t.Fatalf("objects with only the hub visited = %d, want 3 (2 cells + 1 line)", hubOnly)
 	}
 	ui.markVisited("loc.ody_troy_shore")

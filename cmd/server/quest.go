@@ -41,7 +41,7 @@ func (s *Server) advanceQuestLocked(player *Player, questID string, quest *Quest
 	logger.Info("quest_completed", "player", player.Name, "quest", questID, "max_hp_gain", questMaxHPGain(quest))
 	gain := questMaxHPGain(quest)
 	player.MaxHPBonus += gain
-	player.HP = s.maxHPLocked(player) // finishing a quest also restores full health
+	player.HP = s.maxHPLocked(player)
 	s.sendPlayerEventLocked(player.Name, "QUEST", LocalizedText{
 		"en": "Quest complete: \"%s\"! Reward: max HP +%d (now %d), and your HP is fully restored. Use QUESTS to see your quests, and look for the next NPC with a request.",
 		"ja": "クエスト達成: 「%s」! 報酬: 最大HP+%d(現在の最大HP %d)、HPも全回復。QUESTSで一覧を確認し、次の依頼を探そう。",

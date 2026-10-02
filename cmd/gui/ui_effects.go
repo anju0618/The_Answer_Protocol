@@ -15,12 +15,10 @@ var (
 	flashTravel = color.NRGBA{A: 230}
 )
 
-// newFlashLayer is a see-through rectangle laid over the scene picture; effects animate its colour.
 func newFlashLayer() *canvas.Rectangle {
 	return canvas.NewRectangle(flashClear)
 }
 
-// flashScene fades the flash layer from `from` to transparent over `duration`.
 func (ui *gui) flashScene(from color.NRGBA, duration time.Duration) {
 	if ui.flash == nil {
 		return

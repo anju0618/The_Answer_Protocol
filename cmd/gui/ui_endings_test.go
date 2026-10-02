@@ -37,14 +37,13 @@ func TestEndingGalleryShowsTrophiesAndRemembersFatalRooms(t *testing.T) {
 	ui.nameEntry.SetText("gallery-tester")
 
 	ui.showInventory([]string{"item.olive_branch_of_ithaca"})
-	// header + 4 slots + fatal counter
 	if len(ui.endingBox.Objects) != 6 {
 		t.Fatalf("gallery objects = %d, want 6", len(ui.endingBox.Objects))
 	}
 
 	room := "loc.ody_lotus_garden"
 	ui.recordFatalRoom(room)
-	ui.recordFatalRoom(room) // the same room twice counts once
+	ui.recordFatalRoom(room)
 	if got := ui.fatalRooms(); len(got) != 1 || got[0] != room {
 		t.Fatalf("fatal rooms = %v", got)
 	}

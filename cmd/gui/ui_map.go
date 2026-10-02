@@ -18,7 +18,6 @@ var directionSteps = map[string]gridPos{
 	"north": {0, -1}, "south": {0, 1}, "east": {1, 0}, "west": {-1, 0},
 }
 
-// arcOf returns the arc prefix of a room id ("loc.ody_cicones" -> "loc.ody"), or "" for the hub.
 func arcOf(roomID string) string {
 	if roomID == hubRoomID {
 		return ""
@@ -27,8 +26,6 @@ func arcOf(roomID string) string {
 	return name
 }
 
-// computeMapLayout places the hub at (0,0) and walks the exits (north/south/east/west),
-// giving every room of one arc a grid position. The first room to claim a cell keeps it.
 func computeMapLayout(catalog *worldCatalog, arc string) map[string]gridPos {
 	positions := map[string]gridPos{}
 	if catalog == nil {
@@ -76,10 +73,9 @@ func (ui *gui) markVisited(roomID string) {
 type mapCell struct {
 	obj fyne.CanvasObject
 	pos gridPos
-	to  *gridPos // when set, obj is a line from pos to *to
+	to  *gridPos
 }
 
-// mapLayout scales the grid to the size of the panel and positions every cell and line.
 type mapLayout struct {
 	cells      []mapCell
 	minX, minY int
@@ -131,8 +127,6 @@ func (ui *gui) roomMapColor(roomID string) color.Color {
 	return mapVisited
 }
 
-// refreshMap redraws the whole minimap: visited rooms are coloured, rooms next to
-// a visited room are shown as dim "unknown" cells, everything else stays hidden.
 func (ui *gui) refreshMap() {
 	if ui.catalog == nil {
 		return

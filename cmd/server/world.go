@@ -26,13 +26,13 @@ type NPC struct {
 	RoomID               string          `json:"room_id"`
 	HP                   int             `json:"hp"`
 	Dialogue             []LocalizedText `json:"dialogue"`
-	DialogueCleared      []LocalizedText `json:"dialogue_cleared,omitempty"` // said instead once the room's enemies are beaten
+	DialogueCleared      []LocalizedText `json:"dialogue_cleared,omitempty"`
 	MythRequirementItem  string          `json:"myth_requirement_item,omitempty"`
 	MythRequirementQuest string          `json:"myth_requirement_quest,omitempty"`
 	FleeAccurate         bool            `json:"flee_accurate,omitempty"`
 	FleeSucceedsOnce     bool            `json:"flee_succeeds_once,omitempty"`
 	Unwinnable           bool            `json:"unwinnable,omitempty"`
-	Mighty               bool            `json:"mighty,omitempty"` // a non-enemy so powerful that attacking it is instant death
+	Mighty               bool            `json:"mighty,omitempty"`
 	CrewLossOnAttack     int             `json:"crew_loss_on_attack,omitempty"`
 	Guide                bool            `json:"guide,omitempty"`
 	Ending               *Ending         `json:"ending,omitempty"`
@@ -57,13 +57,12 @@ type Quest struct {
 }
 
 type World struct {
-	StartRoomID string            `json:"start_room_id"`
-	Rooms       map[string]*Room  `json:"rooms"`
-	Items       map[string]*Item  `json:"items"`
-	NPCs        map[string]*NPC   `json:"npcs"`
-	Quests      map[string]*Quest `json:"quests"`
-	// Hints maps what killed a player (an NPC, room or item ID) to the Moirai's hint about it.
-	Hints map[string]LocalizedText `json:"hints,omitempty"`
+	StartRoomID string                   `json:"start_room_id"`
+	Rooms       map[string]*Room         `json:"rooms"`
+	Items       map[string]*Item         `json:"items"`
+	NPCs        map[string]*NPC          `json:"npcs"`
+	Quests      map[string]*Quest        `json:"quests"`
+	Hints       map[string]LocalizedText `json:"hints,omitempty"`
 }
 
 func loadWorld(path string) (*World, error) {

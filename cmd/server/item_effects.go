@@ -2,15 +2,11 @@ package main
 
 import "fmt"
 
-// Items change the player while they are carried (not while they lie on the floor). Unlike a god's blessing,
-// an item effect can be bad, so Value may be negative. It is a separate system from Ending.Blessing.
 const (
-	effectMaxHP = "max_hp" // Value more (or fewer) max HP while carried
+	effectMaxHP = "max_hp"
 
-	// A quest's reward HP is turned into a permanent max HP gain: reward / questMaxHPDivisor (at least 1).
 	questMaxHPDivisor = 5
-	// minPlayerMaxHP keeps a bad item from pushing max HP under the HP a player respawns with.
-	minPlayerMaxHP = 20
+	minPlayerMaxHP    = 20
 )
 
 type ItemEffect struct {
@@ -43,7 +39,6 @@ func (w *World) validateItemEffects() error {
 	return nil
 }
 
-// itemEffectTotalLocked adds up one effect over everything the player is carrying.
 func (s *Server) itemEffectTotalLocked(player *Player, effect string) int {
 	if s.world == nil {
 		return 0
@@ -61,17 +56,14 @@ func (s *Server) itemEffectTotalLocked(player *Player, effect string) int {
 	return total
 }
 
-// effectTotalLocked is the player's total for one effect: god blessings plus carried items.
 func (s *Server) effectTotalLocked(player *Player, effect string) int {
 	return s.blessingTotalLocked(player, effect) + s.itemEffectTotalLocked(player, effect)
 }
 
-// maxHPLocked is the player's current max HP: the base, quest gains (kept after death) and carried items.
 func (s *Server) maxHPLocked(player *Player) int {
 	return max(minPlayerMaxHP, maxPlayerHP+player.MaxHPBonus+s.itemEffectTotalLocked(player, effectMaxHP))
 }
 
-// questMaxHPGain is how much max HP finishing the quest gives.
 func questMaxHPGain(quest *Quest) int {
 	return max(1, quest.Reward.HP/questMaxHPDivisor)
 }

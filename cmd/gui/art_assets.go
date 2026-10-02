@@ -41,8 +41,6 @@ func loadArt(kind, id string) image.Image {
 	return img
 }
 
-// defeatedSprite is how a beaten enemy looks: hand-drawn art from assets/npcs_defeated if there is any,
-// otherwise the standing sprite darkened and knocked onto its back.
 func defeatedSprite(id string) image.Image {
 	if data, err := artAssets.ReadFile("assets/npcs_defeated/" + id + ".png"); err == nil {
 		if img, err := png.Decode(bytes.NewReader(data)); err == nil {
@@ -54,7 +52,6 @@ func defeatedSprite(id string) image.Image {
 		return nil
 	}
 	bounds := standing.Bounds()
-	// Turn 90 degrees clockwise: the old top (the head) ends up on the right.
 	lying := image.NewNRGBA(image.Rect(0, 0, bounds.Dy(), bounds.Dx()))
 	for y := 0; y < bounds.Dy(); y++ {
 		for x := 0; x < bounds.Dx(); x++ {
@@ -66,7 +63,6 @@ func defeatedSprite(id string) image.Image {
 	return lying
 }
 
-// composeScene paints the room and the NPCs in it; defeated NPCs are drawn lying down.
 func composeScene(roomID string, npcs, defeated []string) *image.RGBA {
 	background := image.NewRGBA(image.Rect(0, 0, artWidth, artHeight))
 	if room := loadArt("rooms", roomID); room != nil {
@@ -104,7 +100,6 @@ func composeScene(roomID string, npcs, defeated []string) *image.RGBA {
 		if slices.Contains(defeated, id) {
 			sprite = defeatedSprite(id)
 			if sprite != nil {
-				// A body lying down is wider than a person standing, and rests on the floor.
 				lyingWidth := width * 3 / 2
 				lyingHeight := lyingWidth * sprite.Bounds().Dy() / sprite.Bounds().Dx()
 				dest = image.Rect(x-(lyingWidth-width)/2, artHeight-lyingHeight-27, x+(lyingWidth+width)/2, artHeight-27)

@@ -17,11 +17,10 @@ var droidFont []byte
 var droidResource = fyne.NewStaticResource("DroidSansFallbackFull.ttf", droidFont)
 
 var (
-	ink   = color.NRGBA{R: 5, G: 12, B: 30, A: 255}
-	navy  = color.NRGBA{R: 12, G: 27, B: 56, A: 255}
-	ivory = color.NRGBA{R: 244, G: 232, B: 191, A: 255}
-	gold  = color.NRGBA{R: 204, G: 168, B: 90, A: 255}
-	// dimGold is for frames and dividers: visible, but quieter than gold text and highlights.
+	ink     = color.NRGBA{R: 5, G: 12, B: 30, A: 255}
+	navy    = color.NRGBA{R: 12, G: 27, B: 56, A: 255}
+	ivory   = color.NRGBA{R: 244, G: 232, B: 191, A: 255}
+	gold    = color.NRGBA{R: 204, G: 168, B: 90, A: 255}
 	dimGold = color.NRGBA{R: 112, G: 96, B: 62, A: 255}
 )
 

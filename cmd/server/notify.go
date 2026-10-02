@@ -144,8 +144,6 @@ func (s *Server) guideNPC() *NPC {
 	return s.world.NPCs[ids[0]]
 }
 
-// sendDeathHintLocked gives the player the Moirai's hint about what last killed them, once.
-// Without a recorded death (or a hint for it) she adds nothing.
 func (s *Server) sendDeathHintLocked(player *Player, name string) {
 	subject := player.LastDeathSubject
 	if subject == "" || s.world == nil {

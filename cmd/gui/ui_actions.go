@@ -32,7 +32,6 @@ func (ui *gui) chooseAction(action string) {
 	title := ui.tr("Choose a target", "対象を選ぶ")
 	switch action {
 	case "COMMANDS":
-		// Rarely used commands live on their own page so the main screen stays uncluttered.
 		title = ui.tr("Other commands", "その他の操作")
 		choices = []menuChoice{
 			{label: ui.tr("Look around (LOOK)", "まわりを見る (LOOK)"), command: "LOOK"},

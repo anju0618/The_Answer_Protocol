@@ -9,7 +9,6 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// storyKind says what a line of the Adventure tab is about, so we can colour it.
 type storyKind int
 
 const (
@@ -29,8 +28,6 @@ type storyEntry struct {
 	text string
 }
 
-// Custom theme colour names. RichText styles pick colours by name,
-// and retroTheme.Color turns each name into a real colour.
 const (
 	colorStoryDeath  fyne.ThemeColorName = "storyDeath"
 	colorStoryQuest  fyne.ThemeColorName = "storyQuest"
@@ -58,7 +55,6 @@ func storyColorName(kind storyKind) fyne.ThemeColorName {
 	return "foreground"
 }
 
-// storyColor returns the colour for a custom story colour name (and false for any other name).
 func storyColor(name fyne.ThemeColorName) (color.Color, bool) {
 	switch name {
 	case colorStoryDeath:
@@ -77,7 +73,6 @@ func storyColor(name fyne.ThemeColorName) (color.Color, bool) {
 	return nil, false
 }
 
-// storyKindOf maps the kind word of "EVT PLAYER <kind> <text>" to a storyKind.
 func storyKindOf(word string) storyKind {
 	switch word {
 	case "DEATH":
@@ -100,7 +95,6 @@ func newStoryText() *widget.RichText {
 	return text
 }
 
-// storySegments turns entries into coloured RichText paragraphs.
 func storySegments(entries []storyEntry) []widget.RichTextSegment {
 	segments := make([]widget.RichTextSegment, 0, len(entries))
 	for _, entry := range entries {

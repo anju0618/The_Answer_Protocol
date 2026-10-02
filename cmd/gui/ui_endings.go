@@ -9,16 +9,14 @@ import (
 	"fyne.io/fyne/v2/widget"
 )
 
-// endingOrder is the order the gallery lists endings in (the final one last).
 var endingOrder = []string{"ending.argo", "ending.troy", "ending.odyssey", "ending.final"}
 
 type endingSlot struct {
 	id, rewardItem string
 	name           localizedName
-	blessing       string // "God: Name. Description" in the current locale, or "" if the ending has none
+	blessing       string
 }
 
-// endingSlots lists every ending of the world, ordered by endingOrder.
 func (catalog *worldCatalog) endingSlots(locale string) []endingSlot {
 	var slots []endingSlot
 	if catalog == nil {
@@ -43,7 +41,6 @@ func (catalog *worldCatalog) endingSlots(locale string) []endingSlot {
 	return slots
 }
 
-// lethalRoomCount is how many game-over rooms the world has.
 func (catalog *worldCatalog) lethalRoomCount() int {
 	count := 0
 	if catalog == nil {
@@ -59,7 +56,6 @@ func (catalog *worldCatalog) lethalRoomCount() int {
 
 func (ui *gui) fatalKey() string { return "fatal." + strings.TrimSpace(ui.nameEntry.Text) }
 
-// fatalRooms are the game-over rooms this player has already found (kept between sessions).
 func (ui *gui) fatalRooms() []string {
 	if app := fyne.CurrentApp(); app != nil {
 		return app.Preferences().StringList(ui.fatalKey())
@@ -76,7 +72,6 @@ func (ui *gui) recordFatalRoom(roomID string) {
 	ui.showEndings()
 }
 
-// showEndings redraws the gallery: endings reached (we own their trophy) and game-over rooms found.
 func (ui *gui) showEndings() {
 	if ui.endingBox == nil {
 		return

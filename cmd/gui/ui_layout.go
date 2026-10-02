@@ -187,14 +187,12 @@ func compactLabel(text string) *widget.Label {
 	return label
 }
 
-// dimLabel is for secondary info (counts, status): same size, quieter colour.
 func dimLabel(text string) *widget.Label {
 	label := compactLabel(text)
 	label.Importance = widget.LowImportance
 	return label
 }
 
-// boldLabel is for the numbers the player watches most (HP, crew).
 func boldLabel(text string) *widget.Label {
 	label := compactLabel(text)
 	label.TextStyle.Bold = true
