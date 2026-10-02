@@ -262,7 +262,7 @@ func TestEveryArcIsWinnableByEveryPlayer(t *testing.T) {
 
 		w.teleport(server.world.StartRoomID)
 		w.do("TALK npc.moirai")
-		if !w.reached("ending.final") || !w.has("item.thread_of_fate") || !w.eventsContain("42") {
+		if !w.reached("ending.final") || !w.has("item.thread_of_fate") || !w.eventsContain("Atropos") {
 			t.Fatalf("%s did not get the final ending (events: %q)", playerName, w.events)
 		}
 	}

@@ -228,6 +228,7 @@ flowchart TB
   ody_calypso <-->|E| ody_phaeacia
   ody_phaeacia <-->|E| ody_ithaca_shore
   ody_ithaca_shore -->|E| hall_of_fates
+  troy_fall -->|E| hall_of_fates
   ody_ithaca_shore <-->|N| ody_palace
   classDef hub fill:#2e7d32,color:#fff,stroke:#1b5e20
   classDef hazard fill:#ef6c00,color:#fff,stroke:#bf360c
@@ -482,6 +483,7 @@ flowchart TB
   ody_calypso <-->|東| ody_phaeacia
   ody_phaeacia <-->|東| ody_ithaca_shore
   ody_ithaca_shore -->|東| hall_of_fates
+  troy_fall -->|東| hall_of_fates
   ody_ithaca_shore <-->|北| ody_palace
   classDef hub fill:#2e7d32,color:#fff,stroke:#1b5e20
   classDef hazard fill:#ef6c00,color:#fff,stroke:#bf360c

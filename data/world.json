@@ -359,7 +359,8 @@
         "ja": "木馬は捧げ物として門の内側へ引き込まれ、夜になるとその中に隠れていた兵たちが待ち構えるギリシア軍に都市を開いた。トロイアは燃えている。"
       },
       "exits": {
-        "south": "loc.troy_horse"
+        "south": "loc.troy_horse",
+        "east": "loc.hall_of_fates"
       }
     },
     "loc.ody_troy_shore": {
@@ -1980,8 +1981,8 @@
             "ja": "あなたは、これらすべてに何の意味があるのかを問うためにここへ来た。モイライはただ微笑む。問うべきは「なぜ」ではなく、「どこまで歩けるか」だったのだ。"
           },
           {
-            "en": "And the Answer, the one this Protocol was named for, is 42.",
-            "ja": "そして答え――このプロトコルの名の由来となった答えは、42である。"
+            "en": "Atropos lifts her shears and, for once, does not cut. \"The Answer? It was never woven into any tapestry. It is what you did at every crossroads, when no one told you which way to go.\"",
+            "ja": "アトロポスは鋏を掲げ、このときばかりは何も断ち切らない。「答え? それはどのタペストリーにも織り込まれていない。道の分かれ目のたびに、誰も行く先を教えてくれない中で、そなたが選んだこと――それが答えだ」"
           },
           {
             "en": "Now go where you like. The threads never truly end; they only wait for the next hero.",
