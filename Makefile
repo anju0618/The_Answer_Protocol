@@ -1,7 +1,3 @@
-# The Answer Protocol (TAP): build tool.
-# Run every target from the repository root: the server reads data/world.json
-# and writes saves/ relative to the current directory.
-
 GO      ?= go
 BIN_DIR ?= bin
 ADDR    ?= 127.0.0.1:4242
