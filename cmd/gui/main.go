@@ -96,6 +96,8 @@ type gui struct {
 	chatLines        []string
 	storyLines       []storyEntry
 	logLines         []string
+	skipOwnCombat    bool
+	sawDeath         bool
 }
 
 func main() {
@@ -253,6 +255,8 @@ func (ui *gui) disconnect() {
 		ui.client = nil
 	}
 	ui.connected = false
+	ui.skipOwnCombat = false
+	ui.sawDeath = false
 	ui.stateUnavailable = false
 	ui.state = stateView{}
 	ui.room = lookView{}
@@ -308,6 +312,7 @@ func (ui *gui) handleEvent(line string) {
 		ui.addStoryKind(storyKindOf(kind), text)
 		switch kind {
 		case "DEATH":
+			ui.sawDeath = true
 			ui.flashScene(flashDeath, 900*time.Millisecond)
 			ui.showFight(nil)
 			ui.refresh("LOOK", "INVENTORY", "STATUS", "STATE")
@@ -327,7 +332,12 @@ func (ui *gui) handleEvent(line string) {
 		ui.send("LOOK")
 	}
 	if strings.HasPrefix(line, "EVT ROOM COMBAT ") {
-		ui.addStoryKind(storyCombat, strings.TrimPrefix(line, "EVT ROOM COMBAT "))
+		text := strings.TrimPrefix(line, "EVT ROOM COMBAT ")
+		if ui.skipOwnCombat && ui.isOwnCombatNarration(text) {
+			ui.skipOwnCombat = false
+		} else {
+			ui.addStoryKind(storyCombat, text)
+		}
 		ui.send("LOOK")
 		ui.send("STATUS")
 		ui.refresh("STATE")
@@ -344,7 +354,29 @@ func (ui *gui) handleEvent(line string) {
 	}
 }
 
+func (ui *gui) isOwnCombatNarration(text string) bool {
+	if ui.nameEntry == nil || ui.nameEntry.Text == "" {
+		return false
+	}
+	separator := " "
+	if ui.locale == "ja" {
+		separator = "は"
+	}
+	name := ui.nameEntry.Text
+	if !strings.HasPrefix(text, name+separator) {
+		return false
+	}
+	for _, other := range append(ui.room.Players, ui.state.Players...) {
+		if len(other) > len(name) && strings.HasPrefix(text, other+separator) {
+			return false
+		}
+	}
+	return true
+}
+
 func (ui *gui) handleResponse(command, request, line string) {
+	defer func() { ui.sawDeath = false }()
+	ui.skipOwnCombat = strings.HasPrefix(line, "OK ") && (command == "ATTACK" || command == "FLEE" || command == "DEFEND")
 	if strings.HasPrefix(line, "ERR ") {
 		if command == "STATE" && strings.HasPrefix(line, "ERR 400 ") {
 			ui.stateUnavailable = true

@@ -10,7 +10,7 @@
 
 ## Description
 
-**The Answer Protocol (TAP)** is a multiplayer text adventure (MUD): one TCP server (`cmd/server`), a CLI client (`cmd/cli`) and a GUI client (`cmd/gui`, Fyne), all written in Go. The server and the clients follow RFC 42TAP (`protocol-rfc.html`), so they work with other teams' implementations.
+**The Answer Protocol (TAP)** is a multiplayer text adventure (MUD): one TCP server (`cmd/server`), a CLI client (`cmd/cli`) and a GUI client (`cmd/gui`, Fyne), all written in Go. The server implements the 15 commands in RFC 42TAP (`protocol-rfc.html`). Our CLI can send raw commands to another team's server; extensions and the protocol differences listed below may limit some features across implementations.
 
 The world is three Greek myths (the Argonauts, the Iliad, the Odyssey), one arc each, around one hub, the Hall of the Fates. The RFC leaves combat open, so we built one idea on top of it: **acting against the myth gets you killed.** Attacking Polyphemus without the sharpened olive stake is an instant kill, not a fight.
 
@@ -24,9 +24,9 @@ make run-client        # terminal 2: the CLI client
 make run-client-gui    # or the GUI client
 ```
 
-**CLI choice.** The CLI is a **raw relay**: what you type is sent unchanged and every server line is printed unchanged (approach 1 of the subject), so you see exactly what is on the wire. Type `CONNECT <name>` first.
+**CLI choice.** The CLI is a **raw relay**: what you type is sent unchanged and every server line is printed unchanged (approach 1 of the subject), so you see exactly what is on the wire. Start with `CONNECT <name>`, or send `LANG ja` first to choose Japanese.
 
-Commands: all 15 RFC commands (`CONNECT LOOK MOVE TAKE DROP INVENTORY TALK ATTACK STATUS QUEST QUESTS CHAT WHO GROUP QUIT`, see RFC section 5) plus `FLEE`, `DEFEND` (combat) and `LANG <en|ja>` (story language, before `CONNECT`).
+Commands: all 15 RFC commands (`CONNECT LOOK MOVE TAKE DROP INVENTORY TALK ATTACK STATUS QUEST QUESTS CHAT WHO GROUP QUIT`, see RFC section 5) plus `FLEE`, `DEFEND` (combat), `LANG <en|ja>` (story language, before `CONNECT`) and `STATE` (crew and group state used by our GUI).
 
 ```
 OK hello proto=1
@@ -48,8 +48,8 @@ OK {"hp":100,"max_hp":100,"status":"healthy"}
 ## Architecture
 
 - **Dispatcher.** `server.go` has a table from command name to handler. `main.go` listens on `:4242`; each connection gets one goroutine that reads lines with `bufio.Scanner` and runs commands one at a time.
-- **Concurrency.** All shared game state is guarded by one `sync.Mutex` (`Server.mu`). We chose it over an event loop because it is much simpler to keep correct; it will not scale to huge player counts, which is fine here. A second mutex serializes disk writes.
-- **Non-blocking broadcast.** Each connection has an outbound queue drained by its own `writeLoop`, so a handler never writes to a socket while holding the lock, and one slow or dead client cannot stall the others. A disconnect removes the player state first, then broadcasts the leave events.
+- **Concurrency.** All shared game state is guarded by one `sync.Mutex` (`Server.mu`). We chose it over an event loop because it is simpler to keep correct; this design is not intended for large numbers of simultaneous players. A second mutex serializes disk writes.
+- **Non-blocking broadcast.** Each connection has an outbound queue drained by its own `writeLoop`, so a handler never writes to a socket while holding the lock. A slow or disconnected client does not hold up broadcasts to the others. A disconnect removes the player state first, then broadcasts the leave events.
 - **Data.** The world (rooms, items, NPCs, quests, hints) is `data/world.json`, validated at start-up (every exit and reference must exist). Player state is saved as JSON in `saves/` (not required by the subject).
 - **Files** (`cmd/server`): `combat.go`, `quest.go`, `hazard.go`, `odyssey.go`, `endings.go`, `hardcore.go`, `item_effects.go`, `defeat.go`, `notify.go`, `flavor.go`, `locale.go`, `chat.go`, `group.go`, `world.go`, `room.go`, `player.go`, `item_store.go`, `player_store.go`, `logging.go`. A tour of every file is in `memo/CODE_WALKTHROUGH.md`.
 
@@ -59,7 +59,7 @@ All 15 RFC commands and the RFC events (`EVT ROOM/GLOBAL/GROUP ...`, `EVT STATS 
 
 **Extensions** (additive; an RFC-only client can ignore them):
 
-- `FLEE`, `DEFEND` (named as examples in RFC 6.1.1) and `LANG <en|ja>` (only before `CONNECT`, otherwise `ERR 400`); `ERR 407 NOT_IN_COMBAT` for `FLEE`/`DEFEND` outside a fight.
+- `FLEE`, `DEFEND` (named as examples in RFC 6.1.1), `LANG <en|ja>` (only before `CONNECT`, otherwise `ERR 400`), and `STATE` (crew, player names, group and invitations for our GUI); `ERR 407 NOT_IN_COMBAT` for `FLEE`/`DEFEND` outside a fight.
 - `EVT ROOM COMBAT <text>` (combat narration) and `EVT PLAYER <kind> <text>` (a private message: `DEATH`, `ENDING`, `TEAM`, `GUIDE`, `HINT`, `QUEST`).
 
 **Deviations and choices** (we document and justify each one):
@@ -86,8 +86,8 @@ All 15 RFC commands and the RFC events (`EVT ROOM/GLOBAL/GROUP ...`, `EVT STATS 
 
 ## Quest System
 
-- `QUEST <npc>` starts that NPC's quest. The objective is `collect_item` or `defeat_npc` and progress is **automatic** (no completion command); progress made before accepting also counts. `QUESTS` lists every started quest with `"progress": "<current>/<target>"`.
-- **Reward.** Finishing a quest raises your max HP by a fifth of its reward (at least 1) and fully heals you; the gain is kept after death.
+- `QUEST <npc>` starts that NPC's quest. The objective is `collect_item` or `defeat_npc` and progress is **automatic** (no completion command). If you already hold the required item or have defeated the target when you accept a quest, it completes immediately. `QUESTS` lists every started quest with `"progress": "<current>/<target>"`.
+- **Reward.** Finishing a quest raises your max HP by one fifth of `reward.hp` in `data/world.json` (at least 1) and fully heals you. The `QUEST` response's `reward` field already contains that final max-HP gain; the gain is kept after death.
 - Quest givers announce themselves with `EVT PLAYER QUEST` when you enter their room or `TALK`, because `LOOK` only lists NPC IDs. After you beat every enemy in a room, its people say new lines.
 - Some quests are traps: the cattle of Helios quest kills you if you do what it asks.
 - **Endings.** Each arc has a final person (Pelias, Aeneas, Penelope) who checks your items and quests, plays the ending and gives a trophy. After all three, the Moirai play the true ending, and a secret room opens south of the Hall.
@@ -97,7 +97,7 @@ All 15 RFC commands and the RFC events (`EVT ROOM/GLOBAL/GROUP ...`, `EVT STATS 
 - **Layout.** The hub (Hall of the Fates) has three exits: west to the Argonauts (12 rooms), north to the Iliad (11 rooms), east to the Odyssey (22 rooms). Every arc leads back to the hub, so the map is made of loops; the Odyssey is a ring with two dead-end branches. After the true ending, a secret exit leads to the Unwoven Loom. 47 rooms in total.
 - **NPCs.** 44 NPCs with three roles: 16 `dialogue`, 16 `quest_giver`, 12 `enemy`. The Moirai in the Hall play a tutorial on first connect.
 - **Items.** 21 items: 17 can be picked up, 4 are trophies given by endings.
-  - **One-of-a-kind items (4).** The Woven Cloak of Lemnos, the Dragon's Teeth, the Honeyed Lotus Fruit and the Unwatered Wine exist **once in the whole world**. `TAKE` removes the item from the room, so nobody else can take it; `DROP` puts it back in the room for others. Where each unique item is, and who holds it, is saved and survives a server restart. If its holder dies, it is not lost: it goes back to the room where it first lay.
+  - **One-of-a-kind items (4).** The Woven Cloak of Lemnos, the Dragon's Teeth, the Honeyed Lotus Fruit and the Unwatered Wine exist **once in the whole world**. `TAKE` removes the item from the room, so nobody else can take it; `DROP` puts it back in the room for others. Where each unique item is, and who holds it, is saved and survives a server restart. If its holder dies without a group companion in the same room, it returns to the room where it first lay; otherwise the holder keeps it.
   - **Renewable items (13).** Items needed by a quest, a gate or an ending (for example the olive stake or the bow of Odysseus) are `renewable`: taking one gives **you** a copy and the original stays in the room. We chose this on purpose, so that one player carrying off a key item can never stop everyone else from finishing the game. This is the one place where we do not follow the subject's "no duplication" rule, and it only concerns items the story requires.
   - **Referencing.** Every item can be named by its ID or its display name, including names with several words.
 - **Hazards** trigger on entering a room: `lethal`, `item_gate` (fatal without the item), `crew_gate`, `crew_cost`. At six points in the Odyssey the exit that goes against the myth leads to a game-over room.
@@ -230,7 +230,7 @@ Everything is logged as **structured JSON, one object per line** with `log/slog`
 | Abuse patterns | `abuse_command_flood`, `abuse_rapid_connections` | WARN | see below |
 | Failures | `save_player_failed`, `encode_response_failed`, ... | ERROR | `error` |
 
-**Monitoring.** Write the log to a file and filter it, for example `TAP_LOG_FILE=server.log make run-server`, then `grep '"level":"WARN"' server.log`. Abuse is only logged, never punished: more than 20 commands in one second gives `abuse_command_flood`, and more than 8 connections from one IP in 10 seconds gives `abuse_rapid_connections`. Logging is one line per event written through a single logger, so it does not slow the game loop.
+**Monitoring.** Write the log to a file and filter it, for example `TAP_LOG_FILE=server.log make run-server`, then `grep '"level":"WARN"' server.log`. Abuse is only logged, never punished: more than 20 commands in one second gives `abuse_command_flood`, and more than 8 connections from one IP in 10 seconds gives `abuse_rapid_connections`. A single logger writes one structured JSON line per event.
 
 ## Group Contributions
 
@@ -282,13 +282,13 @@ The automated tests cover the connection lifecycle and persistence, the success 
 
 ## 概要(Description)
 
-**The Answer Protocol(TAP)** は、複数人で遊ぶテキストアドベンチャー(MUD)。TCPサーバー1つ(`cmd/server`)、CLIクライアント(`cmd/cli`)、GUIクライアント(`cmd/gui`、Fyne)があり、すべてGoで書いた。サーバーとクライアントはRFC 42TAP(`protocol-rfc.html`)に従うので、他のチームの実装とも通信できる。
+**The Answer Protocol(TAP)** は、複数人で遊ぶテキストアドベンチャー(MUD)。TCPサーバー1つ(`cmd/server`)、CLIクライアント(`cmd/cli`)、GUIクライアント(`cmd/gui`、Fyne)があり、すべてGoで書いた。サーバーはRFC 42TAP(`protocol-rfc.html`)の15コマンドを実装している。CLIは他チームのサーバーにも生のコマンドを送れるが、独自拡張や下記の仕様差がある機能は相互接続時に制限される場合がある。
 
-世界は3つのギリシア神話(アルゴ船の航海・イーリアス・オデュッセイア)で、1つの神話が1つの「編」になっていて、ハブの「運命の間」でつながっている。RFCは戦闘の中身を決めていないので、一つの考えを載せた。**神話に逆らうと殺される。** 研いだオリーブの杭なしでポリュペモスを攻撃すると、戦いにならず即死する。
+世界は3つのギリシア神話(アルゴ船の航海・イーリアス・オデュッセイア)で、1つの神話が1つの「編」になっていて、ハブの「運命の間」でつながっている。RFCが戦闘の内容を定めていないため、**神話に逆らうと殺される**という方針で戦闘を設計した。研いだオリーブの杭なしでポリュペモスを攻撃すると、戦いにならず即死する。
 
 ## 使い方(Instructions)
 
-Go 1.25以降が必要。リポジトリのルートで実行すること(サーバーは`data/world.json`を読み、`saves/`に書き込む)。GUIはLinuxではCコンパイラとOpenGL/X11の開発パッケージも必要(Fyneの要件)。全コマンドは[ビルドと実行](#ビルドと実行building-and-running)にある。
+Go 1.25以降が必要。リポジトリのルートで実行すること(サーバーは`data/world.json`を読み、`saves/`に書き込む)。GUIはLinuxではCコンパイラとOpenGL/X11の開発パッケージも必要(Fyneの要件)。起動・ビルドの詳細は[ビルドと実行](#ビルドと実行building-and-running)を参照。
 
 ```sh
 make run-server        # ターミナル1: サーバー(:4242)
@@ -296,24 +296,7 @@ make run-client        # ターミナル2: CLIクライアント
 make run-client-gui    # またはGUIクライアント
 ```
 
-直接実行する場合:
-
-```sh
-# サーバー起動(ポート4242で待ち受け、Ctrl-Cで終了)
-go run ./cmd/server            # または make run-server
-
-# 別ターミナルでCLIクライアント接続(デフォルトは127.0.0.1:4242)
-go run ./cmd/cli               # または make run-client
-go run ./cmd/cli 127.0.0.1:4242   # ホスト:ポートを指定する場合
-
-# GUIクライアント
-go run ./cmd/gui               # または make run-client-gui
-
-# バイナリとしてビルドする場合
-make build                     # bin/ にサーバー・CLI・GUIが出来る
-```
-
-**CLIの方針.** CLIは「生プロトコルをそのまま中継する」方式(課題の方式1)。打った行がそのままサーバーに送られ、サーバーの応答行がそのまま表示されるので、通信の中身がそのまま見える。最初のコマンドは必ず`CONNECT <name>`。日本語版で遊びたい場合は、`CONNECT`より前に`LANG ja`を送る。
+**CLIの方針.** CLIは「生プロトコルをそのまま中継する」方式(課題の方式1)。打った行がそのままサーバーに送られ、サーバーの応答行がそのまま表示されるので、通信の中身がそのまま見える。通常は`CONNECT <name>`から始める。日本語版で遊びたい場合は、その前に`LANG ja`を送る。
 
 ```
 $ go run ./cmd/cli
@@ -329,7 +312,7 @@ OK {"room":{...,"name":"運命の間",...}, ...}
 
 ### コマンド一覧
 
-RFCの15コマンド + 独自拡張3つ(`FLEE`・`DEFEND`・`LANG`、下表に明記)。正式な仕様は`protocol-rfc.html` 5章。
+RFCの15コマンドと独自拡張4つ(`FLEE`・`DEFEND`・`LANG`・`STATE`)。RFCのコマンド仕様は`protocol-rfc.html` 5章。
 
 | コマンド | 構文 | 内容 |
 |---|---|---|
@@ -345,6 +328,7 @@ RFCの15コマンド + 独自拡張3つ(`FLEE`・`DEFEND`・`LANG`、下表に�
 | `FLEE`(独自) | `FLEE` | 現在の戦闘から離脱。戦闘中のみ有効。 |
 | `DEFEND`(独自) | `DEFEND` | 攻撃せずに身構える。ダメージは与えないが、次の反撃が半分になる。戦闘中のみ有効。 |
 | `STATUS` | `STATUS` | 自分のHP・最大HP・戦闘状態を確認。 |
+| `STATE`(独自) | `STATE` | GUIで使う仲間の人数・接続中の名前・グループ・招待の状態を取得。 |
 | `QUEST` | `QUEST <NPC IDまたは名前>` | そのNPCが持つクエストを受注。 |
 | `QUESTS` | `QUESTS` | これまで受注した全クエストと進行状況を一覧表示。 |
 | `CHAT` | `CHAT <GLOBAL\|ROOM\|GROUP> <メッセージ>` | 指定した範囲にチャット送信。 |
@@ -357,13 +341,13 @@ RFCの15コマンド + 独自拡張3つ(`FLEE`・`DEFEND`・`LANG`、下表に�
 - RFC 42TAP(`protocol-rfc.html`)、[RFC 2119](https://www.rfc-editor.org/rfc/rfc2119)、[RFC 5234(ABNF)](https://www.rfc-editor.org/rfc/rfc5234)、[RFC 793(TCP)](https://www.rfc-editor.org/rfc/rfc793)、[RFC 3629(UTF-8)](https://www.rfc-editor.org/rfc/rfc3629)
 - Go: [Effective Go](https://go.dev/doc/effective_go)、[`net`](https://pkg.go.dev/net)、[`sync`](https://pkg.go.dev/sync)、[`log/slog`](https://pkg.go.dev/log/slog)、[`testing`](https://pkg.go.dev/testing)
 - GUIツールキット: [Fyne](https://docs.fyne.io/)。図: [Mermaid](https://mermaid.js.org/)。背景知識: [MUD(Wikipedia)](https://en.wikipedia.org/wiki/MUD)
-- **AIの使い方.** Claude Code(Anthropic)を使った。用途は、課題とRFCを読む、設計を相談する、ゲームシステム(戦闘・クエスト・ハザード・エンディング・ログ・多言語対応)のGoコードとテストを書いてレビューする、`data/world.json`の英日ストーリー文を書く、ドキュメント(このREADMEと`memo/CODE_WALKTHROUGH.md`)を書く、など。GUIのイラスト(部屋・NPC・アイテム・倒された敵)はtakawakaがCodexで生成した。コミットする前に全員で内容を確認し、ビルドとテストを通した。各自が、提出したコードを説明できる。あと、わからないことはClaudeCodeに聞いた。
+- **AIの使い方.** Claude Code(Anthropic)を使った。用途は、課題とRFCを読む、設計を相談する、ゲームシステム(戦闘・クエスト・ハザード・エンディング・ログ・多言語対応)のGoコードとテストを書いてレビューする、`data/world.json`の英日ストーリー文を書く、ドキュメント(このREADMEと`memo/CODE_WALKTHROUGH.md`)を書く、など。GUIのイラスト(部屋・NPC・アイテム・倒された敵)はtakawakaがCodexで生成した。コミットする前に全員で内容を確認し、ビルドとテストを通した。各自が、提出したコードを説明できる。
 
 ## アーキテクチャ(Architecture)
 
 - **ディスパッチャー.** `server.go`にコマンド名からハンドラーへの表がある。`main.go`が`:4242`で待ち受け、接続ごとに1つのgoroutineが`bufio.Scanner`で行を読み、コマンドを1つずつ実行する。
-- **並行モデル.** ゲーム状態はすべて単一の`sync.Mutex`(`Server.mu`)で守る。イベントループにしなかったのは、正しさを保つのがずっと簡単だから。人数が非常に多いと伸びないが、この課題では問題ない。ディスクへの書き込みは別のmutexで順番に行う。
-- **ノンブロッキングのブロードキャスト.** 接続ごとに送信キューがあり、専用の`writeLoop`が送り出す。そのため、ロックを持ったままソケットに書き込むことはなく、遅い・死んだクライアントが他の人を止めることもない。切断時は、先にプレイヤーの状態を消してから、退出イベントを送る。
+- **並行モデル.** ゲーム状態はすべて単一の`sync.Mutex`(`Server.mu`)で守る。イベントループより状態の整合性を保ちやすい構成だが、大規模な同時接続は想定していない。ディスクへの書き込みは別のmutexで順番に行う。
+- **ノンブロッキングのブロードキャスト.** 接続ごとに送信キューがあり、専用の`writeLoop`が送り出す。そのため、ロックを持ったままソケットに書き込むことはなく、受信が遅い、または切断されたクライアントがほかの人への送信を止めることもない。切断時は、先にプレイヤーの状態を消してから、退出イベントを送る。
 - **データ.** ワールド(部屋・アイテム・NPC・クエスト・ヒント)は`data/world.json`にあり、起動時に検証する(出口や参照先がすべて存在すること)。プレイヤーの状態はJSONで`saves/`に保存する(課題では必須ではない)。
 - **ファイル**(`cmd/server`): `combat.go`、`quest.go`、`hazard.go`、`odyssey.go`、`endings.go`、`hardcore.go`、`item_effects.go`、`defeat.go`、`notify.go`、`flavor.go`、`locale.go`、`chat.go`、`group.go`、`world.go`、`room.go`、`player.go`、`item_store.go`、`player_store.go`、`logging.go`。全ファイルの解説は`memo/CODE_WALKTHROUGH.md`。
 
@@ -373,7 +357,7 @@ RFCの15コマンドとRFCのイベント(`EVT ROOM/GLOBAL/GROUP ...`、`EVT STA
 
 **拡張**(追加のみ。RFCだけに対応したクライアントは無視してよい):
 
-- `FLEE`、`DEFEND`(RFC 6.1.1に例として載っている名前)と`LANG <en|ja>`(`CONNECT`より前だけ。それ以外は`ERR 400`)。戦闘中でないときの`FLEE`/`DEFEND`は`ERR 407 NOT_IN_COMBAT`。
+- `FLEE`、`DEFEND`(RFC 6.1.1に例として載っている名前)、`LANG <en|ja>`(`CONNECT`より前だけ。それ以外は`ERR 400`)、`STATE`(GUI用の仲間・プレイヤー名・グループ・招待の状態)。戦闘中でないときの`FLEE`/`DEFEND`は`ERR 407 NOT_IN_COMBAT`。
 - `EVT ROOM COMBAT <text>`(戦闘の実況)と`EVT PLAYER <kind> <text>`(本人だけへの通知。`kind`は`DEATH`・`ENDING`・`TEAM`・`GUIDE`・`HINT`・`QUEST`)。
 
 **RFC・課題との違いと、その理由**(すべて書いて理由を示す):
@@ -392,18 +376,18 @@ RFCの15コマンドとRFCのイベント(`EVT ROOM/GLOBAL/GROUP ...`、`EVT STA
 - **ターンと先攻.** `ATTACK`1回が1ラウンドで、常にプレイヤーが先に動く。自分の攻撃が当たったあと、生き残った敵が同じラウンドで反撃する。`DEFEND`と`FLEE`もラウンドの行動。
 - **ダメージ.** 自分の攻撃 = 8〜14のランダム + 部屋にいる味方1人につき5(最大3人まで) + 祝福・アイテムの補正(最低1)。反撃 = 7〜14のランダムから、味方1人につき20%、祝福、所持アイテム、`DEFEND`(50%、1回限り)で減らす。減らせる合計は80%まで、悪いアイテムで増える分は最大50%、反撃は1未満にならない。
 - **神話ゲート.** 一部の敵は、アイテムか達成済みクエストが必要(データ上の`myth_requirement_*`)。持っていないと`ATTACK`は即死になる(ポリュペモスはオリーブの杭、タロスはメデイアの助け、求婚者たちはオデュッセウスの弓が必要)。
-- **FLEE.** 逃げることが神話に合うかどうかは敵ごとに決めてある。ポリュペモスとライストリュゴネスはいつでも逃げられる。たいていの敵は失敗して反撃される。ヘクトルからは一度だけ逃げられる。ライストリュゴネスは倒せない(`ATTACK`すると仲間を失うだけ)ので、詰みにはならない。
+- **FLEE.** 逃げることが神話に合うかどうかは敵ごとに決めてある。ポリュペモスとライストリュゴネスはいつでも逃げられる。たいていの敵は失敗して反撃される。ヘクトールからは一度だけ逃げられる。ライストリュゴネスは倒せない(`ATTACK`すると仲間を失うだけ)ので、詰みにはならない。
 - **生きている敵は部屋を塞ぐ.** 倒していない・逃げ切っていない敵がいる部屋から出ようとすると即死する。敵のHPはプレイヤーごとで、死ぬと倒した敵も元に戻る。
 - **敵以外への攻撃.** 一般人にもATTACKできる。反撃はしないが、HPを0にした瞬間に自分が死ぬ(ゲームオーバー扱い)。メデイア・キルケー・アテナ・モイライなど強いキャラ(`mighty`)は、攻撃すると一撃で殺される。どちらも「神話に逆らってはいけない」という設計の表れ。
 - **倒した敵の表示と人物のセリフ.** 倒した敵はGUIで倒れた絵に変わる(`LOOK`の`defeated`)。その部屋の敵を全部倒すと、そこにいる人物が別のセリフを話す(`dialogue_cleared`)。
-- **死亡ペナルティ.** 死ぬと、記念品以外の持ち物を失う(詳しくは[ワールド設計](#ワールド設計world-design)の「持ち主が死んだとき」)。同じ部屋にパーティの仲間がいれば何も失わない。死んだあとモイライに`TALK`すると、死因について神話にちなんだ控えめなヒントを1回だけくれる(`EVT PLAYER HINT`)。
+- **死亡ペナルティ.** 持ち物の扱いは[ワールド設計](#ワールド設計world-design)の「持ち主が死んだとき」を参照。死んだあとモイライに`TALK`すると、死因について神話にちなんだ控えめなヒントを1回だけくれる(`EVT PLAYER HINT`)。
 - **アイテムと祝福.** 全アイテムに、持っている間だけ効く効果がある(与ダメージ・被ダメージ・回復速度・最大HP。良い効果も悪い効果もある)。祝福とは別の仕組みで、GUIの持ち物に緑(良)・赤(悪)で表示され、ⓘボタンで解説も読める。各編をクリア(エンディング)すると、その編の神の祝福が永続で手に入る(死んでも消えない)。アテナ(オデュッセイア編)=敵の反撃-20%、ヘラ(アルゴ船編)=HP回復2倍、アポロン(トロイア編)=与ダメージ+3。
 - **ログと通知.** 戦闘の結果はすべてログに残り、`EVT ROOM COMBAT`で部屋にいる全員へ送られる。
 
 ## クエストシステム(Quest System)
 
-- `QUEST <npc>`でそのNPCのクエストを受注する。目標は`collect_item`か`defeat_npc`で、進行は**自動**(完了報告コマンドは無い)。TAKE/ATTACKの成否をサーバー側が判定して、進行・達成・報酬付与まで行う。受注前に済ませた分も数える。`QUESTS`は受注済みの全クエストを`"progress": "<現在>/<目標>"`付きで一覧する。
-- **報酬.** クエストを達成すると、最大HPが報酬値の1/5(最低1)だけ上がり、HPも全回復する。上がった最大HPは死んでも失わない。
+- `QUEST <npc>`でそのNPCのクエストを受注する。目標は`collect_item`か`defeat_npc`で、進行は**自動**(完了報告コマンドは無い)。受注時点ですでに必要なアイテムを持っているか、対象を倒していれば、その場で達成される。`QUESTS`は受注済みの全クエストを`"progress": "<現在>/<目標>"`付きで一覧する。
+- **報酬.** クエストを達成すると、最大HPが`data/world.json`の`reward.hp`の1/5(最低1)だけ上がり、HPも全回復する。`QUEST`応答の`reward`には、この計算を終えた最大HPの上昇量が入る。上がった最大HPは死んでも失わない。
 - クエストを持つ人物は、その部屋に入ったとき・`TALK`したときに`EVT PLAYER QUEST`で名乗る(`LOOK`はNPCのIDしか出さないため)。部屋の敵を全部倒すと、そこの人物が新しいセリフを話す。
 - 罠のクエストもある。ヘリオスの牛のクエストは、頼まれたとおりにすると死ぬ。
 - **エンディング.** 各編には最後の人物(ペリアス・アイネイアス・ペネロペイア)がいて、アイテムとクエストを確認し、エンディングを見せ、記念品をくれる。3編すべてのあと、モイライが真のエンディングを見せ、運命の間の南に隠し部屋が開く。
@@ -412,8 +396,8 @@ RFCの15コマンドとRFCのイベント(`EVT ROOM/GLOBAL/GROUP ...`、`EVT STA
 
 - **構成.** ハブ(運命の間)から、西にアルゴナウタイ編(12部屋)、北にトロイア編(11部屋)、東にオデュッセイア編(22部屋)へ行ける。どの編もハブに戻れるので、地図は輪でできている。オデュッセイア編は単独で輪になっていて(ハブから東へ進み、イタケの岸辺の東の出口でハブに戻る14部屋)、冥界と求婚者たちの広間はそこから分かれる行き止まりの枝。「ループ+分岐、一直線不可」の要件を満たす。真のエンディングのあと、隠し出口から「織られざる機」へ行ける。全47部屋。
 - **NPC.** 44人で、役割は3つ: `dialogue`が16、`quest_giver`が16、`enemy`が12。運命の間のモイライは、最初の接続時にチュートリアルをする。
-- **ゲームオーバー部屋.** 史実に反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入る部屋が6つある。
-- **ハザード**は部屋に入ったときに発動する: `lethal`(必ず死ぬ)、`item_gate`(アイテムが無いと死ぬ)、`crew_gate`、`crew_cost`。オデュッセイア編の6か所では、神話に反する出口がゲームオーバー部屋につながる。
+- **ゲームオーバー部屋.** 神話の筋書きに反する選択(キコネスの宴に居座る、蓮の園に残る、眠るポリュペモスを刺す、ライストリュゴネスの港の奥へ入る、キルケーの食卓につく、カリュプソの不死を受け入れる)をすると入る部屋が6つある。
+- **ハザード**は部屋に入ったときに発動する: `lethal`(必ず死ぬ)、`item_gate`(アイテムが無いと死ぬ)、`crew_gate`、`crew_cost`。
 - **アイテム.** アイテム21種は「一点物」「複製できる」「記念品」の3種類に分かれる。アイテムはIDでも表示名でも指定でき、複数語の名前も使える。
   - **一点物(4つ)**: 世界に1つしか無い。
     - 対象: レムノスの織り布のマント(レムノス島)・竜の歯(青銅の雄牛の野)・蜜のようなロトスの実(ロトパゴイの地)・薄めていない葡萄酒(ポリュペモスの洞窟)。
@@ -478,7 +462,7 @@ flowchart TB
     ody_scylla["スキュラとカリュブディスの海峡"]
     ody_charybdis["カリュブディスの大渦"]
     ody_thrinacia["トリナキエ、太陽の島"]
-    ody_calypso["オギュギエ、カリュプソの島"]
+    ody_calypso["オギュギア、カリュプソの島"]
     ody_phaeacia["スケリエ、パイアケス人の地"]
     ody_ithaca_shore["イタケの岸辺"]
     ody_palace["求婚者たちの広間"]
@@ -561,7 +545,7 @@ flowchart TB
 | 不正利用のパターン | `abuse_command_flood`、`abuse_rapid_connections` | WARN | 下記 |
 | 失敗 | `save_player_failed`、`encode_response_failed`など | ERROR | `error` |
 
-**監視のしかた.** ログをファイルに書き、絞り込んで見る。例: `TAP_LOG_FILE=server.log make run-server`で起動し、`grep '"level":"WARN"' server.log`。不正利用は記録するだけで、罰は与えない。1秒に20コマンドを超えると`abuse_command_flood`、同じIPから10秒に8接続を超えると`abuse_rapid_connections`が出る。ログは1イベント1行で、単一のロガーを通して書くので、ゲームの処理を遅くしない。
+**監視のしかた.** ログをファイルに書き、絞り込んで見る。例: `TAP_LOG_FILE=server.log make run-server`で起動し、`grep '"level":"WARN"' server.log`。不正利用は記録するだけで、罰は与えない。1秒に20コマンドを超えると`abuse_command_flood`、同じIPから10秒に8接続を超えると`abuse_rapid_connections`が出る。ログは1イベント1行の構造化JSONとして、単一のロガーから書き出す。
 
 ## チーム分担(Group Contributions)
 

@@ -45,7 +45,7 @@
       },
       "description": {
         "en": "The Argo strains at her moorings, fifty oars shipped and ready. King Pelias watches from the cliff above, having sent Jason after the Golden Fleece hoping he would never return.",
-        "ja": "アルゴ船は五十本の櫂を装備し、出航の時を待ちながら舫綱に軋んでいる。ペリアス王は崖の上から見下ろしている――ジェイソンを黄金の羊毛皮を求める旅に送り出したのは、彼が二度と戻らぬことを願ってのことだった。"
+        "ja": "アルゴ船は五十本の櫂を装備し、出航の時を待ちながら舫綱に軋んでいる。ペリアス王は崖の上から見下ろしている――黄金の羊毛皮を探すようイアソンに命じたのは、彼が二度と戻らぬことを願ってのことだった。"
       },
       "exits": {
         "east": "loc.hall_of_fates",
@@ -75,7 +75,7 @@
       },
       "description": {
         "en": "King Amycus, proud of his skill with the boxer's leather straps, blocks every crew that lands until their best fighter has faced him.",
-        "ja": "拳闘の腕前を誇るアミュコス王は、自分の最強の戦士と対戦するまで、上陸するすべての乗組員を足止めする。"
+        "ja": "拳闘の腕前を誇るアミュコス王は、上陸した一行の最も強い戦士が自分と対戦するまで、彼らを先へ進ませない。"
       },
       "exits": {
         "north": "loc.argo_iolcus",
@@ -255,7 +255,7 @@
       },
       "description": {
         "en": "A thousand ships sit becalmed, waiting on winds that will not turn until the seer Calchas is satisfied that the goddess Artemis has been answered.",
-        "ja": "千隻の船が凪の中で動けずにいる。予言者カルカスが、女神アルテミスへの答えが済んだと納得するまで、風は変わらない。"
+        "ja": "千隻の船が凪の中で動けずにいる。予言者カルカスが、女神アルテミスへの供物が捧げられたと納得するまで、風は変わらない。"
       },
       "exits": {
         "west": "loc.troy_sparta",
@@ -315,7 +315,7 @@
       },
       "description": {
         "en": "Beneath Troy's great gate, Hector holds the line his city cannot survive without, while Helen watches the battle from the walls above.",
-        "ja": "トロイアの大きな門の下で、ヘクトールは都市が失えば持ちこたえられない防衛線を守っている。その戦いを、ヘレネが城壁の上から見つめている。"
+        "ja": "トロイアの大きな門の下で、ヘクトールは失えば都市が持ちこたえられなくなる防衛線を守っている。その戦いを、ヘレネが城壁の上から見つめている。"
       },
       "exits": {
         "west": "loc.troy_plain",
@@ -390,8 +390,8 @@
         "ja": "トロイアからの出発"
       },
       "description": {
-        "en": "With Troy fallen, Odysseus turns his ships toward Ithaca, not yet knowing the voyage home will take ten more years than the war itself.",
-        "ja": "トロイアが陥落し、オデュッセウスは船をイタケへと向ける――この航海が、戦争そのものよりも十年も長くかかることを、まだ知らずに。"
+        "en": "With Troy fallen, Odysseus turns his ships toward Ithaca, not yet knowing the voyage home will take another ten years.",
+        "ja": "トロイアが陥落し、オデュッセウスは船をイタケへと向ける――帰郷にさらに十年かかることを、まだ知らずに。"
       },
       "exits": {
         "west": "loc.hall_of_fates",
@@ -592,7 +592,7 @@
       "id": "loc.ody_calypso",
       "name": {
         "en": "Ogygia, Isle of Calypso",
-        "ja": "オギュギエ、カリュプソの島"
+        "ja": "オギュギア、カリュプソの島"
       },
       "description": {
         "en": "The nymph Calypso has kept the shipwrecked Odysseus at her side for seven years, offering an undying life he keeps refusing.",
@@ -775,7 +775,7 @@
       },
       "description": {
         "en": "A jar of ointment brewed from a flower rooted in Prometheus's spilled blood, left for Jason under cover of night — proof against the bronze bulls' fire, and an unspoken price for a promise not yet made.",
-        "ja": "プロメテウスの流した血に根ざす花から作られた軟膏の壺。夜のうちにひそかにジェイソンのもとへ届けられた――青銅の雄牛の炎に対する備えであり、まだ交わされていない約束への、言葉にされない代償でもある。"
+        "ja": "プロメテウスの流した血に根ざす花から作られた軟膏の壺。夜のうちにひそかにイアソンのもとへ届けられた――青銅の雄牛の炎に対する備えであり、まだ交わされていない約束への、言葉にされない代償でもある。"
       },
       "effects": [
         { "effect": "counter_reduction", "value": 10 }
@@ -985,7 +985,7 @@
       },
       "description": {
         "en": "Soft wax from Circe's own hives, warm enough to knead and press into a sailor's ears against any song, however beautiful.",
-        "ja": "キルケー自身の蜂の巣から採れた柔らかな蝋。こねて水夫の耳に詰めれば、どれほど美しい歌にも対抗できるほど温かい。"
+        "ja": "キルケー自身の蜂の巣から採れた柔らかな蝋。温めてこね、水夫の耳に詰めれば、どれほど美しい歌声も遮ることができる。"
       },
       "effects": [
         { "effect": "counter_reduction", "value": 5 }
@@ -1248,7 +1248,7 @@
       },
       "description": {
         "en": "Princess of Colchis and sorceress, who falls for Jason against her own family's interest.",
-        "ja": "コルキスの王女にして魔女。自らの一族の利益に反してジェイソンに恋をする。"
+        "ja": "コルキスの王女にして魔女。自らの一族の利益に反してイアソンに恋をする。"
       },
       "role": "quest_giver",
       "mighty": true,
@@ -1353,8 +1353,8 @@
         "ja": "メネラオス"
       },
       "description": {
-        "en": "King of Sparta, husband of Helen, wronged host and gathering king.",
-        "ja": "スパルタの王、ヘレネの夫。裏切られた客人主にして、軍を召集する王。"
+        "en": "King of Sparta and husband of Helen. Betrayed by a guest he welcomed into his home, he rallies an army.",
+        "ja": "スパルタの王で、ヘレネの夫。自らの館に迎えた客に裏切られ、軍を召集している。"
       },
       "role": "dialogue",
       "room_id": "loc.troy_sparta",
@@ -1381,7 +1381,7 @@
       "dialogue": [
         {
           "en": "The winds will not turn until Artemis is answered. Bring an offering worthy of a goddess.",
-          "ja": "アルテミスへの答えが済むまで、風は変わらない。女神にふさわしい供物を持ってきなさい。"
+          "ja": "アルテミスに供物を捧げるまで、風は変わらない。女神にふさわしいものを持ってきなさい。"
         }
       ]
     },
@@ -1452,7 +1452,7 @@
       },
       "description": {
         "en": "The most famous of women, watching the war fought over her from the walls of Troy.",
-        "ja": "女たちの中で最も名高い者。自分をめぐって戦われる戦を、トロイアの城壁から見つめている。"
+        "ja": "女たちの中で最も名高い者。自分をめぐって繰り広げられる戦いを、トロイアの城壁から見つめている。"
       },
       "role": "dialogue",
       "room_id": "loc.troy_gate",
@@ -1830,7 +1830,7 @@
       },
       "description": {
         "en": "The nymph who kept Odysseus seven years on Ogygia, offering an undying life at her side.",
-        "ja": "オギュギエで七年間オデュッセウスを引き止めたニンフ。自分のそばで死なぬ命を差し出している。"
+        "ja": "オギュギアで七年間オデュッセウスを引き止めたニンフ。自分のそばで死なぬ命を差し出している。"
       },
       "role": "dialogue",
       "mighty": true,
@@ -2074,16 +2074,12 @@
           "ja": "クエスト: 依頼を持つ人がいる部屋に入ると知らせが届く。QUEST <名前> で受注し、QUESTS で進み具合を確認できる。クエストは目的を果たした瞬間に自動で達成され、報酬としてHPが回復する。"
         },
         {
-          "en": "Beware: the old myths are cruel. Some foes and places kill the unprepared at once, and nothing will tell you what you lacked. If you fall, you wake here with only 20 HP, stripped of all but your trophies. Try again, wiser.",
-          "ja": "心せよ、古い神話は残酷だ。備えのない者を即座に殺す敵や場所があり、何が足りなかったかは誰も教えてくれない。倒れればHP20でここに戻り、記念品以外はすべて失う。賢くなって、もう一度挑むがよい。"
+          "en": "Beware: the old myths are cruel. Some foes and places kill the unprepared at once. If you fall, you wake here with 20 HP. You keep your trophies, and a companion in your group and room can protect your other belongings. Ask us for a hint about what happened, then try again.",
+          "ja": "心せよ、古い神話は残酷だ。備えのない者を即座に殺す敵や場所がある。倒れればHP20でここに戻る。記念品は残り、同じ部屋にいるグループの仲間がいれば、ほかの持ち物も守られる。死因の手掛かりが欲しければ我らに話しかけ、もう一度挑むがよい。"
         },
         {
-          "en": "Beware: the old myths are cruel. Some foes and places kill the unprepared at once. If you fall, you wake here with only 20 HP, and we will tell you why you fell. Learn from it and try again.",
-          "ja": "心せよ、古い神話は残酷だ。備えのない者を即座に殺す敵や場所がある。倒れればHP20でここに戻り、なぜ倒れたのかは我らが教えよう。学んで、もう一度挑むがよい。"
-        },
-        {
-          "en": "You are not alone in these tapestries: CHAT speaks to everyone in your room, WHO counts the players online, and GROUP lets you travel together. Talk to us again whenever you need to hear this. Now go, hero.",
-          "ja": "このタペストリーにはそなただけがいるわけではない。CHAT で同じ部屋の全員に話しかけ、WHO でオンラインの人数を確認し、GROUP で仲間と旅ができる。この話を聞き直したくなったら、いつでも我らに TALK するがよい。さあ、行け、英雄よ。"
+          "en": "You are not alone in these tapestries: CHAT ROOM <message> speaks to everyone in your room, WHO counts the players online, and GROUP lets you travel together. Talk to us again whenever you need to hear this. Now go, hero.",
+          "ja": "このタペストリーにはそなただけがいるわけではない。CHAT ROOM <メッセージ> で同じ部屋の全員に話しかけ、WHO でオンラインの人数を確認し、GROUP で仲間と旅ができる。この話を聞き直したくなったら、いつでも我らに TALK するがよい。さあ、行け、英雄よ。"
         }
       ],
       "ending": {
@@ -2530,8 +2526,8 @@
       "ja": "ヘルメスは、キルケに会う前のオデュッセウスに、黒い根と乳白色の花をもつ草を授けた。"
     },
     "npc.scylla": {
-      "en": "No one fights Scylla. The strait takes its toll, and the ship passes.",
-      "ja": "スキュラと戦う者はいない。海峡は代償を取り、船は通り抜ける。"
+      "en": "Scylla need not be defeated to pass the strait. The ship can sail on, even after losing crew.",
+      "ja": "スキュラを倒さなくても海峡は通り抜けられる。仲間を失っても、船は先へ進める。"
     },
     "npc.antinous": {
       "en": "Only one man in the hall could string that great bow, and the suitors knew it was not them.",
@@ -2547,19 +2543,19 @@
     },
     "npc.khalkotauroi": {
       "en": "Medea's ointment kept Jason from the bulls' fire.",
-      "ja": "メディアの塗り薬が、イアソンを雄牛の炎から守った。"
+      "ja": "メデイアの塗り薬が、イアソンを雄牛の炎から守った。"
     },
     "npc.colchis_dragon": {
       "en": "The sleepless dragon was put to sleep by Medea's draught, not by a sword.",
-      "ja": "眠らぬ竜を眠らせたのは剣ではなく、メディアの薬だった。"
+      "ja": "眠らぬ竜を眠らせたのは剣ではなく、メデイアの薬だった。"
     },
     "npc.talos": {
       "en": "Talos had a single vein sealed at the ankle. Who among the Argonauts knew how to unmake him?",
       "ja": "タロスの命は足首の一本の血管に封じられていた。それを解く術を知っていたのは誰か。"
     },
     "npc.hector": {
-      "en": "Hector wore Achilles' old armor once, and only Achilles' armor was worth fighting him in.",
-      "ja": "ヘクトルが戦ったのは、アキレウスの武具をまとった者だった。"
+      "en": "After killing Patroclus, Hector wore Achilles' old armor. Carry the shield made for Achilles if you mean to face him.",
+      "ja": "ヘクトールはパトロクロスを討ち、アキレウスの古い武具をまとった。彼に挑むなら、アキレウスのために作られた盾を携えよ。"
     },
     "loc.ody_sirens": {
       "en": "Odysseus plugged his crew's ears with wax and had himself bound to the mast.",
@@ -2579,7 +2575,7 @@
     },
     "loc.ody_lotus_garden": {
       "en": "Whoever tastes what the Lotus-Eaters offer forgets the way home.",
-      "ja": "ロトパゴス人の差し出すものを口にした者は、故郷への道を忘れる。"
+      "ja": "ロトパゴイが差し出すものを口にした者は、故郷への道を忘れる。"
     },
     "loc.ody_sealed_cave": {
       "en": "Odysseus did not slay the sleeping Cyclops: who else could move the boulder at the cave mouth?",
@@ -2591,7 +2587,7 @@
     },
     "loc.ody_pigsty": {
       "en": "Circe's cup turns men into swine, unless you carry what Hermes gave.",
-      "ja": "キルケの杯は人を豚に変える。ヘルメスの贈り物を持たない者は。"
+      "ja": "キルケーの杯は、ヘルメスの贈り物を持たない者を豚に変える。"
     },
     "loc.ody_eternal_ogygia": {
       "en": "Calypso offered immortality; Odysseus asked only to go home.",
