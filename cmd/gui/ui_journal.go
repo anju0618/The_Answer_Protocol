@@ -56,7 +56,7 @@ func (ui *gui) showRoom(view lookView) {
 	defer ui.refreshMap()
 	if ui.scene.Image == nil || previous.Room.ID != view.Room.ID || !slices.Equal(previous.NPCs, view.NPCs) {
 		ui.scene.Resource = nil
-		ui.scene.Image = composeScene(view.Room.ID, view.NPCs)
+		ui.scene.Image = composeScene(view.Room.ID, view.NPCs, view.Defeated)
 		ui.scene.Refresh()
 	}
 	if previous.Room.ID != view.Room.ID || !slices.Equal(previous.Items, view.Items) {
@@ -91,11 +91,17 @@ func (ui *gui) showRoom(view lookView) {
 		}
 		actions := container.NewGridWithColumns(len(buttons), buttons...)
 		content := textVBox(journalName(ui.catalog.label("npc", id, ui.locale)), actions)
-		if !known || ui.catalog.NPCs[id].Role == "enemy" {
+		switch {
+		case slices.Contains(view.Defeated, id):
+			// Nothing more to do to someone already beaten.
+		case !known || ui.catalog.NPCs[id].Role == "enemy":
 			content.Add(container.NewGridWithColumns(2,
 				ui.commandButton(ui.tr("Attack", "戦う"), func() { ui.send("ATTACK " + id) }),
 				ui.commandButton(ui.tr("Flee", "逃げる"), func() { ui.send("FLEE") }),
 			))
+		default:
+			// A person can be attacked too, but the result is rarely good.
+			content.Add(ui.commandButton(ui.tr("Attack", "攻撃する"), func() { ui.send("ATTACK " + id) }))
 		}
 		npcs = append(npcs, journalCard(content))
 	}
@@ -136,7 +142,37 @@ func (ui *gui) itemRow(id, command, text string) fyne.CanvasObject {
 		picture = container.NewGridWrap(fyne.NewSize(44, 44), image)
 	}
 	button := ui.commandButton(text, func() { ui.send(command + " " + id) })
-	return journalCard(container.NewBorder(nil, nil, picture, button, journalName(ui.catalog.label("item", id, ui.locale))))
+	info := textVBox(journalName(ui.catalog.label("item", id, ui.locale)))
+	for _, line := range ui.itemEffectLines(id) {
+		info.Add(line)
+	}
+	buttons := fyne.CanvasObject(button)
+	if description := ui.itemDescription(id); description != "" {
+		// The explanation is hidden until the player taps the info button, so the list stays short.
+		explanation := widget.NewLabel(description)
+		explanation.Wrapping = fyne.TextWrapWord
+		explanation.Hide()
+		info.Add(explanation)
+		infoButton := widget.NewButtonWithIcon("", theme.InfoIcon(), nil)
+		infoButton.OnTapped = func() {
+			if explanation.Visible() {
+				explanation.Hide()
+			} else {
+				explanation.Show()
+			}
+			ui.journal.Refresh()
+		}
+		buttons = container.NewHBox(infoButton, button)
+	}
+	return journalCard(container.NewBorder(nil, nil, picture, buttons, info))
+}
+
+// itemDescription is the item's explanation from data/world.json in the current language (empty if unknown).
+func (ui *gui) itemDescription(id string) string {
+	if ui.catalog == nil {
+		return ""
+	}
+	return ui.catalog.Items[id].Description.get(ui.locale)
 }
 
 func (ui *gui) showInventory(ids []string) {

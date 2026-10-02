@@ -192,7 +192,7 @@ func (s *Server) playerForUpdateLocked(name string) *Player {
 	if player == nil || player.exiting {
 		return nil
 	}
-	player.regenLocked(time.Now(), s.blessingTotalLocked(player, blessingRegenBonus))
+	player.regenLocked(time.Now(), s.effectTotalLocked(player, blessingRegenBonus), s.maxHPLocked(player))
 	return player
 }
 
@@ -307,6 +307,7 @@ func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	roomID := player.RoomID
 	room := newRoomView(s.world.Rooms[roomID], clientLocale(conn))
+	room.Exits = s.world.Rooms[roomID].exitsFor(player)
 
 	players := make([]string, 0)
 	for playerName, other := range s.players {
@@ -334,7 +335,9 @@ func handleLook(s *Server, conn net.Conn, name *string, parts []string) bool {
 		Players []string `json:"players"`
 		Items   []string `json:"items"`
 		NPCs    []string `json:"npcs"`
-	}{room, players, items, npcs})
+		// Defeated lists the NPCs here this player has beaten; it is left out when there are none.
+		Defeated []string `json:"defeated,omitempty"`
+	}{room, players, items, npcs, s.defeatedNPCsLocked(player, roomID)})
 	if err != nil {
 		s.mu.Unlock()
 		logger.Error("encode_response_failed", "command", "LOOK", "error", err.Error())
@@ -377,7 +380,7 @@ func handleMove(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	destination, ok := room.Exits[strings.ToLower(parts[1])]
+	destination, ok := room.exitsFor(player)[strings.ToLower(parts[1])]
 	if !ok {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 301 NO_EXIT")
@@ -714,8 +717,8 @@ func handleTalk(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 
 	dialogue := ""
-	if len(npc.Dialogue) > 0 {
-		dialogue = npc.Dialogue[0].Get(locale)
+	if lines := s.dialogueFor(player, npcID, npc); len(lines) > 0 {
+		dialogue = lines[0].Get(locale)
 	}
 	if dialogue == "" || strings.TrimSpace(dialogue) == "" || !utf8.ValidString(dialogue) ||
 		strings.IndexFunc(dialogue, unicode.IsControl) >= 0 || len("OK ")+len(dialogue) > maxProtocolLineBytes {
@@ -758,7 +761,7 @@ func handleStatus(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	player.regenLocked(time.Now(), s.blessingTotalLocked(player, blessingRegenBonus))
+	player.regenLocked(time.Now(), s.effectTotalLocked(player, blessingRegenBonus), s.maxHPLocked(player))
 	status := "healthy"
 	if player.CombatTargetID != "" {
 		status = "combat"
@@ -767,7 +770,7 @@ func handleStatus(s *Server, conn net.Conn, name *string, parts []string) bool {
 		HP     int    `json:"hp"`
 		MaxHP  int    `json:"max_hp"`
 		Status string `json:"status"`
-	}{player.HP, maxPlayerHP, status})
+	}{player.HP, s.maxHPLocked(player), status})
 	if err != nil {
 		s.mu.Unlock()
 		logger.Error("encode_response_failed", "command", "STATUS", "error", err.Error())

@@ -76,6 +76,8 @@ func TestDeathTextsFormatCleanly(t *testing.T) {
 	args := map[string][]any{
 		"attack_counter":    {"Foe"},
 		"attack_unprepared": {"Foe"},
+		"attack_mighty":     {"Foe"},
+		"attack_murder":     {"Foe"},
 		"flee_failed":       {"Foe"},
 		"slip_past":         {"Foe"},
 		"talk_unprepared":   {"Foe"},
@@ -169,5 +171,5 @@ func TestQuestAnnouncedAndCompletedEvenIfItemTakenFirst(t *testing.T) {
 	if !strings.Contains(done, "Fetch Herb") {
 		t.Fatalf("completion = %q, want quest name", done)
 	}
-	alice.cmd(t, "STATUS", `OK {"hp":100,"max_hp":100,"status":"healthy"}`)
+	alice.cmd(t, "STATUS", `OK {"hp":102,"max_hp":102,"status":"healthy"}`)
 }

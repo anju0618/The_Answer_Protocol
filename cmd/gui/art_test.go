@@ -85,10 +85,10 @@ func TestArtCoversWorld(t *testing.T) {
 }
 
 func TestSceneChangesWithRoomAndNPCs(t *testing.T) {
-	empty := composeScene("loc.argo_grove", nil)
-	withMedea := composeScene("loc.argo_grove", []string{"npc.medea"})
-	withDragon := composeScene("loc.argo_grove", []string{"npc.colchis_dragon"})
-	otherRoom := composeScene("loc.argo_bull_field", []string{"npc.medea"})
+	empty := composeScene("loc.argo_grove", nil, nil)
+	withMedea := composeScene("loc.argo_grove", []string{"npc.medea"}, nil)
+	withDragon := composeScene("loc.argo_grove", []string{"npc.colchis_dragon"}, nil)
+	otherRoom := composeScene("loc.argo_bull_field", []string{"npc.medea"}, nil)
 	for name, img := range map[string]*image.RGBA{"Medea": withMedea, "dragon": withDragon, "other room": otherRoom} {
 		if sha256.Sum256(img.Pix) == sha256.Sum256(empty.Pix) {
 			t.Errorf("scene did not change for %s", name)
@@ -112,8 +112,8 @@ func TestUnknownRoomAndNPCUsePNGAssets(t *testing.T) {
 			t.Fatalf("decode %s: %v", path, err)
 		}
 	}
-	actual := composeScene("loc.other_team", []string{"npc.other_team"})
-	expected := composeScene("unknown", []string{"unknown"})
+	actual := composeScene("loc.other_team", []string{"npc.other_team"}, nil)
+	expected := composeScene("unknown", []string{"unknown"}, nil)
 	if sha256.Sum256(actual.Pix) != sha256.Sum256(expected.Pix) {
 		t.Fatal("unknown IDs did not use the PNG fallbacks")
 	}
@@ -129,7 +129,7 @@ func previewArt(t *testing.T, rooms, npcs []string) {
 				occupants = []string{npcs[i%len(npcs)]}
 			}
 			x, y := i%5*artWidth, i/5*artHeight
-			draw.Draw(contact, image.Rect(x, y, x+artWidth, y+artHeight), composeScene(id, occupants), image.Point{}, draw.Src)
+			draw.Draw(contact, image.Rect(x, y, x+artWidth, y+artHeight), composeScene(id, occupants, nil), image.Point{}, draw.Src)
 		}
 		writePreview(t, path, contact)
 	}
@@ -154,5 +154,17 @@ func writePreview(t *testing.T, path string, img image.Image) {
 	defer file.Close()
 	if err := png.Encode(file, img); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestDefeatedEnemyIsDrawnDifferently(t *testing.T) {
+	alive := composeScene("loc.argo_bebrycia", []string{"npc.amycus"}, nil)
+	beaten := composeScene("loc.argo_bebrycia", []string{"npc.amycus"}, []string{"npc.amycus"})
+	if bytes.Equal(alive.Pix, beaten.Pix) {
+		t.Fatal("a defeated enemy looks the same as a living one")
+	}
+	sprite := defeatedSprite("npc.amycus")
+	if sprite == nil || sprite.Bounds().Dx() <= sprite.Bounds().Dy() {
+		t.Fatalf("defeated sprite should be lying down (wider than tall), got %v", sprite)
 	}
 }

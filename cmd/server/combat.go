@@ -25,9 +25,10 @@ func takeGuard(player *Player) int {
 }
 
 // reduceCounter lowers a counter-attack by percent (capped), never below 1 damage.
+// A negative percent (a bad item) makes the counter-attack hurt more, up to maxCounterIncrease.
 func reduceCounter(counter, percent int) int {
-	percent = min(percent, maxCounterReduction)
-	if percent <= 0 {
+	percent = max(-maxCounterIncrease, min(percent, maxCounterReduction))
+	if percent == 0 {
 		return counter
 	}
 	return max(1, counter*(100-percent)/100)
@@ -99,7 +100,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 	}
 	npc := s.world.NPCs[npcID]
 	enemyHP := player.enemyHP(npcID, npc)
-	if npc.Role != "enemy" || enemyHP <= 0 {
+	if npc.Role == "enemy" && enemyHP <= 0 {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 405 NPC_NOT_HOSTILE")
 		return false
@@ -121,11 +122,31 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		event = flavor{key: "attack_unprepared", player: *name, npc: npc}
 		result = combatResult{0, enemyHP, 0, "dead"}
 
+	case npc.Role != "enemy" && (npc.Mighty || npc.Guide):
+		// Gods, sorcerers and the like answer a blow with death before it lands.
+		s.respawnPlayerLocked(player, *name, "attack_mighty", npcID, npc.Name.Get(locale))
+		event = flavor{key: "attack_mighty", player: *name, npc: npc}
+		result = combatResult{0, enemyHP, 0, "smitten"}
+
+	case npc.Role != "enemy":
+		// An ordinary person cannot fight back, but killing them ends the game for you.
+		damage := max(1, randDamage(combatMinDamage, combatMaxDamage)+s.effectTotalLocked(player, blessingDamageBonus))
+		enemyHP = max(0, enemyHP-damage)
+		player.setEnemyHP(npcID, enemyHP)
+		if enemyHP == 0 {
+			s.respawnPlayerLocked(player, *name, "attack_murder", npcID, npc.Name.Get(locale))
+			event = flavor{key: "attack_murder", player: *name, npc: npc}
+			result = combatResult{0, 0, damage, "murder"}
+		} else {
+			event = flavor{key: "attack_wounded", player: *name, npc: npc, n: damage}
+			result = combatResult{player.HP, enemyHP, damage, "wounded"}
+		}
+
 	default:
 
 		allies := s.alliesInRoomLocked(*name)
 		bonus := allyBonusCount(allies)
-		damage := randDamage(combatMinDamage, combatMaxDamage) + bonus*allyDamageBonus + s.blessingTotalLocked(player, blessingDamageBonus)
+		damage := max(1, randDamage(combatMinDamage, combatMaxDamage)+bonus*allyDamageBonus+s.effectTotalLocked(player, blessingDamageBonus))
 		enemyHP -= damage
 		if enemyHP < 0 {
 			enemyHP = 0
@@ -140,7 +161,7 @@ func handleAttack(s *Server, conn net.Conn, name *string, parts []string) bool {
 		} else {
 			player.CombatTargetID = npcID
 			counter := randDamage(counterMinDamage, counterMaxDamage)
-			counter = reduceCounter(counter, bonus*allyCounterReductionPercent+s.blessingTotalLocked(player, blessingCounterReduction)+takeGuard(player))
+			counter = reduceCounter(counter, bonus*allyCounterReductionPercent+s.effectTotalLocked(player, blessingCounterReduction)+takeGuard(player))
 			player.HP -= counter
 			if player.HP <= 0 {
 				s.respawnPlayerLocked(player, *name, "attack_counter", npcID, npc.Name.Get(locale))
@@ -219,7 +240,7 @@ func handleFlee(s *Server, conn net.Conn, name *string, parts []string) bool {
 		}
 		player.FledFrom[targetID] = true
 	} else {
-		counter := reduceCounter(randDamage(counterMinDamage, counterMaxDamage), s.blessingTotalLocked(player, blessingCounterReduction)+takeGuard(player))
+		counter := reduceCounter(randDamage(counterMinDamage, counterMaxDamage), s.effectTotalLocked(player, blessingCounterReduction)+takeGuard(player))
 		player.HP -= counter
 		if player.HP <= 0 {
 			s.respawnPlayerLocked(player, *name, "flee_failed", targetID, npc.Name.Get(locale))

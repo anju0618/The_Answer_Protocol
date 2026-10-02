@@ -14,6 +14,7 @@ type Item struct {
 	Obtainable  bool          `json:"obtainable"`
 	Renewable   bool          `json:"renewable,omitempty"`
 	RewardOnly  bool          `json:"reward_only,omitempty"`
+	Effects     []ItemEffect  `json:"effects,omitempty"`
 
 	HomeRoomID string `json:"-"`
 }
@@ -25,11 +26,13 @@ type NPC struct {
 	RoomID               string          `json:"room_id"`
 	HP                   int             `json:"hp"`
 	Dialogue             []LocalizedText `json:"dialogue"`
+	DialogueCleared      []LocalizedText `json:"dialogue_cleared,omitempty"` // said instead once the room's enemies are beaten
 	MythRequirementItem  string          `json:"myth_requirement_item,omitempty"`
 	MythRequirementQuest string          `json:"myth_requirement_quest,omitempty"`
 	FleeAccurate         bool            `json:"flee_accurate,omitempty"`
 	FleeSucceedsOnce     bool            `json:"flee_succeeds_once,omitempty"`
 	Unwinnable           bool            `json:"unwinnable,omitempty"`
+	Mighty               bool            `json:"mighty,omitempty"` // a non-enemy so powerful that attacking it is instant death
 	CrewLossOnAttack     int             `json:"crew_loss_on_attack,omitempty"`
 	Guide                bool            `json:"guide,omitempty"`
 	Ending               *Ending         `json:"ending,omitempty"`
@@ -104,6 +107,14 @@ func (w *World) validate() error {
 		for dir, dest := range room.Exits {
 			if w.Rooms[dest] == nil {
 				return fmt.Errorf("room %q exit %q points to unknown room %q", id, dir, dest)
+			}
+		}
+		for dir, secret := range room.SecretExits {
+			if w.Rooms[secret.Room] == nil {
+				return fmt.Errorf("room %q secret exit %q points to unknown room %q", id, dir, secret.Room)
+			}
+			if _, clash := room.Exits[dir]; clash {
+				return fmt.Errorf("room %q secret exit %q duplicates a normal exit", id, dir)
 			}
 		}
 		if h := room.Hazard; h != nil {
@@ -191,6 +202,9 @@ func (w *World) validate() error {
 		default:
 			return fmt.Errorf("quest %q has unknown objective type %q", id, quest.Objective.Type)
 		}
+	}
+	if err := w.validateItemEffects(); err != nil {
+		return err
 	}
 	return w.validateEndings()
 }

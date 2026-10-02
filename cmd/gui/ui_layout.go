@@ -28,14 +28,16 @@ func (ui *gui) build() {
 	})
 	ui.settingsButton = widget.NewButtonWithIcon("", theme.SettingsIcon(), ui.showConnectionSettings)
 	ui.quitButton = widget.NewButton(ui.tr("Disconnect", "切断"), func() { ui.send("QUIT") })
+	ui.quitButton.Importance = widget.LowImportance
+	ui.connectButton.Importance = widget.HighImportance
 	ui.quitButton.Disable()
-	ui.statusLabel = compactLabel(ui.tr("Not connected", "未接続"))
-	ui.roomCount = compactLabel(ui.tr("Here: -", "部屋: - 人"))
-	ui.totalCount = compactLabel(ui.tr("Online: -", "全体: - 人"))
-	ui.hpLabel = compactLabel("HP: -")
-	ui.crewLabel = compactLabel(ui.tr("Crew: -", "仲間: - 人"))
+	ui.statusLabel = dimLabel(ui.tr("Not connected", "未接続"))
+	ui.roomCount = dimLabel(ui.tr("Here: -", "部屋: - 人"))
+	ui.totalCount = dimLabel(ui.tr("Online: -", "全体: - 人"))
+	ui.hpLabel = boldLabel("HP: -")
+	ui.crewLabel = boldLabel(ui.tr("Crew: -", "仲間: - 人"))
 	ui.hpBar, ui.crewBar = newStatBar(), newStatBar()
-	ui.groupLabel = compactLabel(ui.tr("Group: -", "グループ: -"))
+	ui.groupLabel = dimLabel(ui.tr("Group: -", "グループ: -"))
 
 	ui.roomTitle = widget.NewLabelWithStyle(ui.tr("Your journey", "冒険の旅"), fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	ui.roomTitle.Truncation = fyne.TextTruncateEllipsis
@@ -181,6 +183,20 @@ func (ui *gui) build() {
 func compactLabel(text string) *widget.Label {
 	label := widget.NewLabel(text)
 	label.Truncation = fyne.TextTruncateEllipsis
+	return label
+}
+
+// dimLabel is for secondary info (counts, status): same size, quieter colour.
+func dimLabel(text string) *widget.Label {
+	label := compactLabel(text)
+	label.Importance = widget.LowImportance
+	return label
+}
+
+// boldLabel is for the numbers the player watches most (HP, crew).
+func boldLabel(text string) *widget.Label {
+	label := compactLabel(text)
+	label.TextStyle.Bold = true
 	return label
 }
 

@@ -15,6 +15,26 @@
         "west": "loc.argo_iolcus",
         "north": "loc.troy_ida",
         "east": "loc.ody_troy_shore"
+      },
+      "secret_exits": {
+        "south": {
+          "room": "loc.unwoven_loom",
+          "requires_endings": ["ending.final"]
+        }
+      }
+    },
+    "loc.unwoven_loom": {
+      "id": "loc.unwoven_loom",
+      "name": {
+        "en": "The Unwoven Loom",
+        "ja": "織られざる機"
+      },
+      "description": {
+        "en": "Behind the three tapestries stands a loom no one has ever used. The warp is strung, but the weft hangs loose, waiting. The Moirai say it was kept for the one who finished all three tales and still asked what came next.",
+        "ja": "三枚のタペストリーの裏に、誰も使ったことのない機(はた)がある。経糸は張られているが、緯糸は垂れたまま待っている。モイライいわく、これは三つの物語を終えてなお「その次は?」と問う者のために取っておかれたものだという。"
+      },
+      "exits": {
+        "north": "loc.hall_of_fates"
       }
     },
     "loc.argo_iolcus": {
@@ -359,7 +379,8 @@
         "ja": "木馬は捧げ物として門の内側へ引き込まれ、夜になるとその中に隠れていた兵たちが待ち構えるギリシア軍に都市を開いた。トロイアは燃えている。"
       },
       "exits": {
-        "south": "loc.troy_horse"
+        "south": "loc.troy_horse",
+        "east": "loc.hall_of_fates"
       }
     },
     "loc.ody_troy_shore": {
@@ -741,6 +762,9 @@
         "en": "A finely woven cloak, a parting gift from the women of Lemnos.",
         "ja": "レムノスの女たちからの別れの贈り物である、精巧に織られたマント。"
       },
+      "effects": [
+        { "effect": "regen_bonus", "value": 1 }
+      ],
       "room_id": "loc.argo_lemnos",
       "obtainable": true
     },
@@ -753,6 +777,9 @@
         "en": "A jar of ointment brewed from a flower rooted in Prometheus's spilled blood, left for Jason under cover of night — proof against the bronze bulls' fire, and an unspoken price for a promise not yet made.",
         "ja": "プロメテウスの流した血に根ざす花から作られた軟膏の壺。夜のうちにひそかにジェイソンのもとへ届けられた――青銅の雄牛の炎に対する備えであり、まだ交わされていない約束への、言葉にされない代償でもある。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": 10 }
+      ],
       "room_id": "loc.argo_court_aeetes",
       "obtainable": true,
       "renewable": true
@@ -766,6 +793,9 @@
         "en": "A potion brewed from grave-herbs, strong enough to close a dragon's sleepless eyes.",
         "ja": "墓地の薬草から調合された薬。竜の眠らぬ目さえ閉じさせるほどに強い。"
       },
+      "effects": [
+        { "effect": "damage_bonus", "value": -2 }
+      ],
       "room_id": "loc.argo_grove",
       "obtainable": true,
       "renewable": true
@@ -779,6 +809,10 @@
         "en": "Teeth drawn from the slain guardian dragon of Ares, said to grow into armed warriors when sown.",
         "ja": "アレスに仕える倒された守護竜から抜き取った歯。蒔けば武装した戦士に育つと言われている。"
       },
+      "effects": [
+        { "effect": "damage_bonus", "value": 3 },
+        { "effect": "counter_reduction", "value": -10 }
+      ],
       "room_id": "loc.argo_bull_field",
       "obtainable": true
     },
@@ -791,6 +825,9 @@
         "en": "The shining pelt of the ram Chrysomallos, which once carried Phrixus safely across the sea.",
         "ja": "かつてプリクソスを無事に海の向こうへと運んだ牡羊クリュソマロスの、輝く毛皮。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": 10 }
+      ],
       "room_id": "loc.argo_grove",
       "obtainable": true,
       "renewable": true
@@ -804,6 +841,9 @@
         "en": "An offering sent in place of a king's daughter, if the old stories are kind to Agamemnon.",
         "ja": "王の娘の身代わりとして捧げられた供物――古い物語がアガメムノンに優しければの話だが。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": -5 }
+      ],
       "room_id": "loc.troy_aulis",
       "obtainable": true,
       "renewable": true
@@ -817,6 +857,9 @@
         "en": "Forged by Hephaestus at the sea-nymph Thetis's plea, its rim shows the whole world in bronze, tin, silver, and gold.",
         "ja": "海の精テティスの懇願を受けてヘファイストスが鍛えた盾。その縁には、青銅・錫・銀・金で全世界が描かれている。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": 15 }
+      ],
       "room_id": "loc.troy_achilles_tent",
       "obtainable": true,
       "renewable": true
@@ -830,6 +873,9 @@
         "en": "A king's weight in gold and fine cloth, Priam's price for the return of his son's body.",
         "ja": "息子の亡骸を取り戻すためにプリアモスが支払う、王の重さに等しい黄金と上質な布。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": -10 }
+      ],
       "room_id": "loc.troy_city",
       "obtainable": true,
       "renewable": true
@@ -843,6 +889,9 @@
         "en": "A hollow horse of fir planking, tall as the city walls, with a rope ladder coiled in its belly.",
         "ja": "都市の城壁ほどもある高さの、モミ材でできた中空の馬。腹の中には縄梯子が巻かれている。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": -15 }
+      ],
       "room_id": "loc.troy_horse",
       "obtainable": true,
       "renewable": true
@@ -856,6 +905,10 @@
         "en": "A fruit as sweet as forgetting itself. One bite and home stops mattering.",
         "ja": "忘却そのもののように甘い実。一口かじれば、故郷はもうどうでもよくなる。"
       },
+      "effects": [
+        { "effect": "regen_bonus", "value": 1 },
+        { "effect": "damage_bonus", "value": -3 }
+      ],
       "room_id": "loc.ody_lotus",
       "obtainable": true
     },
@@ -868,6 +921,9 @@
         "en": "A great stake of green olive wood, hardened in the fire and sharpened to a point.",
         "ja": "火で硬くし先端を尖らせた、青々としたオリーブ材の大きな杭。"
       },
+      "effects": [
+        { "effect": "damage_bonus", "value": 3 }
+      ],
       "room_id": "loc.ody_cyclops",
       "obtainable": true,
       "renewable": true
@@ -881,6 +937,10 @@
         "en": "Wine strong enough to fell a god, carried ashore from the ship's stores.",
         "ja": "神さえも打ち倒すほど強い酒。船の貯蔵から岸へと運ばれてきた。"
       },
+      "effects": [
+        { "effect": "regen_bonus", "value": 1 },
+        { "effect": "damage_bonus", "value": -2 }
+      ],
       "room_id": "loc.ody_cyclops",
       "obtainable": true
     },
@@ -893,6 +953,10 @@
         "en": "A leather bag holding every wind but the one already loosed to carry the ship home. Best left unopened.",
         "ja": "船を故郷へ運ぶために既に解き放たれた風を除く、あらゆる風を閉じ込めた革袋。開けずにおくのが一番だ。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": 10 },
+        { "effect": "max_hp", "value": -5 }
+      ],
       "room_id": "loc.ody_aeolus",
       "obtainable": true,
       "renewable": true
@@ -906,6 +970,10 @@
         "en": "A small herb with white flowers and a black root, a gift from Hermes proof against any enchantment of Circe's.",
         "ja": "白い花と黒い根を持つ小さな薬草。ヘルメスからの贈り物で、キルケーのいかなる魔法にも対抗できる。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": 5 },
+        { "effect": "regen_bonus", "value": 1 }
+      ],
       "room_id": "loc.ody_circe",
       "obtainable": true,
       "renewable": true
@@ -919,6 +987,9 @@
         "en": "Soft wax from Circe's own hives, warm enough to knead and press into a sailor's ears against any song, however beautiful.",
         "ja": "キルケー自身の蜂の巣から採れた柔らかな蝋。こねて水夫の耳に詰めれば、どれほど美しい歌にも対抗できるほど温かい。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": 5 }
+      ],
       "room_id": "loc.ody_circe",
       "obtainable": true,
       "renewable": true
@@ -932,6 +1003,9 @@
         "en": "One of the sun god's own immortal cattle, coat bright as noon. Touching it is forbidden.",
         "ja": "太陽神自身の不死の牛の一頭。その毛並みは真昼のように明るい。触れることは禁じられている。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": -20 }
+      ],
       "room_id": "loc.ody_thrinacia",
       "obtainable": true,
       "renewable": true
@@ -945,6 +1019,9 @@
         "en": "A great bow that no suitor could even bend, let alone string. It has waited twenty years for its owner's return.",
         "ja": "どの求婚者も曲げることすらできなかった大弓。二十年もの間、持ち主の帰りを待ち続けている。"
       },
+      "effects": [
+        { "effect": "damage_bonus", "value": 4 }
+      ],
       "room_id": "loc.ody_palace",
       "obtainable": true,
       "renewable": true
@@ -958,6 +1035,10 @@
         "en": "A laurel wreath awarded to those who brought the Golden Fleece home.",
         "ja": "黄金の羊毛皮を持ち帰った者に授けられる月桂冠。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": 10 },
+        { "effect": "counter_reduction", "value": 5 }
+      ],
       "room_id": "",
       "obtainable": false,
       "renewable": true,
@@ -972,6 +1053,9 @@
         "en": "A glowing ember carried out of the burning city.",
         "ja": "炎上する都から持ち出された、赤く光る燃えさし。"
       },
+      "effects": [
+        { "effect": "damage_bonus", "value": 3 }
+      ],
       "room_id": "",
       "obtainable": false,
       "renewable": true,
@@ -986,6 +1070,10 @@
         "en": "A branch from the living olive that anchors the marriage bed of Odysseus and Penelope.",
         "ja": "オデュッセウスとペネロペイアの寝台を支える、生きたオリーブの木の枝。"
       },
+      "effects": [
+        { "effect": "regen_bonus", "value": 1 },
+        { "effect": "max_hp", "value": 5 }
+      ],
       "room_id": "",
       "obtainable": false,
       "renewable": true,
@@ -1000,6 +1088,10 @@
         "en": "A thread from the Moirai's loom, given to those who have walked all three tapestries to their end.",
         "ja": "三枚のタペストリーすべてを結末まで歩いた者に、モイライが与える運命の糸。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": 10 },
+        { "effect": "damage_bonus", "value": 2 }
+      ],
       "room_id": "",
       "obtainable": false,
       "renewable": true,
@@ -1062,6 +1154,12 @@
           "en": "Drive off the Harpies that torment me, and I will tell you how to pass the Clashing Rocks.",
           "ja": "私を苦しめるハルピュイアを追い払ってくれれば、衝突する岩の通り方を教えよう。"
         }
+      ],
+      "dialogue_cleared": [
+        {
+          "en": "The Harpies are gone. For the first time in years, nothing is snatched from my table. As I promised: loose a dove at the Clashing Rocks, and row with all your strength the instant they part.",
+          "ja": "ハルピュイアは去った。何年ぶりだろう、食卓から何も奪われないのは。約束どおり教えよう――衝突する岩の前で鳩を放ち、岩が開いた瞬間に全力で漕ぐのだ。"
+        }
       ]
     },
     "npc.harpy": {
@@ -1093,6 +1191,7 @@
         "ja": "コルキスの王、太陽神ヘリオスの息子であり、黄金の羊毛皮の守り主。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.argo_court_aeetes",
       "hp": 50,
       "dialogue": [
@@ -1152,12 +1251,19 @@
         "ja": "コルキスの王女にして魔女。自らの一族の利益に反してジェイソンに恋をする。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.argo_grove",
       "hp": 25,
       "dialogue": [
         {
           "en": "Take this draught — it will close the dragon's eyes. Know that in helping you, I betray my own father.",
           "ja": "この薬を持っていって――竜の目を閉じさせるものです。あなたを助けることで、私は自分の父を裏切るのだと知っておいてください。"
+        }
+      ],
+      "dialogue_cleared": [
+        {
+          "en": "The dragon sleeps at last. Stealing my father's treasure is a sin I will carry, and still I do not regret it. Take the Fleece to your ship, quickly, before dawn.",
+          "ja": "竜はようやく眠った。父の宝を奪うという罪は、私が背負いましょう。それでも後悔はしていません。さあ、羊毛皮を船へ――夜が明ける前に。"
         }
       ]
     },
@@ -1308,6 +1414,7 @@
         "ja": "ギリシア最強の戦士。奪われた捕虜をめぐり、怒りと悲しみのうちに戦から退いている。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.troy_achilles_tent",
       "hp": 80,
       "dialogue": [
@@ -1354,6 +1461,12 @@
         {
           "en": "I watch my two husbands from these walls — the one I left, and the one who dies defending the roof that hides me.",
           "ja": "この城壁から、私の二人の夫を見つめている――一人は私が去った夫、もう一人は私を匿う屋根を守って死んでいく夫。"
+        }
+      ],
+      "dialogue_cleared": [
+        {
+          "en": "Hector has fallen. In all those years he never once blamed me, and that is the hardest thing to bear.",
+          "ja": "ヘクトールは倒れた。あの方は何年たっても、一度も私を責めなかった……それがいちばん、つらい。"
         }
       ]
     },
@@ -1520,6 +1633,12 @@
           "en": "Blind the beast before he eats us all one by one — he has already crushed two of our friends against these stones!",
           "ja": "一人ずつ食われる前に、あの獣の目を潰してくれ――もう二人も、この岩に叩きつけられて死んだんだ!"
         }
+      ],
+      "dialogue_cleared": [
+        {
+          "en": "The monster is down... we will not be eaten any more? Thank you, friend of Nobody. I will remember this cave for the rest of my life, and I will not miss it.",
+          "ja": "あの化け物が、倒れた……? もう誰も食われなくていいんだな。ありがとう、「誰でもない者」の仲間よ。この洞窟のことは一生忘れない。二度と戻りたくはないがね。"
+        }
       ]
     },
     "npc.polyphemus": {
@@ -1553,6 +1672,7 @@
         "ja": "ゼウス自らの任命により風を司る、浮島の主。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.ody_aeolus",
       "hp": 20,
       "dialogue": [
@@ -1594,6 +1714,7 @@
         "ja": "アイアイエの魔女、ヘリオスの娘。姿を変えられた水夫たちでいっぱいの豚小屋の主。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.ody_circe",
       "hp": 45,
       "dialogue": [
@@ -1614,6 +1735,7 @@
         "ja": "テーバイの盲目の予言者。その影は死後もなお助言を求められる。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.ody_underworld",
       "hp": 20,
       "dialogue": [
@@ -1652,6 +1774,7 @@
         "ja": "その声を聞いたすべての船を、これまで岩礁へと誘い込んできた歌い手たち。"
       },
       "role": "dialogue",
+      "mighty": true,
       "room_id": "loc.ody_sirens",
       "hp": 30,
       "dialogue": [
@@ -1710,6 +1833,7 @@
         "ja": "オギュギエで七年間オデュッセウスを引き止めたニンフ。自分のそばで死なぬ命を差し出している。"
       },
       "role": "dialogue",
+      "mighty": true,
       "room_id": "loc.ody_calypso",
       "hp": 30,
       "dialogue": [
@@ -1767,6 +1891,7 @@
         "ja": "オデュッセウスの守護女神、知恵の灰色の瞳の女神。若い羊飼いの姿でイタケの浜を歩く。"
       },
       "role": "dialogue",
+      "mighty": true,
       "room_id": "loc.ody_ithaca_shore",
       "hp": 100,
       "dialogue": [
@@ -1857,6 +1982,12 @@
           "ja": "二十年、私は待ち続けました。あの弓を張ることができたのは、ただ一人だけでした。"
         }
       ],
+      "dialogue_cleared": [
+        {
+          "en": "The hall is quiet. For the first time in twenty years, it is quiet. You bent that bow the way he did, and it frightens me how much I want to believe it.",
+          "ja": "広間が、静かです。二十年ぶりに、静か。あなたはあの人と同じ手つきで弓を引いた。それを信じたくてたまらない自分が、少し怖いのです。"
+        }
+      ],
       "ending": {
         "id": "ending.odyssey",
         "name": {
@@ -1917,6 +2048,7 @@
         "ja": "英雄たちの命の糸を紡ぎ、測り、断つ三人の古き姉妹。困ったときは話しかけるとよい。"
       },
       "role": "dialogue",
+      "mighty": true,
       "room_id": "loc.hall_of_fates",
       "hp": 100,
       "guide": true,
@@ -1980,8 +2112,8 @@
             "ja": "あなたは、これらすべてに何の意味があるのかを問うためにここへ来た。モイライはただ微笑む。問うべきは「なぜ」ではなく、「どこまで歩けるか」だったのだ。"
           },
           {
-            "en": "And the Answer, the one this Protocol was named for, is 42.",
-            "ja": "そして答え――このプロトコルの名の由来となった答えは、42である。"
+            "en": "Atropos lifts her shears and, for once, does not cut. \"The Answer? It was never woven into any tapestry. It is what you did at every crossroads, when no one told you which way to go.\"",
+            "ja": "アトロポスは鋏を掲げ、このときばかりは何も断ち切らない。「答え? それはどのタペストリーにも織り込まれていない。道の分かれ目のたびに、誰も行く先を教えてくれない中で、そなたが選んだこと――それが答えだ」"
           },
           {
             "en": "Now go where you like. The threads never truly end; they only wait for the next hero.",

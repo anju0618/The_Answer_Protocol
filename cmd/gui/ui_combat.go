@@ -88,6 +88,15 @@ func (ui *gui) handleAttack(request, line string) bool {
 	case "dead":
 		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("%s struck you down.", "%s にやられた。"), enemy))
 		ui.showFight(nil)
+	case "wounded":
+		// An ordinary person cannot fight back, so there is no fight panel, only the hit.
+		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You strike %s for %d damage. (%d HP left)", "%s に %d ダメージを与えた。(残りHP %d)"), enemy, result.Damage, result.TargetHP))
+	case "murder":
+		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You killed %s. The Fates cut your thread.", "%s を手にかけた。運命の女神たちがあなたの糸を断ち切った。"), enemy))
+		ui.showFight(nil)
+	case "smitten":
+		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You raised your hand against %s, and were struck dead before the blow landed.", "%s に手を上げた。一撃が届く前に打ち殺された。"), enemy))
+		ui.showFight(nil)
 	case "overwhelmed":
 		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("%s is too strong to beat by force.", "%s は力では敵わない。"), enemy))
 		ui.showFight(nil)

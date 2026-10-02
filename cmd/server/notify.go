@@ -38,6 +38,16 @@ var deathTexts = map[string]LocalizedText{
 		"ja": "%sに挑み、即座に殺された。",
 	},
 
+	"attack_mighty": {
+		"en": "You raised your hand against %s, and were struck dead before the blow landed.",
+		"ja": "%sに手を上げた。一撃が届く前に、あなたは打ち殺された。",
+	},
+
+	"attack_murder": {
+		"en": "You killed %s, and the Fates cut your thread for it.",
+		"ja": "%sを手にかけた。運命の女神たちは、その報いにあなたの糸を断ち切った。",
+	},
+
 	"flee_failed": {
 		"en": "You tried to flee from %s, but failed and were cut down.",
 		"ja": "%sから逃げようとしたが失敗し、斬り伏せられた。",

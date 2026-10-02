@@ -103,7 +103,7 @@ func TestAttackUnwinnableCostsCrewNotHP(t *testing.T) {
 	}
 }
 
-func TestAttackDefeatCompletesQuestAndHeals(t *testing.T) {
+func TestAttackDefeatCompletesQuestRaisesMaxHPAndHeals(t *testing.T) {
 	server := newServer(t.TempDir())
 	server.world = &World{
 		StartRoomID: "loc.start",
@@ -123,7 +123,7 @@ func TestAttackDefeatCompletesQuestAndHeals(t *testing.T) {
 	alice := startTestClient(t, server)
 	alice.connect(t, "alice")
 
-	alice.cmd(t, "QUEST npc.giver", `OK {"quest_id":"quest.defeat","description":"Defeat the grunt.","reward":30,"status":"available"}`)
+	alice.cmd(t, "QUEST npc.giver", `OK {"quest_id":"quest.defeat","description":"Defeat the grunt.","reward":6,"status":"available"}`)
 
 	server.mu.Lock()
 	server.players["alice"].HP = 50
@@ -133,7 +133,7 @@ func TestAttackDefeatCompletesQuestAndHeals(t *testing.T) {
 	if data["status"] != "victory" || data["target_hp"] != float64(0) {
 		t.Fatalf("attack result = %v, want a victory with target_hp 0", data)
 	}
-	alice.cmd(t, "STATUS", `OK {"hp":80,"max_hp":100,"status":"healthy"}`)
+	alice.cmd(t, "STATUS", `OK {"hp":106,"max_hp":106,"status":"healthy"}`)
 	alice.cmd(t, "QUESTS", `OK [{"quest_id":"quest.defeat","status":"completed","progress":"1/1"}]`)
 	alice.cmd(t, "QUEST npc.giver", "ERR 406 NO_QUEST_AVAILABLE")
 }

@@ -262,7 +262,7 @@ func TestEveryArcIsWinnableByEveryPlayer(t *testing.T) {
 
 		w.teleport(server.world.StartRoomID)
 		w.do("TALK npc.moirai")
-		if !w.reached("ending.final") || !w.has("item.thread_of_fate") || !w.eventsContain("42") {
+		if !w.reached("ending.final") || !w.has("item.thread_of_fate") || !w.eventsContain("Atropos") {
 			t.Fatalf("%s did not get the final ending (events: %q)", playerName, w.events)
 		}
 	}
@@ -476,12 +476,12 @@ func TestCombatFlavorIsLocalizedPerRecipient(t *testing.T) {
 func TestRegenRestoresHPOverTime(t *testing.T) {
 	start := time.Now()
 	p := &Player{HP: 20}
-	p.regenLocked(start, 0)
-	p.regenLocked(start.Add(10*time.Second), 0)
+	p.regenLocked(start, 0, maxPlayerHP)
+	p.regenLocked(start.Add(10*time.Second), 0, maxPlayerHP)
 	if want := 20 + int(10*time.Second/regenInterval)*regenAmount; p.HP != want {
 		t.Fatalf("HP after 10s = %d, want %d", p.HP, want)
 	}
-	p.regenLocked(start.Add(time.Hour), 0)
+	p.regenLocked(start.Add(time.Hour), 0, maxPlayerHP)
 	if p.HP != maxPlayerHP {
 		t.Fatalf("HP after an hour = %d, want %d", p.HP, maxPlayerHP)
 	}

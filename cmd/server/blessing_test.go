@@ -41,10 +41,10 @@ func TestRegenBonusSpeedsUpHealing(t *testing.T) {
 	start := time.Now()
 	plain := &Player{HP: 20}
 	blessed := &Player{HP: 20}
-	plain.regenLocked(start, 0)
-	blessed.regenLocked(start, 1)
-	plain.regenLocked(start.Add(10*time.Second), 0)
-	blessed.regenLocked(start.Add(10*time.Second), 1)
+	plain.regenLocked(start, 0, maxPlayerHP)
+	blessed.regenLocked(start, 1, maxPlayerHP)
+	plain.regenLocked(start.Add(10*time.Second), 0, maxPlayerHP)
+	blessed.regenLocked(start.Add(10*time.Second), 1, maxPlayerHP)
 	if plain.HP != 25 || blessed.HP != 30 {
 		t.Fatalf("after 10s: plain=%d (want 25), blessed=%d (want 30)", plain.HP, blessed.HP)
 	}

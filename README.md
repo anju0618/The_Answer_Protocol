@@ -100,7 +100,7 @@ The RFC leaves damage, turns and extra commands to each team. Ours:
 
 ## Quest System
 
-- `QUEST <npc>` starts the NPC's quest; objectives are `collect_item` or `defeat_npc` and progress is **automatic** (no completion command). Completion heals you by the quest's reward. Progress you made before accepting also counts.
+- `QUEST <npc>` starts the NPC's quest; objectives are `collect_item` or `defeat_npc` and progress is **automatic** (no completion command). Completion raises your max HP by a fifth of the quest's reward (kept after death) and fully heals you. Progress you made before accepting also counts.
 - `QUESTS` lists every started quest as `"progress": "<current>/<target>"`.
 - Quest givers are announced with `EVT PLAYER QUEST` on entry and after `TALK`, since `LOOK` only lists NPC IDs.
 - Some quests are traps: the cattle of Helios quest kills you if you do what it asks.
@@ -130,6 +130,7 @@ All rooms and exits, generated from `data/world.json`. `<-->` is two-way, `-->` 
 ```mermaid
 flowchart TB
   hall_of_fates["Hall of the Fates"]
+  unwoven_loom["The Unwoven Loom"]
   subgraph argo_arc["Voyage of the Argonauts"]
     argo_iolcus["Harbor of Iolcus"]
     argo_lemnos["Island of Lemnos"]
@@ -184,6 +185,7 @@ flowchart TB
   hall_of_fates <-->|E| ody_troy_shore
   hall_of_fates <-->|W| argo_iolcus
   hall_of_fates <-->|N| troy_ida
+  hall_of_fates <-.->|S: after The Answer| unwoven_loom
   argo_iolcus <-->|S| argo_bebrycia
   argo_iolcus <-->|N| argo_lemnos
   ody_troy_shore <-->|E| ody_cicones
@@ -228,6 +230,7 @@ flowchart TB
   ody_calypso <-->|E| ody_phaeacia
   ody_phaeacia <-->|E| ody_ithaca_shore
   ody_ithaca_shore -->|E| hall_of_fates
+  troy_fall -->|E| hall_of_fates
   ody_ithaca_shore <-->|N| ody_palace
   classDef hub fill:#2e7d32,color:#fff,stroke:#1b5e20
   classDef hazard fill:#ef6c00,color:#fff,stroke:#bf360c
@@ -247,7 +250,7 @@ Everything is logged as **structured JSON, one object per line** with `log/slog`
 | Every command received | `command` | INFO | `remote`, `player` (empty before `CONNECT`), `command`, `args` (clipped to 300 characters) |
 | Every response and error code sent | `response` (`OK ...`), `error_response` (`ERR ...`) | INFO / WARN | `remote`, `player`, `command`, `code` (errors), `line`. Logged at the single point where bytes are written (`writeLoop`), so no response can be missed |
 | World state changes | `item_taken`, `item_dropped`, `player_moved`, `npc_interaction`, `combat_attack`, `combat_flee`, `player_died`, `victory_shared` | INFO | `player`, `item` / `npc` / `room`, combat `status`, `damage`, HPs, death `cause` and what happened to the belongings |
-| Quest progress and completion | `quest_accepted`, `quest_progress`, `quest_completed`, `ending_reached` | INFO | `player`, `quest` / `ending`, `progress`, `target`, `reward_hp` |
+| Quest progress and completion | `quest_accepted`, `quest_progress`, `quest_completed`, `ending_reached` | INFO | `player`, `quest` / `ending`, `progress`, `target`, `max_hp_gain` |
 | Abuse patterns | `abuse_command_flood`, `abuse_rapid_connections` | WARN | see below |
 | Failures | `save_player_failed`, `drop_item_failed`, `encode_response_failed`, ... | ERROR | `error` |
 
@@ -384,6 +387,7 @@ go test ./cmd/server/... -run TestOdysseyArcAgainstRealWorldData -v
 ```mermaid
 flowchart TB
   hall_of_fates["運命の間"]
+  unwoven_loom["織られざる機"]
   subgraph argo_arc["アルゴ船の航海"]
     argo_iolcus["イオルコスの港"]
     argo_lemnos["レムノス島"]
@@ -438,6 +442,7 @@ flowchart TB
   hall_of_fates <-->|東| ody_troy_shore
   argo_iolcus -->|東| hall_of_fates
   troy_ida -->|南| hall_of_fates
+  hall_of_fates <-.->|南: 「答え」の後| unwoven_loom
   argo_iolcus <-->|南| argo_bebrycia
   argo_iolcus <-->|北| argo_lemnos
   ody_troy_shore <-->|東| ody_cicones
@@ -482,6 +487,7 @@ flowchart TB
   ody_calypso <-->|東| ody_phaeacia
   ody_phaeacia <-->|東| ody_ithaca_shore
   ody_ithaca_shore -->|東| hall_of_fates
+  troy_fall -->|東| hall_of_fates
   ody_ithaca_shore <-->|北| ody_palace
   classDef hub fill:#2e7d32,color:#fff,stroke:#1b5e20
   classDef hazard fill:#ef6c00,color:#fff,stroke:#bf360c
