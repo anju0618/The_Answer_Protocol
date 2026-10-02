@@ -2,7 +2,7 @@
 
 # The Answer Protocol (TAP)
 
-[English](#english) ・ [日本語版は下にあります (Japanese version below)](#日本語版)
+[English](#english) ・ [日本語版](#日本語版)
 
 ---
 
@@ -231,7 +231,6 @@ Everything is logged as **structured JSON, one object per line** with `log/slog`
 
 ## Group Contributions
 
-Based on `git log` (amakino also commits as "Anjou Makino" and "amakino desktop").
 
 - **takawaka**: project skeleton; server core (accept loop, command dispatch, `CONNECT`/`LOOK`/`MOVE`); non-blocking send queue; `CHAT` and `GROUP`; item and player persistence; the server tests; the **CLI client**; the **GUI client** foundation (protocol/state model, Japanese font, rendering, mouse controls, responsive layout); the **artwork** (rooms, NPCs, items, game-over rooms, defeated enemies); GUI and server bug fixes.
 - **amakino**: subject and RFC analysis; **world and story** (three arcs, English and Japanese, `data/world.json`); **game systems** (combat `ATTACK`/`FLEE`/`DEFEND`, quests, hazards, crew, myth gates, endings and blessings, death penalty and co-op, hints, localization `LANG`, item effects, secret room); **structured logging**; the **Makefile**; many GUI features (HP bars, colored story log, combat panel, minimap, flashes, endings gallery, item descriptions); integration tests; README and `memo/`.
@@ -478,8 +477,6 @@ flowchart TB
 ```
 
 ## チーム分担
-
-`git log` に基づく(amakinoは「Anjou Makino」「amakino desktop」名義のコミットも含む)。
 
 - **takawaka**: プロジェクトの土台、サーバーの中核(TCP受付・行単位ディスパッチ、CONNECT/LOOK/MOVE)、非同期送信キュー、CHATとGROUP、アイテム・プレイヤーの永続化、サーバーのテスト、**CLIクライアント**、**GUIクライアント**の土台(通信・状態モデル、日本語フォント、描画、マウス操作、レスポンシブなレイアウト)、**イラスト**(部屋・NPC・アイテム・ゲームオーバー部屋・倒された敵)、GUIとサーバーの不具合修正
 - **amakino**: 課題とRFCの分析、**ワールド・ストーリー設計**(3編・英日2言語・`data/world.json`)、**ゲームシステム**(戦闘ATTACK/FLEE/DEFEND、クエスト、ハザード、クルー、神話ゲート、エンディングと祝福、死亡ペナルティと協力、ヒント、`LANG`による多言語対応、アイテム効果、隠し部屋)、**構造化ログ**、**Makefile**、GUIの機能(HPバー・色分けログ・戦闘パネル・ミニマップ・演出・エンディング図鑑・アイテム解説)、結合テスト、READMEと`memo/`
