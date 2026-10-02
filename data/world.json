@@ -1191,6 +1191,7 @@
         "ja": "コルキスの王、太陽神ヘリオスの息子であり、黄金の羊毛皮の守り主。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.argo_court_aeetes",
       "hp": 50,
       "dialogue": [
@@ -1250,6 +1251,7 @@
         "ja": "コルキスの王女にして魔女。自らの一族の利益に反してジェイソンに恋をする。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.argo_grove",
       "hp": 25,
       "dialogue": [
@@ -1412,6 +1414,7 @@
         "ja": "ギリシア最強の戦士。奪われた捕虜をめぐり、怒りと悲しみのうちに戦から退いている。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.troy_achilles_tent",
       "hp": 80,
       "dialogue": [
@@ -1669,6 +1672,7 @@
         "ja": "ゼウス自らの任命により風を司る、浮島の主。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.ody_aeolus",
       "hp": 20,
       "dialogue": [
@@ -1710,6 +1714,7 @@
         "ja": "アイアイエの魔女、ヘリオスの娘。姿を変えられた水夫たちでいっぱいの豚小屋の主。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.ody_circe",
       "hp": 45,
       "dialogue": [
@@ -1730,6 +1735,7 @@
         "ja": "テーバイの盲目の予言者。その影は死後もなお助言を求められる。"
       },
       "role": "quest_giver",
+      "mighty": true,
       "room_id": "loc.ody_underworld",
       "hp": 20,
       "dialogue": [
@@ -1768,6 +1774,7 @@
         "ja": "その声を聞いたすべての船を、これまで岩礁へと誘い込んできた歌い手たち。"
       },
       "role": "dialogue",
+      "mighty": true,
       "room_id": "loc.ody_sirens",
       "hp": 30,
       "dialogue": [
@@ -1826,6 +1833,7 @@
         "ja": "オギュギエで七年間オデュッセウスを引き止めたニンフ。自分のそばで死なぬ命を差し出している。"
       },
       "role": "dialogue",
+      "mighty": true,
       "room_id": "loc.ody_calypso",
       "hp": 30,
       "dialogue": [
@@ -1883,6 +1891,7 @@
         "ja": "オデュッセウスの守護女神、知恵の灰色の瞳の女神。若い羊飼いの姿でイタケの浜を歩く。"
       },
       "role": "dialogue",
+      "mighty": true,
       "room_id": "loc.ody_ithaca_shore",
       "hp": 100,
       "dialogue": [
@@ -2039,6 +2048,7 @@
         "ja": "英雄たちの命の糸を紡ぎ、測り、断つ三人の古き姉妹。困ったときは話しかけるとよい。"
       },
       "role": "dialogue",
+      "mighty": true,
       "room_id": "loc.hall_of_fates",
       "hp": 100,
       "guide": true,

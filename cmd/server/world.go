@@ -32,6 +32,7 @@ type NPC struct {
 	FleeAccurate         bool            `json:"flee_accurate,omitempty"`
 	FleeSucceedsOnce     bool            `json:"flee_succeeds_once,omitempty"`
 	Unwinnable           bool            `json:"unwinnable,omitempty"`
+	Mighty               bool            `json:"mighty,omitempty"` // a non-enemy so powerful that attacking it is instant death
 	CrewLossOnAttack     int             `json:"crew_loss_on_attack,omitempty"`
 	Guide                bool            `json:"guide,omitempty"`
 	Ending               *Ending         `json:"ending,omitempty"`

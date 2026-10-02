@@ -91,11 +91,17 @@ func (ui *gui) showRoom(view lookView) {
 		}
 		actions := container.NewGridWithColumns(len(buttons), buttons...)
 		content := textVBox(journalName(ui.catalog.label("npc", id, ui.locale)), actions)
-		if !known || ui.catalog.NPCs[id].Role == "enemy" {
+		switch {
+		case slices.Contains(view.Defeated, id):
+			// Nothing more to do to someone already beaten.
+		case !known || ui.catalog.NPCs[id].Role == "enemy":
 			content.Add(container.NewGridWithColumns(2,
 				ui.commandButton(ui.tr("Attack", "戦う"), func() { ui.send("ATTACK " + id) }),
 				ui.commandButton(ui.tr("Flee", "逃げる"), func() { ui.send("FLEE") }),
 			))
+		default:
+			// A person can be attacked too, but the result is rarely good.
+			content.Add(ui.commandButton(ui.tr("Attack", "攻撃する"), func() { ui.send("ATTACK " + id) }))
 		}
 		npcs = append(npcs, journalCard(content))
 	}

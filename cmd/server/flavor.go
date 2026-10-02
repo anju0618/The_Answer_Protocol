@@ -24,6 +24,18 @@ var flavorTexts = map[string]LocalizedText{
 		"en": "{player} attacks {npc} unprepared and is killed.",
 		"ja": "{player}は備えのないまま{npc}に挑み、殺された。",
 	},
+	"attack_mighty": {
+		"en": "{player} raises a hand against {npc} and is struck dead before the blow lands.",
+		"ja": "{player}は{npc}に手を上げ、一撃が届く前に打ち殺された。",
+	},
+	"attack_wounded": {
+		"en": "{player} strikes {npc} for {n} damage.",
+		"ja": "{player}は{npc}に{n}のダメージを与えた。",
+	},
+	"attack_murder": {
+		"en": "{player} kills {npc}, and the Fates cut {player}'s thread for it.",
+		"ja": "{player}は{npc}を手にかけ、運命の女神たちにその糸を断ち切られた。",
+	},
 	"attack_defeat": {
 		"en": "{player} defeats {npc}.",
 		"ja": "{player}は{npc}を打ち倒した。",

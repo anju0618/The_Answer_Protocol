@@ -70,3 +70,24 @@ func TestDefendResponseIsExplainedAndRefreshesStatus(t *testing.T) {
 		t.Fatalf("story = %+v", last)
 	}
 }
+
+func TestAttackingPeopleHasNoFightPanelAndDeathsAreMarked(t *testing.T) {
+	ui := newCombatTestUI(t)
+
+	ui.handleResponse("ATTACK", "ATTACK npc.harpy", `OK {"attacker_hp":100,"target_hp":9,"damage":11,"status":"wounded"}`)
+	last := ui.storyLines[len(ui.storyLines)-1]
+	if ui.combatPanel.Visible() || last.kind != storyCombat || last.text != "You strike Harpy for 11 damage. (9 HP left)" {
+		t.Fatalf("after wounding: story = %+v, panel visible = %v", last, ui.combatPanel.Visible())
+	}
+
+	for status, want := range map[string]string{
+		"murder":  "You killed Harpy. The Fates cut your thread.",
+		"smitten": "You raised your hand against Harpy, and were struck dead before the blow landed.",
+	} {
+		ui.handleResponse("ATTACK", "ATTACK npc.harpy", `OK {"attacker_hp":0,"target_hp":0,"damage":0,"status":"`+status+`"}`)
+		last = ui.storyLines[len(ui.storyLines)-1]
+		if last.kind != storyDeath || last.text != want {
+			t.Errorf("%s: story = %+v, want %q as a death line", status, last, want)
+		}
+	}
+}

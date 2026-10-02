@@ -70,3 +70,63 @@ func (client *testClient) cmdRaw(t *testing.T, command string) string {
 	}
 }
 
+func attackPeopleWorld() *World {
+	return &World{
+		StartRoomID: "loc.start",
+		Rooms:       map[string]*Room{"loc.start": {ID: "loc.start"}},
+		NPCs: map[string]*NPC{
+			"npc.villager": {Name: en("Villager"), Role: "dialogue", RoomID: "loc.start", HP: 20, Dialogue: ens("Hello.")},
+			"npc.witch":    {Name: en("Witch"), Role: "quest_giver", RoomID: "loc.start", HP: 45, Mighty: true, Dialogue: ens("Hm.")},
+		},
+	}
+}
+
+func TestAttackingAPersonWoundsThenKillingThemEndsYourRun(t *testing.T) {
+	server := newServer(t.TempDir())
+	server.world = attackPeopleWorld()
+	alice := startTestClient(t, server)
+	alice.connect(t, "alice")
+
+	first := alice.cmdJSON(t, "ATTACK npc.villager")
+	if first["status"] != "wounded" || first["attacker_hp"] != float64(100) {
+		t.Fatalf("first hit = %v, want wounded with no counter-attack", first)
+	}
+	second := alice.cmdJSON(t, "ATTACK npc.villager")
+	if second["status"] != "murder" {
+		t.Fatalf("second hit = %v, want murder (20 HP, hits of at least 8)", second)
+	}
+	server.mu.Lock()
+	hp, bonus := server.players["alice"].HP, server.players["alice"].EnemyHP
+	server.mu.Unlock()
+	if hp != respawnHP || len(bonus) != 0 {
+		t.Fatalf("after the murder HP = %d, wounds = %v; want respawn at %d HP with the villager restored", hp, bonus, respawnHP)
+	}
+	alice.cmd(t, "TALK npc.villager", "OK Hello.")
+}
+
+func TestAttackingAMightyNPCIsInstantDeath(t *testing.T) {
+	server := newServer(t.TempDir())
+	server.world = attackPeopleWorld()
+	alice := startTestClient(t, server)
+	alice.connect(t, "alice")
+
+	data := alice.cmdJSON(t, "ATTACK npc.witch")
+	if data["status"] != "smitten" || data["damage"] != float64(0) {
+		t.Fatalf("attack on the witch = %v, want smitten", data)
+	}
+	server.mu.Lock()
+	hp := server.players["alice"].HP
+	server.mu.Unlock()
+	if hp != respawnHP {
+		t.Fatalf("HP after being smitten = %d, want %d", hp, respawnHP)
+	}
+}
+
+func TestAttackingADefeatedEnemyIsStillRefused(t *testing.T) {
+	server := newServer(t.TempDir())
+	server.world = defeatTestWorld()
+	alice := startTestClient(t, server)
+	alice.connect(t, "alice")
+	alice.cmdJSON(t, "ATTACK npc.grunt")
+	alice.cmd(t, "ATTACK npc.grunt", "ERR 405 NPC_NOT_HOSTILE")
+}

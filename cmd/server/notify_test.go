@@ -76,6 +76,8 @@ func TestDeathTextsFormatCleanly(t *testing.T) {
 	args := map[string][]any{
 		"attack_counter":    {"Foe"},
 		"attack_unprepared": {"Foe"},
+		"attack_mighty":     {"Foe"},
+		"attack_murder":     {"Foe"},
 		"flee_failed":       {"Foe"},
 		"slip_past":         {"Foe"},
 		"talk_unprepared":   {"Foe"},
