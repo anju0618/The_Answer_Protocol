@@ -140,7 +140,33 @@ func (ui *gui) itemRow(id, command, text string) fyne.CanvasObject {
 	for _, line := range ui.itemEffectLines(id) {
 		info.Add(line)
 	}
-	return journalCard(container.NewBorder(nil, nil, picture, button, info))
+	buttons := fyne.CanvasObject(button)
+	if description := ui.itemDescription(id); description != "" {
+		// The explanation is hidden until the player taps the info button, so the list stays short.
+		explanation := widget.NewLabel(description)
+		explanation.Wrapping = fyne.TextWrapWord
+		explanation.Hide()
+		info.Add(explanation)
+		infoButton := widget.NewButtonWithIcon("", theme.InfoIcon(), nil)
+		infoButton.OnTapped = func() {
+			if explanation.Visible() {
+				explanation.Hide()
+			} else {
+				explanation.Show()
+			}
+			ui.journal.Refresh()
+		}
+		buttons = container.NewHBox(infoButton, button)
+	}
+	return journalCard(container.NewBorder(nil, nil, picture, buttons, info))
+}
+
+// itemDescription is the item's explanation from data/world.json in the current language (empty if unknown).
+func (ui *gui) itemDescription(id string) string {
+	if ui.catalog == nil {
+		return ""
+	}
+	return ui.catalog.Items[id].Description.get(ui.locale)
 }
 
 func (ui *gui) showInventory(ids []string) {
