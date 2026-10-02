@@ -357,7 +357,7 @@ RFCの15コマンド + 独自拡張3つ(`FLEE`・`DEFEND`・`LANG`、下表に�
 - RFC 42TAP(`protocol-rfc.html`)、[RFC 2119](https://www.rfc-editor.org/rfc/rfc2119)、[RFC 5234(ABNF)](https://www.rfc-editor.org/rfc/rfc5234)、[RFC 793(TCP)](https://www.rfc-editor.org/rfc/rfc793)、[RFC 3629(UTF-8)](https://www.rfc-editor.org/rfc/rfc3629)
 - Go: [Effective Go](https://go.dev/doc/effective_go)、[`net`](https://pkg.go.dev/net)、[`sync`](https://pkg.go.dev/sync)、[`log/slog`](https://pkg.go.dev/log/slog)、[`testing`](https://pkg.go.dev/testing)
 - GUIツールキット: [Fyne](https://docs.fyne.io/)。図: [Mermaid](https://mermaid.js.org/)。背景知識: [MUD(Wikipedia)](https://en.wikipedia.org/wiki/MUD)
-- **AIの使い方.** Claude Code(Anthropic)を使った。用途は、課題とRFCを読む、設計を相談する、ゲームシステム(戦闘・クエスト・ハザード・エンディング・ログ・多言語対応)のGoコードとテストを書いてレビューする、`data/world.json`の英日ストーリー文を書く、ドキュメント(このREADMEと`memo/CODE_WALKTHROUGH.md`)を書く、など。GUIのイラスト(部屋・NPC・アイテム・倒された敵)はtakawakaがCodexで生成した。コミットする前に全員で内容を確認し、ビルドとテストを通した。各自が、提出したコードを説明できる。
+- **AIの使い方.** Claude Code(Anthropic)を使った。用途は、課題とRFCを読む、設計を相談する、ゲームシステム(戦闘・クエスト・ハザード・エンディング・ログ・多言語対応)のGoコードとテストを書いてレビューする、`data/world.json`の英日ストーリー文を書く、ドキュメント(このREADMEと`memo/CODE_WALKTHROUGH.md`)を書く、など。GUIのイラスト(部屋・NPC・アイテム・倒された敵)はtakawakaがCodexで生成した。コミットする前に全員で内容を確認し、ビルドとテストを通した。各自が、提出したコードを説明できる。あと、わからないことはClaudeCodeに聞いた。
 
 ## アーキテクチャ(Architecture)
 
