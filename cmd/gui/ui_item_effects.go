@@ -20,7 +20,7 @@ func (ui *gui) effectLine(e itemEffect) string {
 	case "counter_reduction":
 		return fmt.Sprintf(ui.tr("Damage taken %+d%%", "被ダメージ %+d%%"), -e.Value)
 	case "regen_bonus":
-		return fmt.Sprintf(ui.tr("Regeneration %+d", "回復速度 %+d"), e.Value)
+		return fmt.Sprintf(ui.tr("HP recovery %+d per 2 sec", "HP回復量 %+d／2秒"), e.Value)
 	case "max_hp":
 		return fmt.Sprintf(ui.tr("Max HP %+d", "最大HP %+d"), e.Value)
 	}

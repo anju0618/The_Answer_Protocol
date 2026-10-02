@@ -89,7 +89,7 @@ var deathTexts = map[string]LocalizedText{
 
 var respawnTail = LocalizedText{
 	"en": "You awaken in %s with %d HP.",
-	"ja": "%sで目を覚ました。HPは%dに減っている。",
+	"ja": "%sで目を覚ました。HPは%dだ。",
 }
 
 var outcomeTexts = map[deathOutcome]LocalizedText{

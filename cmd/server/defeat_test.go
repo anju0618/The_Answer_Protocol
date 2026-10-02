@@ -90,9 +90,19 @@ func TestAttackingAPersonWoundsThenKillingThemEndsYourRun(t *testing.T) {
 	if first["status"] != "wounded" || first["attacker_hp"] != float64(100) {
 		t.Fatalf("first hit = %v, want wounded with no counter-attack", first)
 	}
-	second := alice.cmdJSON(t, "ATTACK npc.villager")
-	if second["status"] != "murder" {
-		t.Fatalf("second hit = %v, want murder (20 HP, hits of at least 8)", second)
+	killed := false
+	for hit := 2; hit <= 3; hit++ {
+		result := alice.cmdJSON(t, "ATTACK npc.villager")
+		if result["status"] == "murder" {
+			killed = true
+			break
+		}
+		if result["status"] != "wounded" || result["attacker_hp"] != float64(100) {
+			t.Fatalf("hit %d = %v, want wounded with no counter-attack", hit, result)
+		}
+	}
+	if !killed {
+		t.Fatal("villager survived three hits of at least 8 damage despite having 20 HP")
 	}
 	server.mu.Lock()
 	hp, bonus := server.players["alice"].HP, server.players["alice"].EnemyHP

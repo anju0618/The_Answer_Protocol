@@ -960,7 +960,7 @@ type NPC struct {
 - `Dialogue []LocalizedText`:**台詞のリスト**。`[]LocalizedText` は「LocalizedTextのスライス」。`TALK` では先頭(`Dialogue[0]`)を返し、ガイドNPCは続きも順に送る。
 - `DialogueCleared []LocalizedText`
   - **その部屋の敵を全部倒した後に話す台詞**です。設定されていて、かつ部屋が「突破済み」のプレイヤーには、`Dialogue` の代わりにこちらを返します(`defeat.go` の `dialogueFor`、第8章の8-7)。
-  - 敵を倒す前と後で、ピネウス・メデイア・ヘレネー・囚われの水夫・ペネロペイアの言葉が変わります。
+  - 敵を倒す前と後で、ピネウス・メデイア・ヘレネ・囚われの水夫・ペネロペイアの言葉が変わります。
 
 ```go
 	MythRequirementItem  string          `json:"myth_requirement_item,omitempty"`
@@ -4833,7 +4833,7 @@ var deathTexts = map[string]LocalizedText{
 ```go
 var respawnTail = LocalizedText{
 	"en": "You awaken in %s with %d HP.",
-	"ja": "%sで目を覚ました。HPは%dに減っている。",
+	"ja": "%sで目を覚ました。HPは%dだ。",
 }
 
 var outcomeTexts = map[deathOutcome]LocalizedText{
@@ -7032,6 +7032,7 @@ func (ui *gui) handleEvent(line string) {
 		ui.addStoryKind(storyKindOf(kind), text)
 		switch kind {
 		case "DEATH":
+			ui.sawDeath = true
 			ui.flashScene(flashDeath, 900*time.Millisecond)
 			ui.showFight(nil)
 			ui.refresh("LOOK", "INVENTORY", "STATUS", "STATE")
@@ -7051,7 +7052,12 @@ func (ui *gui) handleEvent(line string) {
 		ui.send("LOOK")
 	}
 	if strings.HasPrefix(line, "EVT ROOM COMBAT ") {
-		ui.addStoryKind(storyCombat, strings.TrimPrefix(line, "EVT ROOM COMBAT "))
+		text := strings.TrimPrefix(line, "EVT ROOM COMBAT ")
+		if ui.skipOwnCombat && ui.isOwnCombatNarration(text) {
+			ui.skipOwnCombat = false
+		} else {
+			ui.addStoryKind(storyCombat, text)
+		}
 		ui.send("LOOK")
 		ui.send("STATUS")
 		ui.refresh("STATE")
@@ -7069,12 +7075,14 @@ func (ui *gui) handleEvent(line string) {
 }
 ```
 
-- チャットはチャット欄へ、物語の通知は冒険欄へ追加します。死亡や戦闘などで関連する表示を再取得します。招待されたリーダー名は保存し、Groupの参加画面から選べるようにします。
+- チャットはチャット欄へ、物語の通知は冒険欄へ追加します。死亡通知を受けたことを `sawDeath` に記録し、同じ死因を応答からもう一度表示しないようにします。自分の戦闘結果は応答で示すため、本人にも届く `EVT ROOM COMBAT` は二重に追加しません。他のプレイヤーの実況は表示します。死亡や戦闘などで関連する表示を再取得します。招待されたリーダー名は保存し、Groupの参加画面から選べるようにします。
 
 #### `handleResponse`
 
 ```go
 func (ui *gui) handleResponse(command, request, line string) {
+	defer func() { ui.sawDeath = false }()
+	ui.skipOwnCombat = strings.HasPrefix(line, "OK ") && (command == "ATTACK" || command == "FLEE" || command == "DEFEND")
 	if strings.HasPrefix(line, "ERR ") {
 		if command == "STATE" && strings.HasPrefix(line, "ERR 400 ") {
 			ui.stateUnavailable = true
@@ -8882,47 +8890,52 @@ func (ui *gui) handleAttack(request, line string) bool {
 		if ui.fight != nil && ui.fight.npcID == npcID {
 			maxHP = max(maxHP, ui.fight.maxHP)
 		}
-		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You hit %s for %d damage. (%d HP left)", "%s に %d ダメージ!(残りHP %d)"), enemy, result.Damage, result.TargetHP))
+		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You hit %s for %d damage. Enemy HP: %d; your HP: %d.", "%sに%dダメージ。敵の残りHP%d、あなたのHP%d。"), enemy, result.Damage, result.TargetHP, result.AttackerHP))
 		ui.showFight(&fightState{npcID: npcID, hp: result.TargetHP, maxHP: maxHP})
-		ui.flashScene(flashHurt, 350*time.Millisecond) // the enemy survived, so it hit back
+		ui.flashScene(flashHurt, 350*time.Millisecond)
 ```
 
 - **戦闘が続いている**:敵の最大HPを求めます。`catalog.maxHP`(下)で世界データから引き、それが分からなければ**今のHP**で代用します。すでに同じ敵と戦っているなら、**大きいほう**を使います(HPバーの割合がぶれないように)。
-- 「◯◯に△ダメージ!(残りHP □)」を、**戦闘の色**で冒険ログに足します。
+- 与えたダメージ、敵の残りHP、自分のHPを**戦闘の色**で冒険ログに足します。反撃の実況が同じ攻撃を繰り返さないよう、GUIでは自分宛ての `EVT ROOM COMBAT` をもう一度追加しません。
 - 戦闘パネルを更新(`showFight`)し、**赤く光らせます**(`flashHurt`、15-13)。「敵が生き残った=反撃を受けた」ので、ダメージの演出をします。
 
 ```go
 	case "victory":
-		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("Victory! %s is defeated.", "勝利!%s を倒した。"), enemy))
+		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("Victory! %s is defeated.", "勝利！%sを倒した。"), enemy))
 		ui.showFight(nil)
 	case "dead":
-		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("%s struck you down.", "%s にやられた。"), enemy))
+		if !ui.sawDeath {
+			ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("%s struck you down.", "%sにやられた。"), enemy))
+		}
 		ui.showFight(nil)
 ```
 
 - **勝利**:文章を出して、パネルを閉じます(`showFight(nil)`)。
-- **死亡**(`dead`):死亡の色(赤)で文章を出して、パネルを閉じます。
+- **死亡**(`dead`):本人向けの死亡通知が先に届いていれば、同じ死因を重ねて出さずにパネルを閉じます。通知のないサーバーでは、応答から死亡を知らせます。
 
 ```go
 	case "wounded":
-		// An ordinary person cannot fight back, so there is no fight panel, only the hit.
-		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You strike %s for %d damage. (%d HP left)", "%s に %d ダメージを与えた。(残りHP %d)"), enemy, result.Damage, result.TargetHP))
+		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You strike %s for %d damage. (%d HP left)", "%sに%dダメージを与えた。(残りHP%d)"), enemy, result.Damage, result.TargetHP))
 	case "murder":
-		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You killed %s. The Fates cut your thread.", "%s を手にかけた。運命の女神たちがあなたの糸を断ち切った。"), enemy))
+		if !ui.sawDeath {
+			ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You killed %s. The Fates cut your thread.", "%sを手にかけた。運命の女神たちがあなたの糸を断ち切った。"), enemy))
+		}
 		ui.showFight(nil)
 	case "smitten":
-		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You raised your hand against %s, and were struck dead before the blow landed.", "%s に手を上げた。一撃が届く前に打ち殺された。"), enemy))
+		if !ui.sawDeath {
+			ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You raised your hand against %s, and were struck dead before the blow landed.", "%sに手を上げた。一撃が届く前に打ち殺された。"), enemy))
+		}
 		ui.showFight(nil)
 ```
 
 - **敵以外への攻撃**で増えた3つです(8-5のケース3・4)。
   - `wounded`(一般人を傷つけた):文章だけを出します。**戦闘パネルは出しません**(一般人は反撃せず、戦闘にならないため)。
-  - `murder`(殺した)と `smitten`(一撃で殺された):**死亡の色**で文章を出して、パネルを閉じます。サーバー側では、このあと自動的に運命の間へ戻される(復活する)ので、画面の更新は別の処理(`LOOK` の再取得)が行います。
+  - `murder`(殺した)と `smitten`(一撃で殺された):先に死亡通知を受けていれば文章は重ねず、パネルを閉じます。通知がなければ**死亡の色**で文章を出します。サーバー側では自動的に運命の間へ戻される(復活する)ので、画面の更新は別の処理(`LOOK` の再取得)が行います。
 - サーバーが新しい `status` を増やしても、**ここに `case` を足さない限りは `default` に落ちて**、生の文章が表示されます。
 
 ```go
 	case "overwhelmed":
-		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("%s is too strong to beat by force.", "%s は力では敵わない。"), enemy))
+		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("%s is too strong to beat by force.", "%sには力では敵わない。"), enemy))
 		ui.showFight(nil)
 	default:
 		return false
@@ -8947,6 +8960,11 @@ func (ui *gui) handleFlee(line string) bool {
 	if result.Result == "success" {
 		ui.addStoryKind(storyCombat, ui.tr("You got away.", "うまく逃げ切った。"))
 		ui.showFight(nil)
+	} else if result.Result == "failure_dead" {
+		if !ui.sawDeath {
+			ui.addStoryKind(storyDeath, ui.tr("You were struck down while fleeing.", "逃げようとして倒された。"))
+		}
+		ui.showFight(nil)
 	} else {
 		ui.addStoryKind(storyCombat, ui.tr("You could not get away!", "逃げられなかった!"))
 	}
@@ -8955,8 +8973,8 @@ func (ui *gui) handleFlee(line string) bool {
 ```
 
 - `FLEE` の応答 `{"hp":..,"result":"success|failure|failure_dead"}`(8-6)を読みます。
-- `var result struct { ... }`:**その場で型を定義して**変数にします(この関数でしか使わない、2フィールドだけの型)。
-- **成功**なら「うまく逃げ切った」を出してパネルを閉じます。**失敗**なら「逃げられなかった!」を出して、**パネルは開いたまま**です(戦闘は続く)。
+- `var result struct { ... }`:**その場で型を定義して**変数にします(この関数でしか使わない、`Result` フィールドだけの型)。
+- **成功**なら「うまく逃げ切った」を出してパネルを閉じます。**失敗して生き残った場合**は「逃げられなかった!」を出し、パネルを開いたままにします。**逃走中に死亡した場合**はパネルを閉じ、本人向けの死亡通知があればその文を優先します。
 
 ```go
 func (ui *gui) handleDefend(line string) bool {
@@ -9457,7 +9475,7 @@ func (ui *gui) effectLine(e itemEffect) string {
 	case "counter_reduction":
 		return fmt.Sprintf(ui.tr("Damage taken %+d%%", "被ダメージ %+d%%"), -e.Value)
 	case "regen_bonus":
-		return fmt.Sprintf(ui.tr("Regeneration %+d", "回復速度 %+d"), e.Value)
+		return fmt.Sprintf(ui.tr("HP recovery %+d per 2 sec", "HP回復量 %+d／2秒"), e.Value)
 	case "max_hp":
 		return fmt.Sprintf(ui.tr("Max HP %+d", "最大HP %+d"), e.Value)
 	}
@@ -9849,7 +9867,7 @@ func startTestClient(t *testing.T, server *Server) *testClient {
 | `item_effects_test.go` | アイテムの効果が**持っている間だけ**効くこと、最大HPの**下限20**、**クエストの最大HPは死んでも残る**、悪い効果の上限、効果の検査 |
 | `secret_exit_test.go` | 隠し出口が、エンディング達成**前は見えず、後は見える**こと |
 | `endings_test.go`(530行) | 3つの編が独立していること、**全員が全編を最後まで遊べる**こと、条件が足りないエンディングは何も教えないこと、死亡で記念品以外を失うこと、仲間と勝利を分け合うこと、敵のHPがプレイヤーごとであること、自動回復 |
-| `odyssey_integration_test.go` | **本物のデータ**でオデュッセイア編を最後まで通すこと、史実に反する選択がすべて即死になること |
+| `odyssey_integration_test.go` | **本物のデータ**でオデュッセイア編を最後まで通すこと、神話の筋書きに反する選択がすべて即死になること |
 | `argonauts_troy_integration_test.go` | 本物のデータで、アルゴ船編とトロイア編の神話の関門 |
 | `ja_localization_integration_test.go` | 日本語の翻訳が、本物のデータで欠けていないこと |
 | `locale_test.go` | `LANG` で物語の言語が切り替わること |

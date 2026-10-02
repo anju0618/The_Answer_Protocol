@@ -73,25 +73,31 @@ func (ui *gui) handleAttack(request, line string) bool {
 		if ui.fight != nil && ui.fight.npcID == npcID {
 			maxHP = max(maxHP, ui.fight.maxHP)
 		}
-		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You hit %s for %d damage. (%d HP left)", "%s に %d ダメージ!(残りHP %d)"), enemy, result.Damage, result.TargetHP))
+		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You hit %s for %d damage. Enemy HP: %d; your HP: %d.", "%sに%dダメージ。敵の残りHP%d、あなたのHP%d。"), enemy, result.Damage, result.TargetHP, result.AttackerHP))
 		ui.showFight(&fightState{npcID: npcID, hp: result.TargetHP, maxHP: maxHP})
 		ui.flashScene(flashHurt, 350*time.Millisecond)
 	case "victory":
-		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("Victory! %s is defeated.", "勝利!%s を倒した。"), enemy))
+		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("Victory! %s is defeated.", "勝利！%sを倒した。"), enemy))
 		ui.showFight(nil)
 	case "dead":
-		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("%s struck you down.", "%s にやられた。"), enemy))
+		if !ui.sawDeath {
+			ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("%s struck you down.", "%sにやられた。"), enemy))
+		}
 		ui.showFight(nil)
 	case "wounded":
-		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You strike %s for %d damage. (%d HP left)", "%s に %d ダメージを与えた。(残りHP %d)"), enemy, result.Damage, result.TargetHP))
+		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("You strike %s for %d damage. (%d HP left)", "%sに%dダメージを与えた。(残りHP%d)"), enemy, result.Damage, result.TargetHP))
 	case "murder":
-		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You killed %s. The Fates cut your thread.", "%s を手にかけた。運命の女神たちがあなたの糸を断ち切った。"), enemy))
+		if !ui.sawDeath {
+			ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You killed %s. The Fates cut your thread.", "%sを手にかけた。運命の女神たちがあなたの糸を断ち切った。"), enemy))
+		}
 		ui.showFight(nil)
 	case "smitten":
-		ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You raised your hand against %s, and were struck dead before the blow landed.", "%s に手を上げた。一撃が届く前に打ち殺された。"), enemy))
+		if !ui.sawDeath {
+			ui.addStoryKind(storyDeath, fmt.Sprintf(ui.tr("You raised your hand against %s, and were struck dead before the blow landed.", "%sに手を上げた。一撃が届く前に打ち殺された。"), enemy))
+		}
 		ui.showFight(nil)
 	case "overwhelmed":
-		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("%s is too strong to beat by force.", "%s は力では敵わない。"), enemy))
+		ui.addStoryKind(storyCombat, fmt.Sprintf(ui.tr("%s is too strong to beat by force.", "%sには力では敵わない。"), enemy))
 		ui.showFight(nil)
 	default:
 		return false
@@ -108,6 +114,11 @@ func (ui *gui) handleFlee(line string) bool {
 	}
 	if result.Result == "success" {
 		ui.addStoryKind(storyCombat, ui.tr("You got away.", "うまく逃げ切った。"))
+		ui.showFight(nil)
+	} else if result.Result == "failure_dead" {
+		if !ui.sawDeath {
+			ui.addStoryKind(storyDeath, ui.tr("You were struck down while fleeing.", "逃げようとして倒された。"))
+		}
 		ui.showFight(nil)
 	} else {
 		ui.addStoryKind(storyCombat, ui.tr("You could not get away!", "逃げられなかった!"))
