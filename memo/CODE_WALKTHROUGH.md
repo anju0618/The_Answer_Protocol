@@ -7490,10 +7490,11 @@ func (ui *gui) build() {
 			ui.send("QUESTS")
 		}
 	}
-	ui.commandButtons = container.NewGridWithColumns(3,
+	ui.commandButtons = container.NewGridWithColumns(4,
 		ui.commandButton(ui.tr("Refresh", "更新"), func() { ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS", "WHO", "STATE") }),
 		ui.commandButton(ui.tr("Group", "グループ"), func() { ui.chooseAction("GROUP") }),
 		ui.commandButton(ui.tr("Chat", "チャット"), ui.focusChat),
+		ui.commandButton(ui.tr("More", "その他"), func() { ui.chooseAction("COMMANDS") }),
 	)
 	ui.buildCombatPanel()
 	ui.detailPanel = container.NewBorder(ui.combatPanel, ui.commandButtons, nil, nil, ui.journal)
@@ -7964,7 +7965,7 @@ func (l *sceneVisualLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) 
 
 - 左の地図を表示するときは右の地図タブを取り除き、表示できない幅に戻すと同じタブを追加します。地図タブを選択中なら「まわり」へ戻し、持ち物・クエストを選択中ならそのまま保ちます。
 
-## 15-9 `ui_actions.go`(94行)— マウス操作とグループ
+## 15-9 `ui_actions.go`(103行)— マウス操作とグループ・その他の操作
 
 ### `commandButton`
 
@@ -7994,6 +7995,9 @@ func (ui *gui) focusChat() {
 
 ### `chooseAction`
 
+- 画面の下にある4つのボタン(更新・グループ・チャット・**その他**)のうち、「グループ」と「その他」は、**別ページのメニュー**(ポップアップ)をこの関数で開きます。
+- **「その他」のページ**(`"COMMANDS"`)には、**あまり使わない `LOOK`・`STATUS`・`QUESTS`・`WHO`** の4つのボタンがあります。押すと、そのコマンドを送ってページを閉じます。課題は各コマンドのボタンを求めているので用意しましたが、普段は「更新」(4つをまとめて送る)で足りるため、メインの画面を散らかさないよう別ページにまとめてあります。
+
 ```go
 func (ui *gui) chooseAction(action string) {
 	if !ui.connected {
@@ -8004,6 +8008,15 @@ func (ui *gui) chooseAction(action string) {
 	var choices []menuChoice
 	title := ui.tr("Choose a target", "対象を選ぶ")
 	switch action {
+	case "COMMANDS":
+		// Rarely used commands live on their own page so the main screen stays uncluttered.
+		title = ui.tr("Other commands", "その他の操作")
+		choices = []menuChoice{
+			{label: ui.tr("Look around (LOOK)", "まわりを見る (LOOK)"), command: "LOOK"},
+			{label: ui.tr("My status (STATUS)", "自分の状態 (STATUS)"), command: "STATUS"},
+			{label: ui.tr("My quests (QUESTS)", "クエスト一覧 (QUESTS)"), command: "QUESTS"},
+			{label: ui.tr("Players online (WHO)", "接続人数 (WHO)"), command: "WHO"},
+		}
 	case "GROUP":
 		title = ui.tr("Player group", "プレイヤーのグループ")
 		choices = []menuChoice{

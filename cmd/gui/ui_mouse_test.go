@@ -117,6 +117,23 @@ func TestMouseGroupInviteAndJoinWithoutTextEntry(t *testing.T) {
 	}
 }
 
+func TestOtherCommandsPageSendsLookStatusQuestsAndWho(t *testing.T) {
+	ui, reader := mouseTestGUI(t)
+	for label, command := range map[string]string{
+		"Look around (LOOK)":   "LOOK",
+		"My status (STATUS)":   "STATUS",
+		"My quests (QUESTS)":   "QUESTS",
+		"Players online (WHO)": "WHO",
+	} {
+		ui.chooseAction("COMMANDS")
+		test.Tap(findButton(t, ui.choiceBox, label))
+		expectMouseCommand(t, reader, command)
+		if ui.choicePopup != nil {
+			t.Fatalf("%s did not close the page", command)
+		}
+	}
+}
+
 func TestMouseListsIncludeTargetsAfterNineAndMenuClosesOnMove(t *testing.T) {
 	ui, reader := mouseTestGUI(t)
 	view := lookView{Room: roomView{ID: "loc.test"}}

@@ -112,10 +112,11 @@ func (ui *gui) build() {
 			ui.send("QUESTS")
 		}
 	}
-	ui.commandButtons = container.NewGridWithColumns(3,
+	ui.commandButtons = container.NewGridWithColumns(4,
 		ui.commandButton(ui.tr("Refresh", "更新"), func() { ui.refresh("LOOK", "INVENTORY", "STATUS", "QUESTS", "WHO", "STATE") }),
 		ui.commandButton(ui.tr("Group", "グループ"), func() { ui.chooseAction("GROUP") }),
 		ui.commandButton(ui.tr("Chat", "チャット"), ui.focusChat),
+		ui.commandButton(ui.tr("More", "その他"), func() { ui.chooseAction("COMMANDS") }),
 	)
 	ui.buildCombatPanel()
 	ui.detailPanel = container.NewBorder(ui.combatPanel, ui.commandButtons, nil, nil, ui.journal)

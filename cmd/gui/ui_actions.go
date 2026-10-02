@@ -31,6 +31,15 @@ func (ui *gui) chooseAction(action string) {
 	var choices []menuChoice
 	title := ui.tr("Choose a target", "対象を選ぶ")
 	switch action {
+	case "COMMANDS":
+		// Rarely used commands live on their own page so the main screen stays uncluttered.
+		title = ui.tr("Other commands", "その他の操作")
+		choices = []menuChoice{
+			{label: ui.tr("Look around (LOOK)", "まわりを見る (LOOK)"), command: "LOOK"},
+			{label: ui.tr("My status (STATUS)", "自分の状態 (STATUS)"), command: "STATUS"},
+			{label: ui.tr("My quests (QUESTS)", "クエスト一覧 (QUESTS)"), command: "QUESTS"},
+			{label: ui.tr("Players online (WHO)", "接続人数 (WHO)"), command: "WHO"},
+		}
 	case "GROUP":
 		title = ui.tr("Player group", "プレイヤーのグループ")
 		choices = []menuChoice{
