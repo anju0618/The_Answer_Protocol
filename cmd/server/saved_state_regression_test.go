@@ -174,7 +174,7 @@ func TestConnectStartsRegenForSavedPlayer(t *testing.T) {
 		initialHP := player.HP
 		// Advance the clock from the connection's real baseline without sleeping
 		// or issuing an update that could initialize a missing baseline.
-		player.regenLocked(started.Add(regenInterval), 0)
+		player.regenLocked(started.Add(regenInterval), 0, maxPlayerHP)
 		gotHP := player.HP
 		server.mu.Unlock()
 		if want := initialHP + regenAmount; gotHP != want {

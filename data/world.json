@@ -762,6 +762,9 @@
         "en": "A finely woven cloak, a parting gift from the women of Lemnos.",
         "ja": "レムノスの女たちからの別れの贈り物である、精巧に織られたマント。"
       },
+      "effects": [
+        { "effect": "regen_bonus", "value": 1 }
+      ],
       "room_id": "loc.argo_lemnos",
       "obtainable": true
     },
@@ -774,6 +777,9 @@
         "en": "A jar of ointment brewed from a flower rooted in Prometheus's spilled blood, left for Jason under cover of night — proof against the bronze bulls' fire, and an unspoken price for a promise not yet made.",
         "ja": "プロメテウスの流した血に根ざす花から作られた軟膏の壺。夜のうちにひそかにジェイソンのもとへ届けられた――青銅の雄牛の炎に対する備えであり、まだ交わされていない約束への、言葉にされない代償でもある。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": 10 }
+      ],
       "room_id": "loc.argo_court_aeetes",
       "obtainable": true,
       "renewable": true
@@ -787,6 +793,9 @@
         "en": "A potion brewed from grave-herbs, strong enough to close a dragon's sleepless eyes.",
         "ja": "墓地の薬草から調合された薬。竜の眠らぬ目さえ閉じさせるほどに強い。"
       },
+      "effects": [
+        { "effect": "damage_bonus", "value": -2 }
+      ],
       "room_id": "loc.argo_grove",
       "obtainable": true,
       "renewable": true
@@ -800,6 +809,10 @@
         "en": "Teeth drawn from the slain guardian dragon of Ares, said to grow into armed warriors when sown.",
         "ja": "アレスに仕える倒された守護竜から抜き取った歯。蒔けば武装した戦士に育つと言われている。"
       },
+      "effects": [
+        { "effect": "damage_bonus", "value": 3 },
+        { "effect": "counter_reduction", "value": -10 }
+      ],
       "room_id": "loc.argo_bull_field",
       "obtainable": true
     },
@@ -812,6 +825,9 @@
         "en": "The shining pelt of the ram Chrysomallos, which once carried Phrixus safely across the sea.",
         "ja": "かつてプリクソスを無事に海の向こうへと運んだ牡羊クリュソマロスの、輝く毛皮。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": 10 }
+      ],
       "room_id": "loc.argo_grove",
       "obtainable": true,
       "renewable": true
@@ -825,6 +841,9 @@
         "en": "An offering sent in place of a king's daughter, if the old stories are kind to Agamemnon.",
         "ja": "王の娘の身代わりとして捧げられた供物――古い物語がアガメムノンに優しければの話だが。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": -5 }
+      ],
       "room_id": "loc.troy_aulis",
       "obtainable": true,
       "renewable": true
@@ -838,6 +857,9 @@
         "en": "Forged by Hephaestus at the sea-nymph Thetis's plea, its rim shows the whole world in bronze, tin, silver, and gold.",
         "ja": "海の精テティスの懇願を受けてヘファイストスが鍛えた盾。その縁には、青銅・錫・銀・金で全世界が描かれている。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": 15 }
+      ],
       "room_id": "loc.troy_achilles_tent",
       "obtainable": true,
       "renewable": true
@@ -851,6 +873,9 @@
         "en": "A king's weight in gold and fine cloth, Priam's price for the return of his son's body.",
         "ja": "息子の亡骸を取り戻すためにプリアモスが支払う、王の重さに等しい黄金と上質な布。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": -10 }
+      ],
       "room_id": "loc.troy_city",
       "obtainable": true,
       "renewable": true
@@ -864,6 +889,9 @@
         "en": "A hollow horse of fir planking, tall as the city walls, with a rope ladder coiled in its belly.",
         "ja": "都市の城壁ほどもある高さの、モミ材でできた中空の馬。腹の中には縄梯子が巻かれている。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": -15 }
+      ],
       "room_id": "loc.troy_horse",
       "obtainable": true,
       "renewable": true
@@ -877,6 +905,10 @@
         "en": "A fruit as sweet as forgetting itself. One bite and home stops mattering.",
         "ja": "忘却そのもののように甘い実。一口かじれば、故郷はもうどうでもよくなる。"
       },
+      "effects": [
+        { "effect": "regen_bonus", "value": 1 },
+        { "effect": "damage_bonus", "value": -3 }
+      ],
       "room_id": "loc.ody_lotus",
       "obtainable": true
     },
@@ -889,6 +921,9 @@
         "en": "A great stake of green olive wood, hardened in the fire and sharpened to a point.",
         "ja": "火で硬くし先端を尖らせた、青々としたオリーブ材の大きな杭。"
       },
+      "effects": [
+        { "effect": "damage_bonus", "value": 3 }
+      ],
       "room_id": "loc.ody_cyclops",
       "obtainable": true,
       "renewable": true
@@ -902,6 +937,10 @@
         "en": "Wine strong enough to fell a god, carried ashore from the ship's stores.",
         "ja": "神さえも打ち倒すほど強い酒。船の貯蔵から岸へと運ばれてきた。"
       },
+      "effects": [
+        { "effect": "regen_bonus", "value": 1 },
+        { "effect": "damage_bonus", "value": -2 }
+      ],
       "room_id": "loc.ody_cyclops",
       "obtainable": true
     },
@@ -914,6 +953,10 @@
         "en": "A leather bag holding every wind but the one already loosed to carry the ship home. Best left unopened.",
         "ja": "船を故郷へ運ぶために既に解き放たれた風を除く、あらゆる風を閉じ込めた革袋。開けずにおくのが一番だ。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": 10 },
+        { "effect": "max_hp", "value": -5 }
+      ],
       "room_id": "loc.ody_aeolus",
       "obtainable": true,
       "renewable": true
@@ -927,6 +970,10 @@
         "en": "A small herb with white flowers and a black root, a gift from Hermes proof against any enchantment of Circe's.",
         "ja": "白い花と黒い根を持つ小さな薬草。ヘルメスからの贈り物で、キルケーのいかなる魔法にも対抗できる。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": 5 },
+        { "effect": "regen_bonus", "value": 1 }
+      ],
       "room_id": "loc.ody_circe",
       "obtainable": true,
       "renewable": true
@@ -940,6 +987,9 @@
         "en": "Soft wax from Circe's own hives, warm enough to knead and press into a sailor's ears against any song, however beautiful.",
         "ja": "キルケー自身の蜂の巣から採れた柔らかな蝋。こねて水夫の耳に詰めれば、どれほど美しい歌にも対抗できるほど温かい。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": 5 }
+      ],
       "room_id": "loc.ody_circe",
       "obtainable": true,
       "renewable": true
@@ -953,6 +1003,9 @@
         "en": "One of the sun god's own immortal cattle, coat bright as noon. Touching it is forbidden.",
         "ja": "太陽神自身の不死の牛の一頭。その毛並みは真昼のように明るい。触れることは禁じられている。"
       },
+      "effects": [
+        { "effect": "counter_reduction", "value": -20 }
+      ],
       "room_id": "loc.ody_thrinacia",
       "obtainable": true,
       "renewable": true
@@ -966,6 +1019,9 @@
         "en": "A great bow that no suitor could even bend, let alone string. It has waited twenty years for its owner's return.",
         "ja": "どの求婚者も曲げることすらできなかった大弓。二十年もの間、持ち主の帰りを待ち続けている。"
       },
+      "effects": [
+        { "effect": "damage_bonus", "value": 4 }
+      ],
       "room_id": "loc.ody_palace",
       "obtainable": true,
       "renewable": true
@@ -979,6 +1035,10 @@
         "en": "A laurel wreath awarded to those who brought the Golden Fleece home.",
         "ja": "黄金の羊毛皮を持ち帰った者に授けられる月桂冠。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": 10 },
+        { "effect": "counter_reduction", "value": 5 }
+      ],
       "room_id": "",
       "obtainable": false,
       "renewable": true,
@@ -993,6 +1053,9 @@
         "en": "A glowing ember carried out of the burning city.",
         "ja": "炎上する都から持ち出された、赤く光る燃えさし。"
       },
+      "effects": [
+        { "effect": "damage_bonus", "value": 3 }
+      ],
       "room_id": "",
       "obtainable": false,
       "renewable": true,
@@ -1007,6 +1070,10 @@
         "en": "A branch from the living olive that anchors the marriage bed of Odysseus and Penelope.",
         "ja": "オデュッセウスとペネロペイアの寝台を支える、生きたオリーブの木の枝。"
       },
+      "effects": [
+        { "effect": "regen_bonus", "value": 1 },
+        { "effect": "max_hp", "value": 5 }
+      ],
       "room_id": "",
       "obtainable": false,
       "renewable": true,
@@ -1021,6 +1088,10 @@
         "en": "A thread from the Moirai's loom, given to those who have walked all three tapestries to their end.",
         "ja": "三枚のタペストリーすべてを結末まで歩いた者に、モイライが与える運命の糸。"
       },
+      "effects": [
+        { "effect": "max_hp", "value": 10 },
+        { "effect": "damage_bonus", "value": 2 }
+      ],
       "room_id": "",
       "obtainable": false,
       "renewable": true,

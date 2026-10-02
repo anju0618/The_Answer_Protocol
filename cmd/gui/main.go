@@ -462,7 +462,7 @@ func (ui *gui) handleResponse(command, request, line string) {
 			Reward      int    `json:"reward"`
 		}
 		if json.Unmarshal([]byte(words), &quest) == nil && quest.Description != "" {
-			words = ui.catalog.label("quest", quest.QuestID, ui.locale) + "\n" + quest.Description + fmt.Sprintf("\nHP +%d", quest.Reward)
+			words = ui.catalog.label("quest", quest.QuestID, ui.locale) + "\n" + quest.Description + fmt.Sprintf(ui.tr("\nMax HP +%d", "\n最大HP +%d"), quest.Reward)
 		}
 		ui.addStory(words)
 		ui.showMessage("QUEST", words)

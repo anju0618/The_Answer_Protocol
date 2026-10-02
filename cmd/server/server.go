@@ -192,7 +192,7 @@ func (s *Server) playerForUpdateLocked(name string) *Player {
 	if player == nil || player.exiting {
 		return nil
 	}
-	player.regenLocked(time.Now(), s.blessingTotalLocked(player, blessingRegenBonus))
+	player.regenLocked(time.Now(), s.effectTotalLocked(player, blessingRegenBonus), s.maxHPLocked(player))
 	return player
 }
 
@@ -759,7 +759,7 @@ func handleStatus(s *Server, conn net.Conn, name *string, parts []string) bool {
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")
 		return false
 	}
-	player.regenLocked(time.Now(), s.blessingTotalLocked(player, blessingRegenBonus))
+	player.regenLocked(time.Now(), s.effectTotalLocked(player, blessingRegenBonus), s.maxHPLocked(player))
 	status := "healthy"
 	if player.CombatTargetID != "" {
 		status = "combat"
@@ -768,7 +768,7 @@ func handleStatus(s *Server, conn net.Conn, name *string, parts []string) bool {
 		HP     int    `json:"hp"`
 		MaxHP  int    `json:"max_hp"`
 		Status string `json:"status"`
-	}{player.HP, maxPlayerHP, status})
+	}{player.HP, s.maxHPLocked(player), status})
 	if err != nil {
 		s.mu.Unlock()
 		logger.Error("encode_response_failed", "command", "STATUS", "error", err.Error())

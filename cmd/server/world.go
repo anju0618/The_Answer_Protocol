@@ -14,6 +14,7 @@ type Item struct {
 	Obtainable  bool          `json:"obtainable"`
 	Renewable   bool          `json:"renewable,omitempty"`
 	RewardOnly  bool          `json:"reward_only,omitempty"`
+	Effects     []ItemEffect  `json:"effects,omitempty"`
 
 	HomeRoomID string `json:"-"`
 }
@@ -199,6 +200,9 @@ func (w *World) validate() error {
 		default:
 			return fmt.Errorf("quest %q has unknown objective type %q", id, quest.Objective.Type)
 		}
+	}
+	if err := w.validateItemEffects(); err != nil {
+		return err
 	}
 	return w.validateEndings()
 }

@@ -38,15 +38,14 @@ func (s *Server) advanceQuestLocked(player *Player, questID string, quest *Quest
 		return
 	}
 	state.Status = "completed"
-	logger.Info("quest_completed", "player", player.Name, "quest", questID, "reward_hp", quest.Reward.HP)
-	player.HP += quest.Reward.HP
-	if player.HP > maxPlayerHP {
-		player.HP = maxPlayerHP
-	}
+	logger.Info("quest_completed", "player", player.Name, "quest", questID, "max_hp_gain", questMaxHPGain(quest))
+	gain := questMaxHPGain(quest)
+	player.MaxHPBonus += gain
+	player.HP = s.maxHPLocked(player) // finishing a quest also restores full health
 	s.sendPlayerEventLocked(player.Name, "QUEST", LocalizedText{
-		"en": "Quest complete: \"%s\"! Reward: +%d HP (HP is now %d). Use QUESTS to see your quests, and look for the next NPC with a request.",
-		"ja": "クエスト達成: 「%s」! 報酬: HP+%d(現在HP %d)。QUESTSで一覧を確認し、次の依頼を探そう。",
-	}.Format(locale, quest.Name.Get(locale), quest.Reward.HP, player.HP))
+		"en": "Quest complete: \"%s\"! Reward: max HP +%d (now %d), and your HP is fully restored. Use QUESTS to see your quests, and look for the next NPC with a request.",
+		"ja": "クエスト達成: 「%s」! 報酬: 最大HP+%d(現在の最大HP %d)、HPも全回復。QUESTSで一覧を確認し、次の依頼を探そう。",
+	}.Format(locale, quest.Name.Get(locale), gain, s.maxHPLocked(player)))
 }
 
 func (s *Server) questGiverNPCIDsLocked(roomID string) []string {
@@ -92,9 +91,9 @@ func (s *Server) sendQuestHintLocked(player *Player, npcID string) {
 	switch {
 	case state == nil:
 		s.sendPlayerEventLocked(player.Name, "QUEST", LocalizedText{
-			"en": "%s has a quest for you: \"%s\" (reward: +%d HP). Type QUEST %s to accept it.",
-			"ja": "%sはあなたに頼みたいことがある: 「%s」(報酬: HP+%d)。QUEST %s で受注できる。",
-		}.Format(locale, npcName, quest.Name.Get(locale), quest.Reward.HP, npcName))
+			"en": "%s has a quest for you: \"%s\" (reward: max HP +%d). Type QUEST %s to accept it.",
+			"ja": "%sはあなたに頼みたいことがある: 「%s」(報酬: 最大HP+%d)。QUEST %s で受注できる。",
+		}.Format(locale, npcName, quest.Name.Get(locale), questMaxHPGain(quest), npcName))
 	case state.Status == "active":
 		s.sendPlayerEventLocked(player.Name, "QUEST", LocalizedText{
 			"en": "Quest \"%s\" is in progress (%d/%d). Type QUEST %s to hear the details again.",
@@ -152,7 +151,7 @@ func handleQuest(s *Server, conn net.Conn, name *string, parts []string) bool {
 		Description string `json:"description"`
 		Reward      int    `json:"reward"`
 		Status      string `json:"status"`
-	}{questID, quest.Description.Get(locale), quest.Reward.HP, "available"})
+	}{questID, quest.Description.Get(locale), questMaxHPGain(quest), "available"})
 	if err != nil {
 		s.mu.Unlock()
 		fmt.Fprintln(conn, "ERR 500 STATE_ERROR")

@@ -20,6 +20,7 @@ const (
 	blessingCounterReduction = "counter_reduction" // enemy counter-attacks hurt Value% less
 	blessingRegenBonus       = "regen_bonus"       // Value extra HP every regen tick
 	blessingDamageBonus      = "damage_bonus"      // Value extra damage on every hit
+	maxCounterIncrease       = 50                  // bad items never make counter-attacks hurt more than 50% extra
 	maxCounterReduction      = 80                  // allies (3 x 20%) plus a blessing never reach 100%
 )
 

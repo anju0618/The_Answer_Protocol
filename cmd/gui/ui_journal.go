@@ -136,7 +136,11 @@ func (ui *gui) itemRow(id, command, text string) fyne.CanvasObject {
 		picture = container.NewGridWrap(fyne.NewSize(44, 44), image)
 	}
 	button := ui.commandButton(text, func() { ui.send(command + " " + id) })
-	return journalCard(container.NewBorder(nil, nil, picture, button, journalName(ui.catalog.label("item", id, ui.locale))))
+	info := textVBox(journalName(ui.catalog.label("item", id, ui.locale)))
+	for _, line := range ui.itemEffectLines(id) {
+		info.Add(line)
+	}
+	return journalCard(container.NewBorder(nil, nil, picture, button, info))
 }
 
 func (ui *gui) showInventory(ids []string) {

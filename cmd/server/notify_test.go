@@ -169,5 +169,5 @@ func TestQuestAnnouncedAndCompletedEvenIfItemTakenFirst(t *testing.T) {
 	if !strings.Contains(done, "Fetch Herb") {
 		t.Fatalf("completion = %q, want quest name", done)
 	}
-	alice.cmd(t, "STATUS", `OK {"hp":100,"max_hp":100,"status":"healthy"}`)
+	alice.cmd(t, "STATUS", `OK {"hp":102,"max_hp":102,"status":"healthy"}`)
 }

@@ -100,7 +100,7 @@ The RFC leaves damage, turns and extra commands to each team. Ours:
 
 ## Quest System
 
-- `QUEST <npc>` starts the NPC's quest; objectives are `collect_item` or `defeat_npc` and progress is **automatic** (no completion command). Completion heals you by the quest's reward. Progress you made before accepting also counts.
+- `QUEST <npc>` starts the NPC's quest; objectives are `collect_item` or `defeat_npc` and progress is **automatic** (no completion command). Completion raises your max HP by a fifth of the quest's reward (kept after death) and fully heals you. Progress you made before accepting also counts.
 - `QUESTS` lists every started quest as `"progress": "<current>/<target>"`.
 - Quest givers are announced with `EVT PLAYER QUEST` on entry and after `TALK`, since `LOOK` only lists NPC IDs.
 - Some quests are traps: the cattle of Helios quest kills you if you do what it asks.
@@ -250,7 +250,7 @@ Everything is logged as **structured JSON, one object per line** with `log/slog`
 | Every command received | `command` | INFO | `remote`, `player` (empty before `CONNECT`), `command`, `args` (clipped to 300 characters) |
 | Every response and error code sent | `response` (`OK ...`), `error_response` (`ERR ...`) | INFO / WARN | `remote`, `player`, `command`, `code` (errors), `line`. Logged at the single point where bytes are written (`writeLoop`), so no response can be missed |
 | World state changes | `item_taken`, `item_dropped`, `player_moved`, `npc_interaction`, `combat_attack`, `combat_flee`, `player_died`, `victory_shared` | INFO | `player`, `item` / `npc` / `room`, combat `status`, `damage`, HPs, death `cause` and what happened to the belongings |
-| Quest progress and completion | `quest_accepted`, `quest_progress`, `quest_completed`, `ending_reached` | INFO | `player`, `quest` / `ending`, `progress`, `target`, `reward_hp` |
+| Quest progress and completion | `quest_accepted`, `quest_progress`, `quest_completed`, `ending_reached` | INFO | `player`, `quest` / `ending`, `progress`, `target`, `max_hp_gain` |
 | Abuse patterns | `abuse_command_flood`, `abuse_rapid_connections` | WARN | see below |
 | Failures | `save_player_failed`, `drop_item_failed`, `encode_response_failed`, ... | ERROR | `error` |
 

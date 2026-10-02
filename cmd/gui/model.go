@@ -57,6 +57,7 @@ type catalogEntry struct {
 	Role        string            `json:"role"`
 	GiverNPCID  string            `json:"giver_npc_id"`
 	HP          int               `json:"hp"`
+	Effects     []itemEffect      `json:"effects"`
 	Exits       map[string]string `json:"exits"`
 	Ending      *struct {
 		ID         string        `json:"id"`
