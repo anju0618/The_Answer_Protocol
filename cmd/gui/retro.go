@@ -21,6 +21,8 @@ var (
 	navy  = color.NRGBA{R: 12, G: 27, B: 56, A: 255}
 	ivory = color.NRGBA{R: 244, G: 232, B: 191, A: 255}
 	gold  = color.NRGBA{R: 204, G: 168, B: 90, A: 255}
+	// dimGold is for frames and dividers: visible, but quieter than gold text and highlights.
+	dimGold = color.NRGBA{R: 112, G: 96, B: 62, A: 255}
 )
 
 type retroTheme struct{ base fyne.Theme }
@@ -36,9 +38,10 @@ func (t retroTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) c
 		return navy
 	case theme.ColorNameForeground, theme.ColorNameForegroundOnPrimary:
 		return ivory
-	case theme.ColorNamePrimary, theme.ColorNameFocus, theme.ColorNameSelection,
-		theme.ColorNameInputBorder, theme.ColorNameSeparator:
+	case theme.ColorNamePrimary, theme.ColorNameFocus, theme.ColorNameSelection:
 		return gold
+	case theme.ColorNameInputBorder, theme.ColorNameSeparator:
+		return dimGold
 	case theme.ColorNamePlaceHolder:
 		return color.NRGBA{R: 147, G: 153, B: 166, A: 255}
 	case theme.ColorNameDisabledButton:
@@ -65,7 +68,7 @@ func (t retroTheme) Size(name fyne.ThemeSizeName) float32 {
 	case theme.SizeNameHeadingText:
 		return 19
 	case theme.SizeNamePadding:
-		return 6
+		return 8
 	case theme.SizeNameButtonRadius, theme.SizeNameInputRadius,
 		theme.SizeNameDialogRadius, theme.SizeNamePopupRadius:
 		return 0
@@ -75,8 +78,8 @@ func (t retroTheme) Size(name fyne.ThemeSizeName) float32 {
 
 func framed(title string, content fyne.CanvasObject) fyne.CanvasObject {
 	frame := canvas.NewRectangle(ink)
-	frame.StrokeColor = ivory
-	frame.StrokeWidth = 2
+	frame.StrokeColor = dimGold
+	frame.StrokeWidth = 1
 	caption := widget.NewLabelWithStyle(title, fyne.TextAlignLeading, fyne.TextStyle{Bold: true})
 	inside := container.NewBorder(caption, nil, nil, nil, content)
 	return container.NewStack(frame, container.NewPadded(inside))
